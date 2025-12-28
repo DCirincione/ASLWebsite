@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { CSSProperties } from "react";
 
 import { FeatureCard } from "@/components/feature-card";
 import { PageShell } from "@/components/page-shell";
@@ -6,22 +7,22 @@ import { Section } from "@/components/section";
 
 const highlights = [
   {
-    title: "App router first",
+    title: "Community-wide leagues",
     description:
-      "Routing, layouts, and metadata live in app/ so every page follows the same structure.",
-    badge: "App directory",
+      "Organize divisions, standings, and schedules in one place so every team knows what’s next.",
+    badge: "Leagues",
   },
   {
-    title: "Reusable components",
+    title: "Events that feel big",
     description:
-      "A components/ folder is ready for navigation, sections, cards, and anything else you build.",
-    badge: "Components",
+      "Announce tournaments with hero imagery, clear CTAs, and the details parents and players need.",
+    badge: "Events",
   },
   {
-    title: "TypeScript + ESLint",
+    title: "Built for updates",
     description:
-      "Strict types and linting are wired up to keep the project healthy as it grows.",
-    badge: "Quality",
+      "Swap background photos, update copy, and publish new calls-to-action without changing the layout.",
+    badge: "Flexible",
   },
 ];
 
@@ -48,25 +49,75 @@ export default function Home() {
     <PageShell>
       <Section
         id="home"
-        className="hero"
-        eyebrow="ASL Website"
-        title="Next.js starter set up for the app router and shared components"
-        description="Use this as the base for the new site. Swap in your copy, drop in new components, and keep everything consistent."
+        className="hero hero--image hero--full"
+        title="Community Sports. Real Competition. Local Impact."
+        description=""
         headingLevel="h1"
+        showHeader={false}
+        style={
+          {
+            "--hero-image": "url('/hero.jpg')",
+          } as CSSProperties
+        }
       >
-        <div className="hero__actions">
-          <Link className="button primary" href="#projects">
-            Explore sections
-          </Link>
-          <Link className="button ghost" href="#contact">
-            Plan next steps
-          </Link>
+        <div className="hero__panel">
+          <div className="hero__content">
+            <h1 className="hero__title">
+              Community Sports. Real Competition. Local Impact.
+            </h1>
+            <p className="hero__lede">
+              ALDRICH SPORTS hosts tournaments, leagues, and charity events for
+              all ages. Join the community and be part of something special.
+            </p>
+            <div className="hero__actions">
+              <Link className="button primary" href="#events">
+                View Upcoming Events
+              </Link>
+              <Link className="button primary" href="#projects">
+                Register a Team
+              </Link>
+            </div>
+          </div>
+        </div>
+        <Link className="hero__arrow" href="#events" aria-label="Scroll to events">
+          ↓
+        </Link>
+      </Section>
+
+      <Section
+        id="events"
+        eyebrow="Upcoming"
+        title="Upcoming events"
+        description="Drop your next tournament or league here with dates and registration details."
+      >
+        <div className="feature-grid">
+          <FeatureCard
+            title="Spring Tournament"
+            description="Double-elimination play across age groups. Registration closes March 1."
+            badge="March"
+            href="#"
+            actionLabel="View schedule"
+          />
+          <FeatureCard
+            title="Summer League"
+            description="12-week league with standings, stats, and weekly highlights."
+            badge="June"
+            href="#"
+            actionLabel="Join a team"
+          />
+          <FeatureCard
+            title="Charity 5K"
+            description="Run, walk, or cheer—proceeds support youth sports scholarships."
+            badge="August"
+            href="#"
+            actionLabel="Register now"
+          />
         </div>
       </Section>
 
       <Section
         id="projects"
-        eyebrow="Building blocks"
+        eyebrow="What’s inside"
         title="Reusable pieces to start shaping pages"
         description="Use these as placeholders for the first drafts of the site and replace them with real content and assets."
       >
@@ -93,7 +144,7 @@ export default function Home() {
             Keep iterating in <code>app/</code> and extend the{" "}
             <code>components/</code> folder as you add pages.
           </p>
-          <Link className="button primary" href="#projects">
+          <Link className="button primary" href="#events">
             Start building
           </Link>
         </div>

@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "ASL Website",
   description: "Next.js App Router starter with shared components.",
+  icons: {
+    icon: "/ASLLogo.jpg",
+  },
 };
 
 export default function RootLayout({
