@@ -71,10 +71,11 @@ export default function PublicProfilePage() {
   }, [profileId]);
 
   useEffect(() => {
-    if (!profileId || !supabase) return;
+    const client = supabase;
+    if (!profileId || !client) return;
     const loadTeams = async () => {
       setLoadingTeams(true);
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from("team_memberships")
         .select("*")
         .eq("user_id", profileId)
@@ -88,10 +89,11 @@ export default function PublicProfilePage() {
   }, [profileId]);
 
   useEffect(() => {
-    if (!profileId || !supabase) return;
+    const client = supabase;
+    if (!profileId || !client) return;
     const loadFriends = async () => {
       setLoadingFriends(true);
-      const { data: reqs, error } = await supabase
+      const { data: reqs, error } = await client
         .from("friend_requests")
         .select("*")
         .or(`sender_id.eq.${profileId},receiver_id.eq.${profileId}`)
@@ -110,7 +112,7 @@ export default function PublicProfilePage() {
         setLoadingFriends(false);
         return;
       }
-      const { data: profs } = await supabase
+      const { data: profs } = await client
         .from("profiles")
         .select("id,name,avatar_url")
         .in("id", peerIds);

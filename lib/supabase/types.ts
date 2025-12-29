@@ -79,6 +79,63 @@ export type FriendUpdate = {
   skill_level?: number | null;
 };
 
+export type FriendRequest = {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: "pending" | "accepted" | "declined";
+  created_at?: string | null;
+};
+
+export type FriendRequestInsert = {
+  id?: string;
+  sender_id: string;
+  receiver_id: string;
+  status?: "pending" | "accepted" | "declined";
+  created_at?: string | null;
+};
+
+export type FriendRequestUpdate = {
+  id?: string;
+  sender_id?: string;
+  receiver_id?: string;
+  status?: "pending" | "accepted" | "declined";
+  created_at?: string | null;
+};
+
+export type Event = {
+  id: string;
+  title: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  time_info?: string | null;
+  location?: string | null;
+  description?: string | null;
+  status?: "scheduled" | "potential" | "tbd" | null;
+};
+
+export type EventInsert = {
+  id?: string;
+  title: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  time_info?: string | null;
+  location?: string | null;
+  description?: string | null;
+  status?: "scheduled" | "potential" | "tbd" | null;
+};
+
+export type EventUpdate = {
+  id?: string;
+  title?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  time_info?: string | null;
+  location?: string | null;
+  description?: string | null;
+  status?: "scheduled" | "potential" | "tbd" | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -98,6 +155,18 @@ export type Database = {
         Row: Friend;
         Insert: FriendInsert;
         Update: FriendUpdate;
+        Relationships: [];
+      };
+      friend_requests: {
+        Row: FriendRequest;
+        Insert: FriendRequestInsert;
+        Update: FriendRequestUpdate;
+        Relationships: [];
+      };
+      events: {
+        Row: Event;
+        Insert: EventInsert;
+        Update: EventUpdate;
         Relationships: [];
       };
     };

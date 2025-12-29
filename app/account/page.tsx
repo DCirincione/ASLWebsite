@@ -123,10 +123,11 @@ export default function AccountPage() {
 
   // Load teams
   useEffect(() => {
-    if (!supabase || !userId) return;
+    const client = supabase;
+    if (!client || !userId) return;
     const loadTeams = async () => {
       setLoadingTeams(true);
-      const { data, error } = await supabase
+      const { data, error } = await client
         .from("team_memberships")
         .select("*")
         .eq("user_id", userId)
@@ -141,10 +142,11 @@ export default function AccountPage() {
 
   // Load friend requests + accepted friends
   useEffect(() => {
-    if (!supabase || !userId) return;
+    const client = supabase;
+    if (!client || !userId) return;
     const loadFriendsData = async () => {
       setLoadingRequests(true);
-      const { data: reqs, error: reqError } = await supabase
+      const { data: reqs, error: reqError } = await client
         .from("friend_requests")
         .select("*")
         .or(`sender_id.eq.${userId},receiver_id.eq.${userId}`)
@@ -161,7 +163,7 @@ export default function AccountPage() {
           )
         );
         if (peerIds.length > 0) {
-          const { data: profs } = await supabase
+          const { data: profs } = await client
             .from("profiles")
             .select("id,name,sports,skill_level,avatar_url")
             .in("id", peerIds);
