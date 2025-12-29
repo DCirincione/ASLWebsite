@@ -1,7 +1,26 @@
-import Link from "next/link";
+"use client";
 
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+import { AccessibilityControls } from "@/components/accessibility-controls";
 import { AccountNav } from "@/components/account-nav";
+import { supabase } from "@/lib/supabase/client";
 import type { Friend } from "@/lib/supabase/types";
+
+type FriendRequest = {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  status: "pending" | "accepted" | "declined";
+};
+
+type ProfileSummary = {
+  id: string;
+  name: string;
+  sports?: string[] | null;
+  skill_level?: number | null;
+};
 
 const fallbackFriends: Friend[] = [
   { id: "f1", name: "Jordan Lee", sport: "Basketball", skill_level: 9 },
@@ -10,8 +29,177 @@ const fallbackFriends: Friend[] = [
 ];
 
 export default function AccountFriendsPage() {
+  const [userId, setUserId] = useState<string | null>(null);
+  const [friends, setFriends] = useState<Friend[]>([]);
+  const [requests, setRequests] = useState<FriendRequest[]>([]);
+  const [profiles, setProfiles] = useState<Record<string, ProfileSummary>>({});
+  const [search, setSearch] = useState("");
+  const [searchResults, setSearchResults] = useState<ProfileSummary[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingRequests, setLoadingRequests] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      if (!supabase) {
+        setFriends(fallbackFriends);
+        return;
+      }
+      setLoading(true);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const uid = sessionData.session?.user.id ?? null;
+      if (!uid) {
+        setLoading(false);
+        return;
+      }
+      setUserId(uid);
+
+      // Load friend requests involving the user.
+      setLoadingRequests(true);
+      const { data: reqs, error: reqError } = await supabase
+        .from("friend_requests")
+        .select("*")
+        .or(`sender_id.eq.${uid},receiver_id.eq.${uid}`)
+        .order("created_at", { ascending: false });
+
+      if (!reqError && reqs) {
+        setRequests(reqs as FriendRequest[]);
+
+        // Fetch profiles for everyone involved.
+        const peerIds = Array.from(
+          new Set(
+            reqs
+              .map((r) => (r.sender_id === uid ? r.receiver_id : r.sender_id))
+              .filter(Boolean)
+          )
+        );
+        if (peerIds.length > 0) {
+          const { data: profs } = await supabase
+            .from("profiles")
+            .select("id,name,sports,skill_level")
+            .in("id", peerIds);
+          if (profs) {
+            const map: Record<string, ProfileSummary> = {};
+            for (const p of profs) {
+              map[p.id] = p as ProfileSummary;
+            }
+            setProfiles(map);
+            const accepted = reqs
+              .filter((r) => r.status === "accepted")
+              .map((r) => {
+                const otherId = r.sender_id === uid ? r.receiver_id : r.sender_id;
+                const profile = map[otherId];
+                return {
+                  id: otherId,
+                  name: profile?.name ?? "Friend",
+                  sport: profile?.sports?.[0] ?? "Sport",
+                  skill_level: profile?.skill_level ?? null,
+                } as Friend;
+              });
+            setFriends(accepted);
+          }
+        }
+      }
+      if (reqError) {
+        // Table might not exist yet or RLS blocked; show fallback quietly.
+        setRequests([]);
+        setFriends(fallbackFriends);
+        setError(null);
+      }
+      setLoading(false);
+      setLoadingRequests(false);
+    };
+    load();
+  }, []);
+
+  const pendingIncoming = useMemo(
+    () => requests.filter((r) => r.status === "pending" && r.receiver_id === userId),
+    [requests, userId]
+  );
+  const pendingOutgoing = useMemo(
+    () => requests.filter((r) => r.status === "pending" && r.sender_id === userId),
+    [requests, userId]
+  );
+
+  const doSearch = async () => {
+    if (!supabase) return;
+    const term = search.trim();
+    if (!term) {
+      setSearchResults([]);
+      return;
+    }
+    setLoading(true);
+    const { data, error: searchError } = await supabase
+      .from("profiles")
+      .select("id,name,sports,skill_level")
+      .ilike("name", `%${term}%`)
+      .limit(10);
+    if (!searchError && data) {
+      const existingIds = new Set<string>([
+        ...(friends ?? []).map((f) => f.id),
+        ...(requests ?? []).map((r) => (r.sender_id === userId ? r.receiver_id : r.sender_id)),
+        userId ?? "",
+      ]);
+      setSearchResults(
+        (data as ProfileSummary[]).filter((p) => !existingIds.has(p.id))
+      );
+    }
+    if (searchError) {
+      // Table or policy issue; surface quietly.
+      setSearchResults([]);
+      setError(null);
+    }
+    setLoading(false);
+  };
+
+  const sendRequest = async (receiverId: string) => {
+    if (!supabase || !userId) return;
+    const { error: insertError, data } = await supabase
+      .from("friend_requests")
+      .insert({ sender_id: userId, receiver_id: receiverId, status: "pending" });
+    if (insertError) {
+      setError(insertError.message);
+      return;
+    }
+    const inserted = (data as FriendRequest[] | null)?.[0];
+    setRequests((prev) => [
+      inserted ?? { id: crypto.randomUUID(), sender_id: userId, receiver_id: receiverId, status: "pending" },
+      ...prev,
+    ]);
+
+    // Fetch and cache the receiver profile so labels show names.
+    if (!profiles[receiverId]) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("id,name,sports,skill_level")
+        .eq("id", receiverId)
+        .maybeSingle();
+      if (prof) {
+        setProfiles((prev) => ({ ...prev, [receiverId]: prof as ProfileSummary }));
+      }
+    }
+  };
+
+  const respondToRequest = async (id: string, status: "accepted" | "declined") => {
+    if (!supabase) return;
+    const { error: updateError } = await supabase.from("friend_requests").update({ status }).eq("id", id);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
+  };
+
+  const labelForProfile = (id: string) => {
+    const profile = profiles[id];
+    return profile
+      ? `${profile.name} · ${profile.sports?.[0] ?? "Sport"} · Skill ${profile.skill_level ?? "—"}`
+      : "Player";
+  };
+
   return (
     <>
+      <AccessibilityControls />
       <AccountNav />
       <div className="account-body shell">
         <header className="account-header">
@@ -19,28 +207,133 @@ export default function AccountFriendsPage() {
             <p className="eyebrow">Account</p>
             <h1>My Friends</h1>
             <p className="muted">Connect with teammates and opponents.</p>
-        </div>
-        <Link className="button ghost" href="/community">
-          Find Friends
-        </Link>
-      </header>
+          </div>
+          <Link className="button ghost" href="/community">
+            Find Friends
+          </Link>
+        </header>
 
-      <section className="account-card">
-        {fallbackFriends.length === 0 ? (
-          <p className="muted">No friends yet. Connect with players in your leagues.</p>
-        ) : (
-          <ul className="list list--grid">
-            {fallbackFriends.map((friend) => (
-              <li key={friend.id}>
-                <p className="list__title">{friend.name}</p>
-                <p className="muted">
-                  {friend.sport ?? "Sport"} · Skill {friend.skill_level ?? "—"}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+        <section className="account-card">
+          <h3>Search players</h3>
+          <div className="form-grid" style={{ gridTemplateColumns: "1fr auto" }}>
+            <div className="form-control">
+              <label htmlFor="friend-search">Search by name</label>
+              <input
+                id="friend-search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="e.g., Jordan"
+              />
+            </div>
+            <div className="form-control" style={{ alignSelf: "end" }}>
+              <button className="button primary" type="button" onClick={doSearch} disabled={loading}>
+                {loading ? "Searching..." : "Search"}
+              </button>
+            </div>
+          </div>
+          {searchResults.length > 0 ? (
+            <ul className="list list--grid" style={{ marginTop: 12 }}>
+              {searchResults.map((p) => (
+                <li key={p.id} className="team-card">
+                  <div className="team-card__info">
+                    <p className="list__title">{p.name}</p>
+                    <p className="muted">
+                      {p.sports?.[0] ?? "Sport"} · Skill {p.skill_level ?? "—"}
+                    </p>
+                  </div>
+                  <button className="button ghost" type="button" onClick={() => sendRequest(p.id)}>
+                    Add friend
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
+        </section>
+
+        <section className="account-card">
+          <h3>Friend requests</h3>
+          {pendingIncoming.length === 0 && pendingOutgoing.length === 0 ? (
+            <p className="muted">No pending requests.</p>
+          ) : (
+            <>
+              {pendingIncoming.length > 0 ? (
+                <>
+                  <p className="list__title">Incoming</p>
+                  <ul className="list" style={{ display: "grid", gap: 8 }}>
+                    {pendingIncoming.map((req) => (
+                      <li key={req.id} className="team-card">
+                        <div className="team-card__info">
+                          <p className="list__title">{labelForProfile(req.sender_id)}</p>
+                          <p className="muted">Wants to connect</p>
+                        </div>
+                        <div style={{ display: "flex", gap: 8 }}>
+                          <button
+                            className="button primary"
+                            type="button"
+                            onClick={() => respondToRequest(req.id, "accepted")}
+                            disabled={loadingRequests}
+                          >
+                            Accept
+                          </button>
+                          <button
+                            className="button ghost"
+                            type="button"
+                            onClick={() => respondToRequest(req.id, "declined")}
+                            disabled={loadingRequests}
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+              {pendingOutgoing.length > 0 ? (
+                <>
+                  <p className="list__title" style={{ marginTop: 12 }}>
+                    Sent
+                  </p>
+                  <ul className="list" style={{ display: "grid", gap: 8 }}>
+                    {pendingOutgoing.map((req) => (
+                      <li key={req.id} className="team-card">
+                        <div className="team-card__info">
+                          <p className="list__title">{labelForProfile(req.receiver_id)}</p>
+                          <p className="muted">Request sent</p>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+            </>
+          )}
+        </section>
+
+        <section className="account-card">
+          <h3>Your friends</h3>
+          {friends.length === 0 ? (
+            <p className="muted">No friends yet. Connect with players in your leagues.</p>
+          ) : (
+            <ul className="list list--grid">
+              {friends.map((friend) => (
+                <li key={friend.id} className="team-card">
+                  <div className="team-card__info">
+                    <p className="list__title">{friend.name}</p>
+                    <p className="muted">
+                      {friend.sport ?? "Sport"} · Skill {friend.skill_level ?? "—"}
+                    </p>
+                  </div>
+                  <Link className="button ghost" href={`/profiles/${friend.id}`}>
+                    View Profile
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {error ? <p className="form-help error">{error}</p> : null}
       </div>
     </>
   );

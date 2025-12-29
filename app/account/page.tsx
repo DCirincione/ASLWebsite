@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useState } from "react";
 
+import { AccessibilityControls } from "@/components/accessibility-controls";
 import { AccountNav } from "@/components/account-nav";
 import { supabase } from "@/lib/supabase/client";
 import type { Friend, Profile, TeamMembership } from "@/lib/supabase/types";
@@ -120,6 +121,7 @@ export default function AccountPage() {
 
   return (
     <div className="account-page">
+      <AccessibilityControls />
       <AccountNav />
       <div className="account-body shell">
         <header className="account-header">

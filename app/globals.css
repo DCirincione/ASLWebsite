@@ -1408,7 +1408,49 @@ html[data-contrast="high"] .font-controls__value {
 html[data-theme="dark"] .account-card,
 html[data-theme="dark"] .account-header {
   border-color: #1f2a40;
+  background: #0f192d;
+}
+
+html[data-theme="dark"] .account-nav__links a,
+html[data-theme="dark"] .list__title,
+html[data-theme="dark"] .stat__value {
+  color: #e8edf7;
+}
+
+html[data-theme="dark"] .stat__label,
+html[data-theme="dark"] .team-card__info .muted,
+html[data-theme="dark"] .account-nav__links,
+html[data-theme="dark"] .account-card .muted,
+html[data-theme="dark"] .account-header__text .muted {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .team-card {
   background: rgba(255, 255, 255, 0.02);
+  border-color: #1f2a40;
+}
+
+html[data-contrast="high"] .account-header,
+html[data-contrast="high"] .account-card {
+  background: #000000;
+  border-color: #f8fafc;
+}
+
+html[data-contrast="high"] .account-nav__links a,
+html[data-contrast="high"] .list__title,
+html[data-contrast="high"] .stat__value {
+  color: #f8fafc;
+}
+
+html[data-contrast="high"] .account-card .muted,
+html[data-contrast="high"] .account-header__text .muted,
+html[data-contrast="high"] .stat__label {
+  color: #e5e7eb;
+}
+
+html[data-contrast="high"] .team-card {
+  background: #000000;
+  border-color: #f8fafc;
 }
 
 @media (max-width: 720px) {

@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { AccessibilityControls } from "@/components/accessibility-controls";
 import { AccountNav } from "@/components/account-nav";
 import { supabase } from "@/lib/supabase/client";
 import type { TeamMembership } from "@/lib/supabase/types";
@@ -58,6 +59,7 @@ export default function AccountTeamPage() {
 
   return (
     <>
+      <AccessibilityControls />
       <AccountNav />
       <div className="account-body shell">
         <header className="account-header">

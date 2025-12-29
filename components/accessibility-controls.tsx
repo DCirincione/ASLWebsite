@@ -50,13 +50,12 @@ export function AccessibilityControls() {
     }
   };
 
-  const saved = getSavedSettings();
-
-  const [fontScale, setFontScale] = useState(saved.fontScale);
-  const [theme, setTheme] = useState<"light" | "dark">(saved.theme);
-  const [contrast, setContrast] = useState<Toggle>(saved.contrast);
-  const [highlightLinks, setHighlightLinks] = useState<Toggle>(saved.highlightLinks);
+  const [fontScale, setFontScale] = useState(1);
+  const [theme, setTheme] = useState<"light" | "dark">("light");
+  const [contrast, setContrast] = useState<Toggle>("off");
+  const [highlightLinks, setHighlightLinks] = useState<Toggle>("off");
   const [open, setOpen] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
 
   const resetAll = () => {
     setFontScale(1);
@@ -72,6 +71,17 @@ export function AccessibilityControls() {
     setFontScale((prev) => Math.max(FONT_MIN, parseFloat((prev - FONT_STEP).toFixed(2))));
 
   useEffect(() => {
+    const saved = getSavedSettings();
+    setFontScale(saved.fontScale);
+    setTheme(saved.theme);
+    setContrast(saved.contrast);
+    setHighlightLinks(saved.highlightLinks);
+    setHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+
     const root = document.documentElement;
     root.dataset.fontScale = fontScale.toString();
     root.dataset.theme = theme;
@@ -89,9 +99,13 @@ export function AccessibilityControls() {
       highlightLinks,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
-  }, [fontScale, theme, contrast, highlightLinks]);
+  }, [fontScale, theme, contrast, highlightLinks, hydrated]);
 
   const toggleOpen = () => setOpen((prev) => !prev);
+
+  if (!hydrated) {
+    return null;
+  }
 
   return (
     <>
