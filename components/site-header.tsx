@@ -3,11 +3,11 @@ import Link from "next/link";
 
 const links = [
   { href: "/", label: "Home" },
-  { href: "#events", label: "Events" },
-  { href: "#projects", label: "Leagues" },
-  { href: "#community", label: "Community" },
-  { href: "#sponsors", label: "Sponsors" },
-  { href: "#contact", label: "Contact" },
+  { href: "/events", label: "Events" },
+  { href: "/leagues", label: "Leagues" },
+  { href: "/community", label: "Community" },
+  { href: "/sponsors", label: "Sponsors" },
+  { href: "/contact", label: "Contact" },
 ];
 
 export function SiteHeader() {
@@ -25,10 +25,10 @@ export function SiteHeader() {
           ))}
         </nav>
         <div className="header-actions">
-          <Link className="button ghost" href="#account">
+          <Link className="button ghost" href="/account">
             Create an Account
           </Link>
-          <Link className="button primary" href="#register">
+          <Link className="button primary" href="/register">
             Register
           </Link>
         </div>
