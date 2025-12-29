@@ -18,9 +18,12 @@ type FriendRequest = {
 type ProfileSummary = {
   id: string;
   name: string;
+  avatar_url?: string | null;
   sports?: string[] | null;
   skill_level?: number | null;
 };
+
+type FriendWithAvatar = Friend & { avatar_url?: string | null };
 
 const fallbackFriends: Friend[] = [
   { id: "f1", name: "Jordan Lee", sport: "Basketball", skill_level: 9 },
@@ -30,14 +33,16 @@ const fallbackFriends: Friend[] = [
 
 export default function AccountFriendsPage() {
   const [userId, setUserId] = useState<string | null>(null);
-  const [friends, setFriends] = useState<Friend[]>([]);
+  const [friends, setFriends] = useState<FriendWithAvatar[]>([]);
   const [requests, setRequests] = useState<FriendRequest[]>([]);
   const [profiles, setProfiles] = useState<Record<string, ProfileSummary>>({});
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<ProfileSummary[]>([]);
   const [loading, setLoading] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [searchDebounce, setSearchDebounce] = useState<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -76,7 +81,7 @@ export default function AccountFriendsPage() {
         if (peerIds.length > 0) {
           const { data: profs } = await supabase
             .from("profiles")
-            .select("id,name,sports,skill_level")
+            .select("id,name,sports,skill_level,avatar_url")
             .in("id", peerIds);
           if (profs) {
             const map: Record<string, ProfileSummary> = {};
@@ -94,7 +99,8 @@ export default function AccountFriendsPage() {
                   name: profile?.name ?? "Friend",
                   sport: profile?.sports?.[0] ?? "Sport",
                   skill_level: profile?.skill_level ?? null,
-                } as Friend;
+                  avatar_url: profile?.avatar_url ?? null,
+                } as FriendWithAvatar;
               });
             setFriends(accepted);
           }
@@ -112,6 +118,21 @@ export default function AccountFriendsPage() {
     load();
   }, []);
 
+  useEffect(() => {
+    if (!search) {
+      setSearchResults([]);
+      return;
+    }
+    if (searchDebounce) {
+      clearTimeout(searchDebounce);
+    }
+    const handle = setTimeout(() => {
+      void doSearch(search.trim());
+    }, 250);
+    setSearchDebounce(handle);
+    return () => clearTimeout(handle);
+  }, [search]);
+
   const pendingIncoming = useMemo(
     () => requests.filter((r) => r.status === "pending" && r.receiver_id === userId),
     [requests, userId]
@@ -121,17 +142,17 @@ export default function AccountFriendsPage() {
     [requests, userId]
   );
 
-  const doSearch = async () => {
+  const doSearch = async (term: string) => {
     if (!supabase) return;
-    const term = search.trim();
     if (!term) {
       setSearchResults([]);
+      setSearchLoading(false);
       return;
     }
-    setLoading(true);
+    setSearchLoading(true);
     const { data, error: searchError } = await supabase
       .from("profiles")
-      .select("id,name,sports,skill_level")
+      .select("id,name,sports,skill_level,avatar_url")
       .ilike("name", `%${term}%`)
       .limit(10);
     if (!searchError && data) {
@@ -140,16 +161,11 @@ export default function AccountFriendsPage() {
         ...(requests ?? []).map((r) => (r.sender_id === userId ? r.receiver_id : r.sender_id)),
         userId ?? "",
       ]);
-      setSearchResults(
-        (data as ProfileSummary[]).filter((p) => !existingIds.has(p.id))
-      );
-    }
-    if (searchError) {
-      // Table or policy issue; surface quietly.
+      setSearchResults((data as ProfileSummary[]).filter((p) => !existingIds.has(p.id)));
+    } else {
       setSearchResults([]);
-      setError(null);
     }
-    setLoading(false);
+    setSearchLoading(false);
   };
 
   const sendRequest = async (receiverId: string) => {
@@ -171,7 +187,7 @@ export default function AccountFriendsPage() {
     if (!profiles[receiverId]) {
       const { data: prof } = await supabase
         .from("profiles")
-        .select("id,name,sports,skill_level")
+        .select("id,name,sports,skill_level,avatar_url")
         .eq("id", receiverId)
         .maybeSingle();
       if (prof) {
@@ -190,11 +206,11 @@ export default function AccountFriendsPage() {
     setRequests((prev) => prev.map((r) => (r.id === id ? { ...r, status } : r)));
   };
 
+  const getProfile = (id: string) => profiles[id];
+
   const labelForProfile = (id: string) => {
-    const profile = profiles[id];
-    return profile
-      ? `${profile.name} · ${profile.sports?.[0] ?? "Sport"} · Skill ${profile.skill_level ?? "—"}`
-      : "Player";
+    const profile = getProfile(id);
+    return profile ? profile.name : "Player";
   };
 
   return (
@@ -214,39 +230,51 @@ export default function AccountFriendsPage() {
         </header>
 
         <section className="account-card">
-          <h3>Search players</h3>
-          <div className="form-grid" style={{ gridTemplateColumns: "1fr auto" }}>
-            <div className="form-control">
-              <label htmlFor="friend-search">Search by name</label>
-              <input
-                id="friend-search"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="e.g., Jordan"
-              />
+          <div className="search-panel">
+            <div className="search-panel__text">
+              <p className="eyebrow">Find players</p>
+              <h3>Search the community</h3>
+              <p className="muted">Send a request to connect and keep up with teammates and rivals.</p>
             </div>
-            <div className="form-control" style={{ alignSelf: "end" }}>
-              <button className="button primary" type="button" onClick={doSearch} disabled={loading}>
-                {loading ? "Searching..." : "Search"}
-              </button>
+            <div className="search-panel__controls">
+              <label className="sr-only" htmlFor="friend-search">
+                Search by name
+              </label>
+              <div className="search-panel__input">
+                <input
+                  id="friend-search"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name"
+                  autoComplete="off"
+                />
+                <button className="button primary" type="button" onClick={() => doSearch(search.trim())} disabled={searchLoading}>
+                  Search
+                </button>
+                {searchResults.length > 0 ? (
+                  <ul className="search-dropdown">
+                    {searchResults.map((p) => (
+                      <li key={p.id} className="search-dropdown__item">
+                        <div className="team-card__logo">
+                          <img src={p.avatar_url ?? "/avatar-placeholder.svg"} alt="" />
+                        </div>
+                        <div className="search-dropdown__info">
+                          <p className="list__title">{p.name}</p>
+                        </div>
+                        <button className="button ghost" type="button" onClick={() => sendRequest(p.id)}>
+                          Add
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
             </div>
           </div>
-          {searchResults.length > 0 ? (
-            <ul className="list list--grid" style={{ marginTop: 12 }}>
-              {searchResults.map((p) => (
-                <li key={p.id} className="team-card">
-                  <div className="team-card__info">
-                    <p className="list__title">{p.name}</p>
-                    <p className="muted">
-                      {p.sports?.[0] ?? "Sport"} · Skill {p.skill_level ?? "—"}
-                    </p>
-                  </div>
-                  <button className="button ghost" type="button" onClick={() => sendRequest(p.id)}>
-                    Add friend
-                  </button>
-                </li>
-              ))}
-            </ul>
+          {search && !searchLoading && searchResults.length === 0 ? (
+            <p className="muted" style={{ marginTop: 12 }}>
+              No players found for “{search}”.
+            </p>
           ) : null}
         </section>
 
@@ -262,6 +290,12 @@ export default function AccountFriendsPage() {
                   <ul className="list" style={{ display: "grid", gap: 8 }}>
                     {pendingIncoming.map((req) => (
                       <li key={req.id} className="team-card">
+                        <div className="team-card__logo">
+                          <img
+                            src={getProfile(req.sender_id)?.avatar_url ?? "/avatar-placeholder.svg"}
+                            alt=""
+                          />
+                        </div>
                         <div className="team-card__info">
                           <p className="list__title">{labelForProfile(req.sender_id)}</p>
                           <p className="muted">Wants to connect</p>
@@ -297,6 +331,12 @@ export default function AccountFriendsPage() {
                   <ul className="list" style={{ display: "grid", gap: 8 }}>
                     {pendingOutgoing.map((req) => (
                       <li key={req.id} className="team-card">
+                        <div className="team-card__logo">
+                          <img
+                            src={getProfile(req.receiver_id)?.avatar_url ?? "/avatar-placeholder.svg"}
+                            alt=""
+                          />
+                        </div>
                         <div className="team-card__info">
                           <p className="list__title">{labelForProfile(req.receiver_id)}</p>
                           <p className="muted">Request sent</p>
@@ -318,11 +358,11 @@ export default function AccountFriendsPage() {
             <ul className="list list--grid">
               {friends.map((friend) => (
                 <li key={friend.id} className="team-card">
+                  <div className="team-card__logo">
+                    <img src={(friend as any).avatar_url ?? "/avatar-placeholder.svg"} alt="" />
+                  </div>
                   <div className="team-card__info">
                     <p className="list__title">{friend.name}</p>
-                    <p className="muted">
-                      {friend.sport ?? "Sport"} · Skill {friend.skill_level ?? "—"}
-                    </p>
                   </div>
                   <Link className="button ghost" href={`/profiles/${friend.id}`}>
                     View Profile
