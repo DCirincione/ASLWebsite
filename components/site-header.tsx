@@ -164,12 +164,6 @@ export function SiteHeader() {
                     <Link href="/account#profile" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                       My Profile
                     </Link>
-                    <Link href="/account/team" role="menuitem" onClick={() => setIsMenuOpen(false)}>
-                      My Teams
-                    </Link>
-                    <Link href="/account/friends" role="menuitem" onClick={() => setIsMenuOpen(false)}>
-                      My Friends
-                    </Link>
                     <Link href="/events" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                       My Events
                     </Link>

@@ -1524,6 +1524,11 @@ html[data-contrast="high"] .team-card {
   margin: 0;
 }
 
+.search-dropdown__actions {
+  display: flex;
+  gap: 8px;
+}
+
 html[data-theme="dark"] .search-panel__input input {
   background: rgba(255, 255, 255, 0.06);
   border-color: #1f2a40;

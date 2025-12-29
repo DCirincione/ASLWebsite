@@ -261,9 +261,14 @@ export default function AccountFriendsPage() {
                         <div className="search-dropdown__info">
                           <p className="list__title">{p.name}</p>
                         </div>
-                        <button className="button ghost" type="button" onClick={() => sendRequest(p.id)}>
-                          Add
-                        </button>
+                        <div className="search-dropdown__actions">
+                          <Link className="button ghost" href={`/profiles/${p.id}`}>
+                            View
+                          </Link>
+                          <button className="button primary" type="button" onClick={() => sendRequest(p.id)}>
+                            Add
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -300,7 +305,10 @@ export default function AccountFriendsPage() {
                           <p className="list__title">{labelForProfile(req.sender_id)}</p>
                           <p className="muted">Wants to connect</p>
                         </div>
-                        <div style={{ display: "flex", gap: 8 }}>
+                        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                          <Link className="button ghost" href={`/profiles/${req.sender_id}`}>
+                            View
+                          </Link>
                           <button
                             className="button primary"
                             type="button"
@@ -341,6 +349,9 @@ export default function AccountFriendsPage() {
                           <p className="list__title">{labelForProfile(req.receiver_id)}</p>
                           <p className="muted">Request sent</p>
                         </div>
+                        <Link className="button ghost" href={`/profiles/${req.receiver_id}`}>
+                          View
+                        </Link>
                       </li>
                     ))}
                   </ul>
