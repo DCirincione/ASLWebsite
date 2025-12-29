@@ -16,7 +16,7 @@ export const metadata: Metadata = {
   title: "ASL Website",
   description: "Next.js App Router starter with shared components.",
   icons: {
-    icon: "/ASLLogo.jpg",
+    icon: "/ASLLogo.png",
   },
 };
 

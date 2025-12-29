@@ -17,7 +17,7 @@ export default function Home() {
         showHeader={false}
         style={
           {
-            "--hero-image": "url('/hero.jpg')",
+            "--hero-image": "url('/Hero.jpg')",
           } as CSSProperties
         }
       >
