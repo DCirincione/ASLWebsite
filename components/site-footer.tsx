@@ -14,8 +14,8 @@ const resources = [
 ];
 
 const socials = [
-  { href: "https://instagram.com", label: "Instagram" },
-  { href: "https://facebook.com", label: "Facebook" },
+  { href: "https://www.instagram.com/aldrichsportsleague/", label: "Instagram" },
+  { href: "https://www.facebook.com/profile.php?id=61558144266881", label: "Facebook" },
 ];
 
 export function SiteFooter() {
