@@ -33,21 +33,26 @@ export function SiteHeader() {
   }, []);
 
   useEffect(() => {
-    if (!supabase) return;
+    const client = supabase;
+    if (!client) return;
 
-    supabase.auth.getSession().then(async ({ data }) => {
+    client.auth.getSession().then(async ({ data }) => {
       const session = data.session;
       setIsAuthenticated(Boolean(session));
       if (session?.user?.id) {
-        const { data: profile } = await supabase.from("profiles").select("avatar_url").eq("id", session.user.id).maybeSingle();
+        const { data: profile } = await client
+          .from("profiles")
+          .select("avatar_url")
+          .eq("id", session.user.id)
+          .maybeSingle();
         setAvatarUrl(profile?.avatar_url ?? null);
       }
     });
 
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(Boolean(session));
       if (session?.user?.id) {
-        supabase
+        client
           .from("profiles")
           .select("avatar_url")
           .eq("id", session.user.id)
