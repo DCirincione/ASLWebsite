@@ -803,6 +803,13 @@ html[data-contrast="high"] .font-controls__value {
   min-height: 46px;
 }
 
+.event-card__footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .event-card__meta {
   display: flex;
   flex-direction: column;

@@ -1,5 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import Link from "next/link";
+import { useCallback, useEffect, useState } from "react";
+
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
@@ -18,6 +20,10 @@ type EventItem = {
 export default function EventsPage() {
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [signups, setSignups] = useState<Set<string>>(new Set());
+  const [savingEventId, setSavingEventId] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -34,6 +40,44 @@ export default function EventsPage() {
     };
     loadEvents();
   }, []);
+
+  const loadSignups = useCallback(async (uid: string) => {
+    if (!supabase) return;
+    const { data, error } = await supabase
+      .from("event_signups")
+      .select("event_id")
+      .eq("user_id", uid);
+    if (!error && data) {
+      setSignups(new Set(data.map((row) => row.event_id)));
+    }
+  }, []);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+
+    client.auth.getSession().then(({ data }) => {
+      const uid = data.session?.user.id ?? null;
+      setUserId(uid);
+      if (uid) {
+        loadSignups(uid);
+      }
+    });
+
+    const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
+      const uid = session?.user.id ?? null;
+      setUserId(uid);
+      if (uid) {
+        loadSignups(uid);
+      } else {
+        setSignups(new Set());
+      }
+    });
+
+    return () => {
+      subscription?.subscription.unsubscribe();
+    };
+  }, [loadSignups]);
 
   const parseDateUTC = (value?: string | null) => {
     if (!value) return null;
@@ -74,6 +118,35 @@ export default function EventsPage() {
     return "pill pill--green";
   };
 
+  const handleSignup = async (eventId: string) => {
+    if (!supabase) {
+      setMessage("Connect Supabase to enable event sign-ups.");
+      return;
+    }
+    if (!userId) {
+      setMessage("Sign in to join events and track them in My Events.");
+      return;
+    }
+
+    setSavingEventId(eventId);
+    setMessage(null);
+    const { error } = await supabase
+      .from("event_signups")
+      .upsert({ event_id: eventId, user_id: userId }, { onConflict: "event_id,user_id" });
+
+    if (error) {
+      setMessage("Could not save your sign-up. Please try again.");
+    } else {
+      setSignups((prev) => {
+        const next = new Set(prev);
+        next.add(eventId);
+        return next;
+      });
+      setMessage("Added to My Events.");
+    }
+    setSavingEventId(null);
+  };
+
   return (
     <PageShell>
       <Section
@@ -83,22 +156,52 @@ export default function EventsPage() {
         description="Tournaments, showcases, leagues, and fundraisers. See what's coming up and plan your season."
         headingLevel="h1"
       >
+        {message ? (
+          <p className="muted" role="status" aria-live="polite">
+            {message}
+          </p>
+        ) : null}
         <div className="event-list">
           {loading ? <p className="muted">Loading events...</p> : null}
           {!loading &&
-            events.map((event) => (
+            events.map((event) => {
+              const dateRange = formatDateRange(event.start_date, event.end_date);
+              const timeInfo = event.time_info?.trim();
+              const primaryDate = timeInfo || dateRange || null;
+              return (
               <article key={event.id} className="event-card-simple">
                 <div className="event-card__header">
                   <h3>{event.title}</h3>
                   <span className={statusClass(event.status)}>{statusLabel(event.status)}</span>
                 </div>
                 <div className="event-card__meta">
-                  {event.time_info ? <p className="muted">{event.time_info}</p> : null}
-                  {event.location ? <p className="muted">{event.location}</p> : null}
+                  {primaryDate ? <p className="muted">Date: {primaryDate}</p> : null}
+                  {event.location ? <p className="muted">Location: {event.location}</p> : null}
                 </div>
-                {event.description ? <p className="muted">{event.description}</p> : null}
+                {event.description ? <p className="muted">About this event: {event.description}</p> : null}
+                <div className="event-card__actions">
+                  {signups.has(event.id) ? (
+                    <span className="pill pill--green" role="status" aria-live="polite">
+                      Added to My Events
+                    </span>
+                  ) : userId ? (
+                    <button
+                      className="button primary"
+                      type="button"
+                      disabled={savingEventId === event.id}
+                      onClick={() => handleSignup(event.id)}
+                    >
+                      {savingEventId === event.id ? "Saving..." : "Sign up"}
+                    </button>
+                  ) : (
+                    <Link className="button ghost" href="/account">
+                      Sign in to sign up
+                    </Link>
+                  )}
+                </div>
               </article>
-            ))}
+            );
+            })}
         </div>
       </Section>
     </PageShell>

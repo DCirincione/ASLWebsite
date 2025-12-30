@@ -4,8 +4,132 @@ import { CSSProperties } from "react";
 import { EventCard } from "@/components/event-card";
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
+import { supabase } from "@/lib/supabase/client";
 
-export default function Home() {
+type HomeEvent = {
+  title: string;
+  date: string;
+  location: string;
+  href?: string;
+  image?: string;
+};
+
+const fallbackEvents: HomeEvent[] = [
+  {
+    title: "3v3 Basketball Tournament",
+    date: "March 15, 2024",
+    location: "Central Sports Complex",
+    image:
+      "https://images.unsplash.com/photo-1505666287802-931dc83948e0?auto=format&fit=crop&w=800&q=80",
+    href: "/events",
+  },
+  {
+    title: "Pickleball League",
+    date: "March 20, 2024",
+    location: "Riverside Courts",
+    image: "public/Pickleball/boxPB.jpeg",
+    href: "/events",
+  },
+  {
+    title: "Flag Football Tournament",
+    date: "April 5, 2024",
+    location: "Green Field Park",
+    image:
+      "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?auto=format&fit=crop&w=800&q=80",
+    href: "/events",
+  },
+  {
+    title: "Community vs Kids Charity Game",
+    date: "April 12, 2024",
+    location: "Central Sports Complex",
+    image:
+      "https://images.unsplash.com/photo-1508609349937-5ec4ae374ebf?auto=format&fit=crop&w=800&q=80",
+    href: "/events",
+  },
+];
+
+const formatDate = (value?: string | null) => {
+  if (!value) return "Date TBD";
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return "Date TBD";
+  const [year, month, day] = parts;
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+};
+
+const forever5Images = ["/forever5/newman5.png"];
+const pickleballImages = ["/pickleball/boxPB.jpeg", "/PickleTourneyCourt6.png"];
+const aldrichJrImages: string[] = [];
+const basketballImages: string[] = ["/basketball/champst2025.jpeg"];
+const amputeeImages: string[] = ["/amputee/amputee2025.jpeg"];
+const sundayLeagueImages: string[] = ["/sundayLeague/champs2025.jpeg"];
+const communityVsKidsImages: string[] = ["/commVsKids/cVsK2025.jpeg"];
+
+const fallbackImages = fallbackEvents.map((e) => e.image).filter(Boolean) as string[];
+
+const pickImageForTitle = (title: string, idx: number) => {
+  const lower = title.toLowerCase();
+  const rules: { keywords: string[]; pool: string[] }[] = [
+    {
+      keywords: [
+        "community vs kids",
+        "community vs. kids",
+        "community versus kids",
+        "community kids",
+      ],
+      pool: communityVsKidsImages,
+    },
+    { keywords: ["newman"], pool: forever5Images },
+    { keywords: ["pickleball"], pool: pickleballImages },
+    { keywords: ["aldrich jr", "jr"], pool: aldrichJrImages },
+    { keywords: ["basketball", "hoops"], pool: basketballImages },
+    { keywords: ["amputee"], pool: amputeeImages },
+    { keywords: ["sunday league"], pool: sundayLeagueImages },
+  ];
+
+  for (const rule of rules) {
+    if (rule.keywords.some((kw) => lower.includes(kw)) && rule.pool.length > 0) {
+      return rule.pool[idx % rule.pool.length];
+    }
+  }
+
+  if (fallbackImages.length > 0) {
+    return fallbackImages[idx % fallbackImages.length];
+  }
+  return undefined;
+};
+
+async function getUpcomingEvents(): Promise<HomeEvent[]> {
+  if (!supabase) return fallbackEvents;
+
+  const { data, error } = await supabase
+    .from("events")
+    .select("title,start_date,location")
+    .order("start_date", { ascending: true, nullsFirst: false })
+    .limit(4);
+
+  if (error || !data || data.length === 0) return fallbackEvents;
+
+  return data.map((event, idx) => {
+    const image = pickImageForTitle(event.title, idx);
+    return {
+      title: event.title,
+      date: formatDate(event.start_date),
+      location: event.location ?? "Location TBD",
+      href: "/events",
+      image,
+    };
+  });
+}
+
+export default async function Home() {
+  const upcomingEvents = await getUpcomingEvents();
+
   return (
     <PageShell>
       <Section
@@ -52,34 +176,16 @@ export default function Home() {
         description="Check out the latest tournaments and leagues happening near you."
       >
         <div className="event-grid">
-          <EventCard
-            title="3v3 Basketball Tournament"
-            date="March 15, 2024"
-            location="Central Sports Complex"
-            image="https://images.unsplash.com/photo-1505666287802-931dc83948e0?auto=format&fit=crop&w=800&q=80"
-            href="/events"
-          />
-          <EventCard
-            title="Pickleball League"
-            date="March 20, 2024"
-            location="Riverside Courts"
-            image="https://images.unsplash.com/photo-1618461126964-81ccf0be2cfd?auto=format&fit=crop&w=800&q=80"
-            href="/events"
-          />
-          <EventCard
-            title="Flag Football Tournament"
-            date="April 5, 2024"
-            location="Green Field Park"
-            image="https://images.unsplash.com/photo-1471295253337-3ceaaedca402?auto=format&fit=crop&w=800&q=80"
-            href="/events"
-          />
-          <EventCard
-            title="Community vs Kids Charity Game"
-            date="April 12, 2024"
-            location="Central Sports Complex"
-            image="https://images.unsplash.com/photo-1508609349937-5ec4ae374ebf?auto=format&fit=crop&w=800&q=80"
-            href="/events"
-          />
+          {upcomingEvents.map((event, idx) => (
+            <EventCard
+              key={`${event.title}-${idx}`}
+              title={event.title}
+              date={event.date}
+              location={event.location}
+              image={event.image}
+              href={event.href}
+            />
+          ))}
         </div>
         <div className="event-actions">
           <Link className="button primary" href="/events">

@@ -20,19 +20,21 @@ export function EventCard({ title, date, location, href = "#", image }: EventCar
       />
       <div className="event-card__body">
         <h3 className="event-card__title">{title}</h3>
-        <div className="event-card__meta">
-          <div className="event-card__meta-row">
-            <span aria-hidden>📅</span>
-            <span>{date}</span>
+        <div className="event-card__footer">
+          <div className="event-card__meta">
+            <div className="event-card__meta-row">
+              <span aria-hidden>📅</span>
+              <span>{date}</span>
+            </div>
+            <div className="event-card__meta-row">
+              <span aria-hidden>📍</span>
+              <span>{location}</span>
+            </div>
           </div>
-          <div className="event-card__meta-row">
-            <span aria-hidden>📍</span>
-            <span>{location}</span>
-          </div>
+          <Link href={href} className="button ghost event-card__cta">
+            Learn More
+          </Link>
         </div>
-        <Link href={href} className="button ghost event-card__cta">
-          Learn More
-        </Link>
       </div>
     </article>
   );
