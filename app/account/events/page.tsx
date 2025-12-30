@@ -172,6 +172,9 @@ export default function AccountEventsPage() {
             <div className="event-list">
               {list.map((event) => {
                 const dateRange = formatDateRange(event.start_date, event.end_date);
+                const primaryDate = event.time_info?.trim() || null;
+                const fallbackDate = primaryDate ? null : dateRange;
+                const dateToShow = primaryDate || fallbackDate || null;
                 return (
                   <article key={event.id} className="event-card-simple">
                     <div className="event-card__header">
@@ -179,9 +182,8 @@ export default function AccountEventsPage() {
                       <span className={statusClass(event.status)}>{statusLabel(event.status)}</span>
                     </div>
                     <div className="event-card__meta">
-                      {dateRange ? <p className="muted">{dateRange}</p> : null}
-                      {event.time_info ? <p className="muted">{event.time_info}</p> : null}
-                      {event.location ? <p className="muted">{event.location}</p> : null}
+                      {dateToShow ? <p className="muted">Date: {dateToShow}</p> : null}
+                      {event.location ? <p className="muted">Location: {event.location}</p> : null}
                     </div>
                     {event.description ? <p className="muted">{event.description}</p> : null}
                   </article>
