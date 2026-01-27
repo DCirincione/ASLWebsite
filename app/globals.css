@@ -598,8 +598,12 @@ html[data-contrast="high"] .font-controls__value {
 }
 
 .section {
-  padding: 64px 0;
+  padding: 40px 0;
   scroll-margin-top: 30px;
+}
+
+.page-content > .shell > .section:first-of-type:not(.hero) {
+  padding-top: 20px;
 }
 
 .section + .section {
