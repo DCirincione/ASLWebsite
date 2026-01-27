@@ -313,7 +313,7 @@ export default async function Home() {
           <Link className="button primary" href="/register">
             Register a Team
           </Link>
-          <Link className="button ghost" href="/sponsors">
+          <Link className="button ghost" href="/contact">
             Become a Sponsor
           </Link>
           <Link className="button ghost" href="/contact">

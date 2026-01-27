@@ -9,7 +9,6 @@ const quickLinks = [
 ];
 
 const resources = [
-  { href: "/sponsors", label: "Sponsors" },
   { href: "/contact", label: "Contact" },
 ];
 
