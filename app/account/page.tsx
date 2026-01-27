@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { supabase } from "@/lib/supabase/client";
@@ -51,6 +51,10 @@ export default function AccountPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [signingOut, setSigningOut] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+  const [avatarSuccess, setAvatarSuccess] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Teams
   const [teams, setTeams] = useState<TeamMembership[]>([]);
@@ -80,6 +84,61 @@ export default function AccountPage() {
     setSearch("");
     setSearchResults([]);
     setSigningOut(false);
+  };
+
+  const handleAvatarSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const fileInput = event.target;
+    const file = fileInput.files?.[0];
+    if (!file) return;
+    if (!supabase) {
+      setAvatarError("Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+      return;
+    }
+    if (!userId) {
+      setAvatarError("You need to be signed in to change your photo.");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setAvatarError("Please choose an image under 5MB.");
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setAvatarError(null);
+    setAvatarSuccess(null);
+
+    const readAsDataUrl = () =>
+      new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => reject(new Error("Could not read file"));
+        reader.readAsDataURL(file);
+      });
+
+    let dataUrl: string;
+    try {
+      dataUrl = await readAsDataUrl();
+    } catch (err) {
+      setAvatarError("Unable to read image file.");
+      setUploadingAvatar(false);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update({ avatar_url: dataUrl })
+      .eq("id", userId);
+
+    if (updateError) {
+      setAvatarError(updateError.message);
+      setUploadingAvatar(false);
+      return;
+    }
+
+    setProfile((prev) => (prev ? { ...prev, avatar_url: dataUrl } : prev));
+    setAvatarSuccess("Profile photo updated!");
+    setUploadingAvatar(false);
+    fileInput.value = "";
   };
 
   // Load profile and session
@@ -330,6 +389,27 @@ export default function AccountPage() {
               <p className="eyebrow">Account</p>
               <h1>{data.name}</h1>
               <p className="muted">Manage your profile, teams, and friends.</p>
+              <div className="avatar-upload">
+                <input
+                  ref={fileInputRef}
+                  id="avatar-upload"
+                  type="file"
+                  accept="image/*"
+                  onChange={handleAvatarSelect}
+                  className="sr-only"
+                />
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingAvatar}
+                >
+                  {uploadingAvatar ? "Uploading..." : "Change photo"}
+                </button>
+                <p className="muted">JPG or PNG, max 5MB.</p>
+                {avatarError ? <p className="form-help error">{avatarError}</p> : null}
+                {avatarSuccess ? <p className="form-help success">{avatarSuccess}</p> : null}
+              </div>
             </div>
           </div>
           <button className="button ghost" type="button" onClick={handleSignOut} disabled={signingOut}>

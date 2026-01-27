@@ -1431,6 +1431,17 @@ html[data-contrast="high"] .font-controls__value {
   margin: 4px 0 6px;
 }
 
+.avatar-upload {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.avatar-upload .button {
+  align-self: flex-start;
+}
+
 .account-card {
   border: 1px solid var(--border);
   border-radius: 16px;
