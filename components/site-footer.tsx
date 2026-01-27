@@ -4,7 +4,7 @@ import Link from "next/link";
 const quickLinks = [
   { href: "/", label: "Home" },
   { href: "/events", label: "Events" },
-  { href: "/leagues", label: "League" },
+  { href: "/sports", label: "Sports" },
   { href: "/community", label: "Community" },
 ];
 

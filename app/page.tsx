@@ -214,8 +214,8 @@ export default async function Home() {
             <div className="program-card__icon" aria-hidden>
               👥
             </div>
-            <h3>Leagues</h3>
-            <p className="muted">Seasonal leagues for all skill levels.</p>
+            <h3>Sports</h3>
+            <p className="muted">Seasonal leagues and pickup for all skill levels.</p>
           </div>
           <div className="program-card">
             <div className="program-card__icon" aria-hidden>

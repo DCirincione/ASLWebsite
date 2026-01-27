@@ -364,7 +364,7 @@ export default function AccountFriendsPage() {
         <section className="account-card">
           <h3>Your friends</h3>
           {friends.length === 0 ? (
-            <p className="muted">No friends yet. Connect with players in your leagues.</p>
+            <p className="muted">No friends yet. Connect with players in your sports.</p>
           ) : (
             <ul className="list list--grid">
               {friends.map((friend) => (

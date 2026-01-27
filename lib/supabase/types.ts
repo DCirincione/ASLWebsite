@@ -160,6 +160,42 @@ export type EventSignupUpdate = {
   created_at?: string | null;
 };
 
+export type Sport = {
+  id: string;
+  title: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  time_info?: string | null;
+  players_per_team?: number | null;
+  gender?: "men" | "women" | "coed" | "open" | null;
+  short_description?: string | null;
+  created_at?: string | null;
+};
+
+export type SportInsert = {
+  id?: string;
+  title: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  time_info?: string | null;
+  players_per_team?: number | null;
+  gender?: "men" | "women" | "coed" | "open" | null;
+  short_description?: string | null;
+  created_at?: string | null;
+};
+
+export type SportUpdate = {
+  id?: string;
+  title?: string;
+  start_date?: string | null;
+  end_date?: string | null;
+  time_info?: string | null;
+  players_per_team?: number | null;
+  gender?: "men" | "women" | "coed" | "open" | null;
+  short_description?: string | null;
+  created_at?: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -197,6 +233,12 @@ export type Database = {
         Row: EventSignup;
         Insert: EventSignupInsert;
         Update: EventSignupUpdate;
+        Relationships: [];
+      };
+      sports: {
+        Row: Sport;
+        Insert: SportInsert;
+        Update: SportUpdate;
         Relationships: [];
       };
     };

@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase/client";
 const links = [
   { href: "/", label: "Home" },
   { href: "/events", label: "Events" },
-  { href: "/leagues", label: "Leagues" },
+  { href: "/sports", label: "Sports" },
   { href: "/community", label: "Community" },
   { href: "/sponsors", label: "Sponsors" },
   { href: "/contact", label: "Contact" },
@@ -24,6 +24,7 @@ export function SiteHeader() {
   const [authMode, setAuthMode] = useState<"signup" | "signin">("signup");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const closeAccountModal = useCallback(() => setIsAccountOpen(false), []);
@@ -122,6 +123,16 @@ export function SiteHeader() {
     };
   }, [isMenuOpen]);
 
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth > 900 && isMobileNavOpen) {
+        setIsMobileNavOpen(false);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isMobileNavOpen]);
+
   return (
     <>
       <header className="site-header">
@@ -129,9 +140,23 @@ export function SiteHeader() {
           <Link href="/" className="logo">
             <Image src="/ASLLogo.png" alt="ASL Logo" width={75} height={75} />
           </Link>
-          <nav className="nav" aria-label="Main navigation">
+          <button
+            className="mobile-nav-toggle"
+            type="button"
+            aria-label="Toggle navigation"
+            aria-expanded={isMobileNavOpen}
+            onClick={() => setIsMobileNavOpen((open) => !open)}
+          >
+            <span aria-hidden>{isMobileNavOpen ? "✕" : "☰"}</span>
+          </button>
+          <nav className={`nav ${isMobileNavOpen ? "nav--open" : ""}`} aria-label="Main navigation">
             {links.map((link) => (
-              <Link key={link.href} href={link.href} className="nav__link">
+              <Link
+                key={link.href}
+                href={link.href}
+                className="nav__link"
+                onClick={() => setIsMobileNavOpen(false)}
+              >
                 {link.label}
               </Link>
             ))}

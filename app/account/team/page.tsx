@@ -91,7 +91,7 @@ export default function AccountTeamPage() {
                     <p className="list__title">{team.team_name}</p>
                     <p className="muted">{team.role ?? "Player"}</p>
                   </div>
-                  <Link className="button ghost" href="/leagues">
+                  <Link className="button ghost" href="/sports">
                     View Schedule
                   </Link>
                 </li>

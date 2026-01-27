@@ -373,7 +373,7 @@ export default function AccountPage() {
                     <p className="list__title">{team.team_name}</p>
                     <p className="muted">{team.role ?? "Player"}</p>
                   </div>
-                  <Link className="button ghost" href="/leagues">
+                  <Link className="button ghost" href="/sports">
                     View Schedule
                   </Link>
                 </li>
@@ -518,7 +518,7 @@ export default function AccountPage() {
           <section className="account-card" style={{ marginTop: 12 }}>
             <h3>Your friends</h3>
             {friends.length === 0 ? (
-              <p className="muted">No friends yet. Connect with players in your leagues.</p>
+            <p className="muted">No friends yet. Connect with players in your sports.</p>
             ) : (
               <ul className="list list--grid">
                 {friends.map((friend) => (
