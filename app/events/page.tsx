@@ -15,6 +15,8 @@ type EventItem = {
   location?: string | null;
   description?: string | null;
   status?: "scheduled" | "potential" | "tbd" | null;
+  host_type?: "aldrich" | "featured" | "partner" | "other" | null;
+  image?: string;
 };
 
 export default function EventsPage() {
@@ -31,7 +33,7 @@ export default function EventsPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,status")
+        .select("id,title,start_date,end_date,time_info,location,description,status,host_type")
         .order("start_date", { ascending: true, nullsFirst: false });
       if (!error && data) {
         setEvents(data as EventItem[]);
@@ -118,6 +120,146 @@ export default function EventsPage() {
     return "pill pill--green";
   };
 
+  const handleJump = (targetId: string) => {
+    const el = document.getElementById(targetId);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
+
+  const pickImageForTitle = (title: string, idx: number) => {
+    const lower = title.toLowerCase();
+    const rules: { keywords: string[]; pool: string[] }[] = [
+      { keywords: ["community vs kids", "community vs. kids", "community kids"], pool: ["/commVsKids/cVsK2025.jpeg"] },
+      { keywords: ["newman"], pool: ["/forever5/newman5.png"] },
+      { keywords: ["pick up", "pickup", "late night"], pool: ["/basketball/champst2025.jpeg"] },
+      { keywords: ["pickleball"], pool: ["/pickleball/boxPB.jpeg", "/PickleTourneyCourt6.png"] },
+      { keywords: ["basketball", "hoops"], pool: ["/basketball/champst2025.jpeg"] },
+      { keywords: ["amputee"], pool: ["/amputee/amputee2025.jpeg"] },
+      { keywords: ["sunday league"], pool: ["/sundayLeague/champs2025.jpeg"] },
+    ];
+    const fallback = [
+      "/basketball/champst2025.jpeg",
+      "/forever5/newman5.png",
+      "/PickleTourneyCourt6.png",
+      "/commVsKids/cVsK2025.jpeg",
+    ];
+
+    for (const rule of rules) {
+      if (rule.keywords.some((kw) => lower.includes(kw)) && rule.pool.length > 0) {
+        return rule.pool[idx % rule.pool.length];
+      }
+    }
+    return fallback[idx % fallback.length];
+  };
+
+  const sortByStartDate = (a: EventItem, b: EventItem) => {
+    const aDate = parseDateUTC(a.start_date);
+    const bDate = parseDateUTC(b.start_date);
+    if (!aDate && !bDate) return 0;
+    if (!aDate) return 1;
+    if (!bDate) return -1;
+    return aDate.getTime() - bDate.getTime();
+  };
+
+  const prepareCollections = () => {
+    const ordered = [...events].sort(sortByStartDate);
+
+    const heuristicAldrich = (event: EventItem) => {
+      const titleMatch = event.title?.toLowerCase().includes("aldrich");
+      const locationMatch = event.location?.toLowerCase().includes("aldrich");
+      const clearlyScheduled = event.status === "scheduled";
+      return Boolean(titleMatch || locationMatch || clearlyScheduled);
+    };
+
+    const heuristicFeatured = (event: EventItem) => {
+      const text = `${event.title ?? ""} ${event.description ?? ""}`.toLowerCase();
+      const keywords = ["charity", "fundraiser", "benefit", "partner", "with", "hosted by", "vs"];
+      return keywords.some((kw) => text.includes(kw)) || event.status === "potential";
+    };
+
+    const aldrich = ordered.filter(
+      (event) => event.host_type === "aldrich" || (!event.host_type && heuristicAldrich(event))
+    );
+
+    const featured = ordered.filter(
+      (event) =>
+        event.host_type === "featured" ||
+        event.host_type === "partner" ||
+        (!event.host_type && heuristicFeatured(event))
+    );
+
+    const featuredFallback = ordered.slice(0, 4);
+
+    return {
+      aldrichEvents: (aldrich.length > 0 ? aldrich : featuredFallback).map((ev, idx) => ({
+        ...ev,
+        image: pickImageForTitle(ev.title, idx),
+      })),
+      featuredEvents: (featured.length > 0 ? featured : featuredFallback).map((ev, idx) => ({
+        ...ev,
+        image: pickImageForTitle(ev.title, idx + 2),
+      })),
+      allEvents: ordered.map((ev, idx) => ({
+        ...ev,
+        image: pickImageForTitle(ev.title, idx + 4),
+      })),
+    };
+  };
+
+  const renderEventCard = (event: EventItem) => {
+    const dateRange = formatDateRange(event.start_date, event.end_date);
+    const timeInfo = event.time_info?.trim();
+    const primaryDate = timeInfo || dateRange || "Date TBD";
+
+    return (
+      <article key={event.id} className="event-card event-card--full">
+        <div
+          className="event-card__image"
+          style={{ backgroundImage: event.image ? `url(${event.image})` : undefined }}
+          aria-hidden
+        />
+        <div className="event-card__body">
+          <div className="event-card__header">
+            <h3 className="event-card__title">{event.title}</h3>
+            <span className={statusClass(event.status)}>{statusLabel(event.status)}</span>
+          </div>
+          <div className="event-card__meta">
+            <div className="event-card__meta-row">
+              <span aria-hidden>📅</span>
+              <span>{primaryDate}</span>
+            </div>
+            <div className="event-card__meta-row">
+              <span aria-hidden>📍</span>
+              <span>{event.location || "Location TBD"}</span>
+            </div>
+          </div>
+          {event.description ? <p className="muted">{event.description}</p> : null}
+          <div className="event-card__actions">
+            {signups.has(event.id) ? (
+              <span className="pill pill--green" role="status" aria-live="polite">
+                Added to My Events
+              </span>
+            ) : userId ? (
+              <button
+                className="button primary"
+                type="button"
+                disabled={savingEventId === event.id}
+                onClick={() => handleSignup(event.id)}
+              >
+                {savingEventId === event.id ? "Saving..." : "Sign up"}
+              </button>
+            ) : (
+              <Link className="button ghost" href="/account">
+                Sign in to sign up
+              </Link>
+            )}
+          </div>
+        </div>
+      </article>
+    );
+  };
+
   const handleSignup = async (eventId: string) => {
     if (!supabase) {
       setMessage("Connect Supabase to enable event sign-ups.");
@@ -155,54 +297,85 @@ export default function EventsPage() {
         title="Upcoming Events"
         description="Tournaments, showcases, leagues, pick-up sessions, and fundraisers. See what's coming up and plan your season."
         headingLevel="h1"
+        className="events-section"
       >
         {message ? (
           <p className="muted" role="status" aria-live="polite">
             {message}
           </p>
         ) : null}
-        <div className="event-list">
-          {loading ? <p className="muted">Loading events...</p> : null}
-          {!loading &&
-            events.map((event) => {
-              const dateRange = formatDateRange(event.start_date, event.end_date);
-              const timeInfo = event.time_info?.trim();
-              const primaryDate = timeInfo || dateRange || null;
-              return (
-              <article key={event.id} className="event-card-simple">
-                <div className="event-card__header">
-                  <h3>{event.title}</h3>
-                  <span className={statusClass(event.status)}>{statusLabel(event.status)}</span>
+        {loading ? <p className="muted">Loading events...</p> : null}
+
+        {!loading ? (
+          (() => {
+            const collections = prepareCollections();
+            const hasEvents = collections.allEvents.length > 0;
+            if (!hasEvents) {
+              return <p className="muted">No events posted yet. Check back soon.</p>;
+            }
+            return (
+              <>
+                <div className="events-jump">
+                  <label htmlFor="events-jump-select">Jump to</label>
+                  <select
+                    id="events-jump-select"
+                    onChange={(e) => handleJump(e.target.value)}
+                    defaultValue="aldrich-events"
+                  >
+                    <option value="aldrich-events">Aldrich Events</option>
+                    <option value="featured-events">Featured Events</option>
+                    <option value="all-events">All Events</option>
+                  </select>
+                  <button
+                    type="button"
+                    className="button ghost"
+                    onClick={() => handleJump("events-page")}
+                  >
+                    Back to top
+                  </button>
                 </div>
-                <div className="event-card__meta">
-                  {primaryDate ? <p className="muted">Date: {primaryDate}</p> : null}
-                  {event.location ? <p className="muted">Location: {event.location}</p> : null}
+                <div className="events-deck">
+                <div className="events-group" id="aldrich-events">
+                  <div className="events-group__header">
+                    <p className="eyebrow">Aldrich Sports</p>
+                    <h2>Aldrich Events</h2>
+                    <p className="muted">
+                      Official ASL-hosted tournaments, leagues, and showcases.
+                    </p>
+                  </div>
+                  <div className="event-card-grid">
+                    {collections.aldrichEvents.map(renderEventCard)}
+                  </div>
                 </div>
-                {event.description ? <p className="muted">About this event: {event.description}</p> : null}
-                <div className="event-card__actions">
-                  {signups.has(event.id) ? (
-                    <span className="pill pill--green" role="status" aria-live="polite">
-                      Added to My Events
-                    </span>
-                  ) : userId ? (
-                    <button
-                      className="button primary"
-                      type="button"
-                      disabled={savingEventId === event.id}
-                      onClick={() => handleSignup(event.id)}
-                    >
-                      {savingEventId === event.id ? "Saving..." : "Sign up"}
-                    </button>
-                  ) : (
-                    <Link className="button ghost" href="/account">
-                      Sign in to sign up
-                    </Link>
-                  )}
+
+                <div className="events-group" id="featured-events">
+                  <div className="events-group__header">
+                    <p className="eyebrow">Spotlight</p>
+                    <h2>Featured Events</h2>
+                    <p className="muted">Partnered events, showcases, and community benefits.</p>
+                  </div>
+                  <div className="event-card-grid">
+                    {collections.featuredEvents.map(renderEventCard)}
+                  </div>
                 </div>
-              </article>
+
+                <div className="events-group" id="all-events">
+                  <div className="events-group__header">
+                    <p className="eyebrow">Everything Coming Up</p>
+                    <h2>All Events</h2>
+                    <p className="muted">
+                      Full calendar, sorted by date so you can plan ahead.
+                    </p>
+                  </div>
+                  <div className="event-card-grid">
+                    {collections.allEvents.map(renderEventCard)}
+                  </div>
+                </div>
+              </div>
+              </>
             );
-            })}
-        </div>
+          })()
+        ) : null}
       </Section>
     </PageShell>
   );

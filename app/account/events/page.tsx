@@ -78,7 +78,7 @@ export default function AccountEventsPage() {
 
       const { data: eventData, error: eventsError } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,status")
+        .select("id,title,start_date,end_date,time_info,location,description,status,host_type")
         .in("id", eventIds);
 
       if (eventsError) {

@@ -112,6 +112,7 @@ export type Event = {
   location?: string | null;
   description?: string | null;
   status?: "scheduled" | "potential" | "tbd" | null;
+  host_type?: "aldrich" | "featured" | "partner" | "other" | null;
 };
 
 export type EventInsert = {
@@ -123,6 +124,7 @@ export type EventInsert = {
   location?: string | null;
   description?: string | null;
   status?: "scheduled" | "potential" | "tbd" | null;
+  host_type?: "aldrich" | "featured" | "partner" | "other" | null;
 };
 
 export type EventUpdate = {
@@ -134,6 +136,7 @@ export type EventUpdate = {
   location?: string | null;
   description?: string | null;
   status?: "scheduled" | "potential" | "tbd" | null;
+  host_type?: "aldrich" | "featured" | "partner" | "other" | null;
 };
 
 export type EventSignup = {
