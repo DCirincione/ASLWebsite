@@ -1,25 +1,28 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
 import type { Sport } from "@/lib/supabase/types";
 
-type SportCard = Sport & { image?: string; activities?: string };
+type SportCard = Sport & { image?: string; activities?: string; slug: string };
+
+const toSlug = (value: string) => value.toLowerCase().replace(/\s+/g, "-");
 
 const fallbackSports: SportCard[] = [
-  { id: "baseball", title: "Baseball", players_per_team: 9, gender: "open", short_description: "Diamond leagues, tourneys, and skills." },
-  { id: "basketball", title: "Basketball", players_per_team: 5, gender: "open", short_description: "5v5 leagues, 3v3 nights, clinics." },
-  { id: "esports", title: "Esports", players_per_team: null, gender: "open", short_description: "Seasonal ladders and LAN nights." },
-  { id: "flag-football", title: "Flag Football", players_per_team: 7, gender: "coed", short_description: "Non-contact leagues and tourneys." },
-  { id: "golf", title: "Golf", players_per_team: 4, gender: "open", short_description: "Scrambles, outings, and skins." },
-  { id: "mini-golf", title: "Mini-Golf", players_per_team: 4, gender: "open", short_description: "Casual putt-putt meetups." },
-  { id: "pickleball", title: "Pickleball", players_per_team: 2, gender: "coed", short_description: "Leagues, ladders, and tournaments." },
-  { id: "run-club", title: "Run Club", players_per_team: 1, gender: "open", short_description: "Group runs and race prep." },
-  { id: "soccer", title: "Soccer", players_per_team: 11, gender: "open", short_description: "Leagues, pickup, and cups." },
-  { id: "youth-soccer", title: "Youth Soccer", players_per_team: 7, gender: "coed", short_description: "Small-sided youth play." },
+  { id: "baseball", slug: "baseball", title: "Baseball", players_per_team: 9, gender: "open", short_description: "Diamond leagues, tourneys, and skills." },
+  { id: "basketball", slug: "basketball", title: "Basketball", players_per_team: 5, gender: "open", short_description: "5v5 leagues, 3v3 nights, clinics." },
+  { id: "esports", slug: "esports", title: "Esports", players_per_team: null, gender: "open", short_description: "Seasonal ladders and LAN nights." },
+  { id: "flag-football", slug: "flag-football", title: "Flag Football", players_per_team: 7, gender: "coed", short_description: "Non-contact leagues and tourneys." },
+  { id: "golf", slug: "golf", title: "Golf", players_per_team: 4, gender: "open", short_description: "Scrambles, outings, and skins." },
+  { id: "mini-golf", slug: "mini-golf", title: "Mini-Golf", players_per_team: 4, gender: "open", short_description: "Casual putt-putt meetups." },
+  { id: "pickleball", slug: "pickleball", title: "Pickleball", players_per_team: 2, gender: "coed", short_description: "Leagues, ladders, and tournaments." },
+  { id: "run-club", slug: "run-club", title: "Run Club", players_per_team: 1, gender: "open", short_description: "Group runs and race prep." },
+  { id: "soccer", slug: "soccer", title: "Soccer", players_per_team: 11, gender: "open", short_description: "Leagues, pickup, and cups." },
+  { id: "youth-soccer", slug: "youth-soccer", title: "Youth Soccer", players_per_team: 7, gender: "coed", short_description: "Small-sided youth play." },
 ];
 
 const sportImages: Record<string, string> = {
@@ -58,12 +61,12 @@ export default function SportsPage() {
       const { data, error } = await supabase.from("sports").select("*").order("title", { ascending: true });
       if (!error && data) {
         const mapped = (data as Sport[]).map((sport) => {
-          const id = sport.id ?? sport.title.toLowerCase().replace(/\s+/g, "-");
+          const slug = toSlug(sport.title ?? "sport");
           return {
             ...sport,
-            id,
-            image: sportImages[id] || sportImages[sport.title.toLowerCase().replace(/\s+/g, "-")] || undefined,
-          };
+            slug,
+            image: sportImages[slug] || sportImages[toSlug(sport.title ?? "")] || undefined,
+          } as SportCard;
         });
         setSports(mapped);
       }
@@ -73,18 +76,13 @@ export default function SportsPage() {
 
   const filtered = useMemo(() => {
     if (selected === "all") return sports;
-    return sports.filter((s) => s.id === selected || s.title.toLowerCase().replace(/\s+/g, "-") === selected);
+    return sports.filter((s) => s.slug === selected || toSlug(s.title) === selected);
   }, [selected, sports]);
-
-  const handleJump = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
 
   const options = [
     { value: "all", label: "All Sports" },
     ...sports.map((s) => ({
-      value: s.id,
+      value: s.slug,
       label: s.title,
     })),
   ];
@@ -118,11 +116,11 @@ export default function SportsPage() {
 
         <div className="sports-stack">
           {filtered.map((sport, idx) => {
-            const id = sport.id ?? sport.title.toLowerCase().replace(/\s+/g, "-");
+            const id = sport.slug ?? toSlug(sport.title);
             const activities =
               sport.short_description ||
               activityLabels[id] ||
-              activityLabels[sport.title.toLowerCase().replace(/\s+/g, "-")] ||
+              activityLabels[toSlug(sport.title)] ||
               "Leagues • Pickup • Tournaments";
             const bgImage = sport.image || sportImages[id];
             const tone = idx % 2 === 0 ? "sport-card--primary" : "sport-card--secondary";
@@ -139,9 +137,15 @@ export default function SportsPage() {
               >
                 <div className="sport-card__overlay">
                   <div className="sport-card__content">
-                    <button className="sport-card__cta" type="button">
-                      Play {sport.title}
-                    </button>
+                    {sport.slug === "soccer" ? (
+                      <Link className="sport-card__cta" href={`/sports/${id}`}>
+                        Play {sport.title}
+                      </Link>
+                    ) : (
+                      <button className="sport-card__cta" type="button" onClick={() => setSelected(sport.slug)}>
+                        Play {sport.title}
+                      </button>
+                    )}
                     <p className="sport-card__meta">{activities}</p>
                   </div>
                 </div>

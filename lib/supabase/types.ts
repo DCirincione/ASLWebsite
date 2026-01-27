@@ -196,6 +196,51 @@ export type SportUpdate = {
   created_at?: string | null;
 };
 
+export type Soccer = {
+  id: string;
+  title: string;
+  type: "clinic" | "league" | "pickup" | "tournament" | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  time_info?: string | null;
+  location?: string | null;
+  description?: string | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  image_url?: string | null;
+  level?: string | null;
+};
+
+export type SoccerInsert = {
+  id?: string;
+  title: string;
+  type?: "clinic" | "league" | "pickup" | "tournament" | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  time_info?: string | null;
+  location?: string | null;
+  description?: string | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  image_url?: string | null;
+  level?: string | null;
+};
+
+export type SoccerUpdate = {
+  id?: string;
+  title?: string;
+  type?: "clinic" | "league" | "pickup" | "tournament" | null;
+  start_date?: string | null;
+  end_date?: string | null;
+  time_info?: string | null;
+  location?: string | null;
+  description?: string | null;
+  cta_label?: string | null;
+  cta_url?: string | null;
+  image_url?: string | null;
+  level?: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -239,6 +284,12 @@ export type Database = {
         Row: Sport;
         Insert: SportInsert;
         Update: SportUpdate;
+        Relationships: [];
+      };
+      soccer: {
+        Row: Soccer;
+        Insert: SoccerInsert;
+        Update: SoccerUpdate;
         Relationships: [];
       };
     };

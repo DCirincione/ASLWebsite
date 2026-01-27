@@ -419,6 +419,7 @@ html[data-contrast="high"] .font-controls__value {
   overflow: hidden;
 }
 
+
 .logo__image img {
   object-fit: contain;
   width: 100%;
@@ -1913,6 +1914,22 @@ html[data-contrast="high"] .contact-card .list__title {
   scroll-margin-top: 90px;
 }
 
+html[data-contrast="high"] .events-section {
+  background: transparent;
+}
+
+html[data-contrast="high"] .events-group {
+  background: #000000;
+  border-color: #f8fafc;
+  box-shadow: none;
+}
+
+html[data-contrast="high"] .events-jump select {
+  background: #000000;
+  color: #f8fafc;
+  border-color: #f8fafc;
+}
+
 .events-group__header h2 {
   margin: 6px 0 6px;
   letter-spacing: -0.01em;
@@ -2075,6 +2092,169 @@ html[data-contrast="high"] .event-card-simple {
   background: #000000;
   border-color: #f8fafc;
   box-shadow: none;
+}
+
+/* Soccer page */
+.soccer-hero {
+  padding: 12px 0 12px;
+  position: relative;
+}
+
+.soccer-hero .section__header {
+  margin-bottom: 10px;
+}
+
+.soccer-hero__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  align-items: start;
+}
+
+.soccer-hero__copy {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.soccer-hero__image {
+  position: relative;
+  min-height: 280px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.soccer-hero__logo {
+  position: absolute;
+  top: 35px;
+  right: 0;
+  width: 140px;
+  height: 180px;
+}
+
+.soccer-hero .tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #0f172a;
+  color: #f8fafc;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  width: fit-content;
+}
+
+.cta-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.highlight-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.highlight-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.highlight-title {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.highlight-detail {
+  margin: 0;
+  color: #475569;
+}
+
+.soccer-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  background: #ffffff;
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  min-height: 180px;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.08);
+}
+
+.soccer-card__media {
+  position: relative;
+  min-height: 180px;
+  background: #0f172a;
+}
+
+.soccer-card__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.soccer-card__body {
+  padding: 14px;
+  display: grid;
+  gap: 8px;
+  align-content: center;
+}
+
+.soccer-card .cta-row .button {
+  flex: 0 0 auto;
+}
+
+html[data-theme="dark"] .soccer-card {
+  background: #0f192d;
+  border-color: #1f2a40;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .soccer-card__media {
+  background: #0c1526;
+}
+
+html[data-contrast="high"] .soccer-card {
+  background: #000000;
+  border-color: #f8fafc;
+  box-shadow: none;
+}
+
+html[data-contrast="high"] .soccer-card__media {
+  background: #0f172a;
+}
+
+.soccer-section .league-card,
+.pickup-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  background: #ffffff;
+}
+
+.pickup-card {
+  margin-bottom: 10px;
+}
+
+@media (max-width: 900px) {
+  .soccer-hero__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .soccer-card {
+    grid-template-columns: 1fr;
+  }
 }
 
 html[data-contrast="high"] .pill {
