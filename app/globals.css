@@ -2358,7 +2358,7 @@ html[data-theme="dark"] .account-form textarea:focus {
 
 .community-board.static-copy {
   display: grid;
-  gap: 14px;
+  gap: 4px;
 }
 
 .community-board__title {

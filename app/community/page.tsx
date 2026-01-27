@@ -123,7 +123,7 @@ export default function CommunityPage() {
                 <p className="article-card__eyebrow">{article.date ?? "Latest"}</p>
                 <p className="article-card__title">{article.title}</p>
                 <p className="article-card__blurb">{article.blurb}</p>
-                <span className="article-card__cta">Read on LinkedIn →</span>
+                <span className="article-card__cta">Read the Full Article Here →</span>
               </a>
             ))}
           </div>
