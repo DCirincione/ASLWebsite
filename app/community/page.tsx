@@ -66,7 +66,7 @@ export default function CommunityPage() {
       >
         <div className="community-stack">
           <div className="community-board static-copy">
-            <p className="community-board__title">Community First, Always.</p>
+            <p className="community-board__title">COMMUNITY FIRST, ALWAYS.</p>
             <p>
               At Aldrich Sports, Community is not an add-on, it is the whole point. Everything we do is built
               around bringing people together through sports, giving back to causes that matter and creating
