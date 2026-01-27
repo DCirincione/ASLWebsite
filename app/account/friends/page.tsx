@@ -68,12 +68,24 @@ export default function AccountFriendsPage() {
         .order("created_at", { ascending: false });
 
       if (!reqError && reqs) {
-        setRequests(reqs as FriendRequest[]);
+        // De-duplicate by unordered pair so we keep only the newest request between two people.
+        const pairLatest = new Map<string, FriendRequest>();
+        for (const r of reqs as FriendRequest[]) {
+          const key =
+            r.sender_id < r.receiver_id
+              ? `${r.sender_id}:${r.receiver_id}`
+              : `${r.receiver_id}:${r.sender_id}`;
+          if (!pairLatest.has(key)) {
+            pairLatest.set(key, r);
+          }
+        }
+        const deduped = Array.from(pairLatest.values());
+        setRequests(deduped);
 
         // Fetch profiles for everyone involved.
         const peerIds = Array.from(
           new Set(
-            reqs
+            deduped
               .map((r) => (r.sender_id === uid ? r.receiver_id : r.sender_id))
               .filter(Boolean)
           )
@@ -89,20 +101,22 @@ export default function AccountFriendsPage() {
               map[p.id] = p as ProfileSummary;
             }
             setProfiles(map);
-            const accepted = reqs
+            const acceptedMap = new Map<string, FriendWithAvatar>();
+            deduped
               .filter((r) => r.status === "accepted")
-              .map((r) => {
+              .forEach((r) => {
                 const otherId = r.sender_id === uid ? r.receiver_id : r.sender_id;
+                if (acceptedMap.has(otherId)) return;
                 const profile = map[otherId];
-                return {
+                acceptedMap.set(otherId, {
                   id: otherId,
                   name: profile?.name ?? "Friend",
                   sport: profile?.sports?.[0] ?? "Sport",
                   skill_level: profile?.skill_level ?? null,
                   avatar_url: profile?.avatar_url ?? null,
-                } as FriendWithAvatar;
+                });
               });
-            setFriends(accepted);
+            setFriends(Array.from(acceptedMap.values()));
           }
         }
       }
@@ -138,7 +152,10 @@ export default function AccountFriendsPage() {
     [requests, userId]
   );
   const pendingOutgoing = useMemo(
-    () => requests.filter((r) => r.status === "pending" && r.sender_id === userId),
+    () =>
+      requests.filter(
+        (r) => r.status === "pending" && r.sender_id === userId && r.receiver_id !== userId
+      ),
     [requests, userId]
   );
 
@@ -159,6 +176,7 @@ export default function AccountFriendsPage() {
       const existingIds = new Set<string>([
         ...(friends ?? []).map((f) => f.id),
         ...(requests ?? []).map((r) => (r.sender_id === userId ? r.receiver_id : r.sender_id)),
+        ...(requests ?? []).map((r) => (r.receiver_id === userId ? r.sender_id : r.receiver_id)),
         userId ?? "",
       ]);
       setSearchResults((data as ProfileSummary[]).filter((p) => !existingIds.has(p.id)));
@@ -170,6 +188,15 @@ export default function AccountFriendsPage() {
 
   const sendRequest = async (receiverId: string) => {
     if (!supabase || !userId) return;
+    const already = requests.find((r) => {
+      const samePair =
+        (r.sender_id === userId && r.receiver_id === receiverId) ||
+        (r.sender_id === receiverId && r.receiver_id === userId);
+      return samePair && r.status === "pending";
+    });
+    if (already) return;
+    const alreadyFriend = friends.some((f) => f.id === receiverId);
+    if (alreadyFriend) return;
     const { error: insertError, data } = await supabase
       .from("friend_requests")
       .insert({ sender_id: userId, receiver_id: receiverId, status: "pending" });
