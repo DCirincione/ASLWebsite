@@ -131,9 +131,11 @@ export default function SportsPage() {
                 key={id}
                 id={id}
                 className={`sport-card ${tone}`}
-                style={{
-                  "--sport-bg": bgImage ? `url(${bgImage})` : "none",
-                }}
+                style={
+                  {
+                    "--sport-bg": bgImage ? `url(${bgImage})` : "none",
+                  } as React.CSSProperties
+                }
               >
                 <div className="sport-card__overlay">
                   <div className="sport-card__content">
