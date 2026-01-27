@@ -160,6 +160,22 @@ export function SiteHeader() {
                 {link.label}
               </Link>
             ))}
+            <div className="nav__mobile-actions">
+              {isAuthenticated ? (
+                <>
+                  <Link href="/account" className="nav__link" onClick={() => setIsMobileNavOpen(false)}>
+                    Account
+                  </Link>
+                  <Link href="/account/events" className="nav__link" onClick={() => setIsMobileNavOpen(false)}>
+                    My Events
+                  </Link>
+                </>
+              ) : (
+                <button className="button ghost" type="button" onClick={() => { setIsMobileNavOpen(false); openAccountModal(); }}>
+                  Sign In / Create Account
+                </button>
+              )}
+            </div>
           </nav>
           <div className="header-actions">
             {isAuthenticated ? (

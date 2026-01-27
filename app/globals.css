@@ -449,6 +449,10 @@ html[data-contrast="high"] .font-controls__value {
   background: rgba(255, 255, 255, 0.02);
 }
 
+.nav__mobile-actions {
+  display: none;
+}
+
 .mobile-nav-toggle {
   display: none;
   background: #0f274a;
@@ -489,6 +493,26 @@ html[data-contrast="high"] .font-controls__value {
     width: 100%;
     color: #e8edf7;
     font-weight: 700;
+  }
+
+  .nav__mobile-actions {
+    display: grid;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .nav__mobile-actions .button {
+    width: 100%;
+    justify-content: center;
+    background: #ffffff;
+    color: #cbd5e1 !important;
+    border-color: #cbd5e1;
+  }
+
+  html[data-theme="dark"] .nav__mobile-actions .button {
+    background: rgba(255, 255, 255, 0.06);
+    color: #e8edf7;
+    border-color: #1f2a40;
   }
 
   .mobile-nav-toggle {
