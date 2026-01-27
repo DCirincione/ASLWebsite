@@ -153,7 +153,7 @@ export default function EventsPage() {
         id="events-page"
         eyebrow="Events"
         title="Upcoming Events"
-        description="Tournaments, showcases, leagues, and fundraisers. See what's coming up and plan your season."
+        description="Tournaments, showcases, leagues, pick-up sessions, and fundraisers. See what's coming up and plan your season."
         headingLevel="h1"
       >
         {message ? (
