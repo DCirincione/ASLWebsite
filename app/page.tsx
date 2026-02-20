@@ -12,6 +12,7 @@ type HomeEvent = {
   location: string;
   href?: string;
   image?: string;
+  image_url?: string | null;
 };
 
 const fallbackEvents: HomeEvent[] = [
@@ -62,67 +63,25 @@ const formatDate = (value?: string | null) => {
   });
 };
 
-const forever5Images = ["/forever5/newman5.png"];
-const pickleballImages = ["/pickleball/boxPB.jpeg", "/PickleTourneyCourt6.png"];
-const aldrichJrImages: string[] = [];
-const basketballImages: string[] = ["/basketball/champst2025.jpeg"];
-const amputeeImages: string[] = ["/amputee/amputee2025.jpeg"];
-const sundayLeagueImages: string[] = ["/sundayLeague/champs2025.jpeg"];
-const communityVsKidsImages: string[] = ["/commVsKids/cVsK2025.jpeg"];
-
-const fallbackImages = fallbackEvents.map((e) => e.image).filter(Boolean) as string[];
-
-const pickImageForTitle = (title: string, idx: number) => {
-  const lower = title.toLowerCase();
-  const rules: { keywords: string[]; pool: string[] }[] = [
-    {
-      keywords: [
-        "community vs kids",
-        "community vs. kids",
-        "community versus kids",
-        "community kids",
-      ],
-      pool: communityVsKidsImages,
-    },
-    { keywords: ["newman"], pool: forever5Images },
-    { keywords: ["pickleball"], pool: pickleballImages },
-    { keywords: ["aldrich jr", "jr"], pool: aldrichJrImages },
-    { keywords: ["basketball", "hoops"], pool: basketballImages },
-    { keywords: ["amputee"], pool: amputeeImages },
-    { keywords: ["sunday league"], pool: sundayLeagueImages },
-  ];
-
-  for (const rule of rules) {
-    if (rule.keywords.some((kw) => lower.includes(kw)) && rule.pool.length > 0) {
-      return rule.pool[idx % rule.pool.length];
-    }
-  }
-
-  if (fallbackImages.length > 0) {
-    return fallbackImages[idx % fallbackImages.length];
-  }
-  return undefined;
-};
-
 async function getUpcomingEvents(): Promise<HomeEvent[]> {
   if (!supabase) return fallbackEvents;
 
   const { data, error } = await supabase
     .from("events")
-    .select("title,start_date,location")
+    .select("title,start_date,location,image_url")
     .order("start_date", { ascending: true, nullsFirst: false })
     .limit(4);
 
   if (error || !data || data.length === 0) return fallbackEvents;
 
   return data.map((event, idx) => {
-    const image = pickImageForTitle(event.title, idx);
     return {
       title: event.title,
       date: formatDate(event.start_date),
       location: event.location ?? "Location TBD",
       href: "/events",
-      image,
+      image: event.image_url ?? undefined,
+      image_url: event.image_url ?? null,
     };
   });
 }

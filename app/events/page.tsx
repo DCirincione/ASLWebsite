@@ -18,6 +18,7 @@ type EventItem = {
   description?: string | null;
   status?: "scheduled" | "potential" | "tbd" | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
+  image_url?: string | null;
   registration_program_slug?: string | null;
   image?: string;
 };
@@ -38,7 +39,7 @@ export default function EventsPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,status,host_type,registration_program_slug")
+        .select("id,title,start_date,end_date,time_info,location,description,status,host_type,image_url,registration_program_slug")
         .order("start_date", { ascending: true, nullsFirst: false });
       if (!error && data) {
         setEvents(data as EventItem[]);
@@ -113,31 +114,7 @@ export default function EventsPage() {
     }
   };
 
-  const pickImageForTitle = (title: string, idx: number) => {
-    const lower = title.toLowerCase();
-    const rules: { keywords: string[]; pool: string[] }[] = [
-      { keywords: ["community vs kids", "community vs. kids", "community kids"], pool: ["/commVsKids/cVsK2025.jpeg"] },
-      { keywords: ["newman"], pool: ["/forever5/newman5.png"] },
-      { keywords: ["pick up", "pickup", "late night"], pool: ["/basketball/champst2025.jpeg"] },
-      { keywords: ["pickleball"], pool: ["/pickleball/boxPB.jpeg", "/PickleTourneyCourt6.png"] },
-      { keywords: ["basketball", "hoops"], pool: ["/basketball/champst2025.jpeg"] },
-      { keywords: ["amputee"], pool: ["/amputee/amputee2025.jpeg"] },
-      { keywords: ["sunday league"], pool: ["/sundayLeague/champs2025.jpeg"] },
-    ];
-    const fallback = [
-      "/basketball/champst2025.jpeg",
-      "/forever5/newman5.png",
-      "/PickleTourneyCourt6.png",
-      "/commVsKids/cVsK2025.jpeg",
-    ];
-
-    for (const rule of rules) {
-      if (rule.keywords.some((kw) => lower.includes(kw)) && rule.pool.length > 0) {
-        return rule.pool[idx % rule.pool.length];
-      }
-    }
-    return fallback[idx % fallback.length];
-  };
+  const ensureImage = (event: EventItem) => event.image_url || undefined;
 
   const sortByStartDate = (a: EventItem, b: EventItem) => {
     const aDate = parseDateUTC(a.start_date);
@@ -180,15 +157,15 @@ export default function EventsPage() {
     return {
       aldrichEvents: (aldrich.length > 0 ? aldrich : featuredFallback).map((ev, idx) => ({
         ...ev,
-        image: pickImageForTitle(ev.title, idx),
+        image: ensureImage(ev),
       })),
       featuredEvents: (featured.length > 0 ? featured : featuredFallback).map((ev, idx) => ({
         ...ev,
-        image: pickImageForTitle(ev.title, idx + 2),
+        image: ensureImage(ev),
       })),
       allEvents: ordered.map((ev, idx) => ({
         ...ev,
-        image: pickImageForTitle(ev.title, idx + 4),
+        image: ensureImage(ev),
       })),
     };
   };
