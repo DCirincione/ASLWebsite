@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { PageShell } from "@/components/page-shell";
+import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
 
@@ -16,16 +18,19 @@ type EventItem = {
   description?: string | null;
   status?: "scheduled" | "potential" | "tbd" | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
+  registration_program_slug?: string | null;
   image?: string;
 };
 
 export default function EventsPage() {
+  const router = useRouter();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [signups, setSignups] = useState<Set<string>>(new Set());
-  const [savingEventId, setSavingEventId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [modalSlug, setModalSlug] = useState<string | null>(null);
+  const [modalTitle, setModalTitle] = useState<string | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -33,7 +38,7 @@ export default function EventsPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,status,host_type")
+        .select("id,title,start_date,end_date,time_info,location,description,status,host_type,registration_program_slug")
         .order("start_date", { ascending: true, nullsFirst: false });
       if (!error && data) {
         setEvents(data as EventItem[]);
@@ -43,17 +48,6 @@ export default function EventsPage() {
     loadEvents();
   }, []);
 
-  const loadSignups = useCallback(async (uid: string) => {
-    if (!supabase) return;
-    const { data, error } = await supabase
-      .from("event_signups")
-      .select("event_id")
-      .eq("user_id", uid);
-    if (!error && data) {
-      setSignups(new Set(data.map((row) => row.event_id)));
-    }
-  }, []);
-
   useEffect(() => {
     const client = supabase;
     if (!client) return;
@@ -61,25 +55,17 @@ export default function EventsPage() {
     client.auth.getSession().then(({ data }) => {
       const uid = data.session?.user.id ?? null;
       setUserId(uid);
-      if (uid) {
-        loadSignups(uid);
-      }
     });
 
     const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
       const uid = session?.user.id ?? null;
       setUserId(uid);
-      if (uid) {
-        loadSignups(uid);
-      } else {
-        setSignups(new Set());
-      }
     });
 
     return () => {
       subscription?.subscription.unsubscribe();
     };
-  }, [loadSignups]);
+  }, []);
 
   const parseDateUTC = (value?: string | null) => {
     if (!value) return null;
@@ -236,57 +222,30 @@ export default function EventsPage() {
           </div>
           {event.description ? <p className="muted">{event.description}</p> : null}
           <div className="event-card__actions">
-            {signups.has(event.id) ? (
-              <span className="pill pill--green" role="status" aria-live="polite">
-                Added to My Events
-              </span>
-            ) : userId ? (
-              <button
-                className="button primary"
-                type="button"
-                disabled={savingEventId === event.id}
-                onClick={() => handleSignup(event.id)}
-              >
-                {savingEventId === event.id ? "Saving..." : "Sign up"}
-              </button>
-            ) : (
-              <Link className="button ghost" href="/account">
-                Sign in to sign up
-              </Link>
-            )}
+            <button
+              className="button primary"
+              type="button"
+              onClick={() => {
+                if (!event.registration_program_slug) {
+                  setMessage("Registration for this event is not available yet.");
+                  return;
+                }
+                if (!userId) {
+                  router.push("/account");
+                  return;
+                }
+                setModalSlug(event.registration_program_slug);
+                setModalTitle(event.title);
+                setModalOpen(true);
+              }}
+              disabled={!event.registration_program_slug}
+            >
+              {event.registration_program_slug ? "Register" : "Registration coming soon"}
+            </button>
           </div>
         </div>
       </article>
     );
-  };
-
-  const handleSignup = async (eventId: string) => {
-    if (!supabase) {
-      setMessage("Connect Supabase to enable event sign-ups.");
-      return;
-    }
-    if (!userId) {
-      setMessage("Sign in to join events and track them in My Events.");
-      return;
-    }
-
-    setSavingEventId(eventId);
-    setMessage(null);
-    const { error } = await supabase
-      .from("event_signups")
-      .upsert({ event_id: eventId, user_id: userId }, { onConflict: "event_id,user_id" });
-
-    if (error) {
-      setMessage("Could not save your sign-up. Please try again.");
-    } else {
-      setSignups((prev) => {
-        const next = new Set(prev);
-        next.add(eventId);
-        return next;
-      });
-      setMessage("Added to My Events.");
-    }
-    setSavingEventId(null);
   };
 
   return (
@@ -377,6 +336,12 @@ export default function EventsPage() {
           })()
         ) : null}
       </Section>
+      <RegistrationModal
+        open={modalOpen}
+        programSlug={modalSlug}
+        contextTitle={modalTitle ?? undefined}
+        onClose={() => setModalOpen(false)}
+      />
     </PageShell>
   );
 }

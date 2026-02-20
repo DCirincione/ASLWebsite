@@ -1977,6 +1977,142 @@ html[data-contrast="high"] .events-jump select {
   aspect-ratio: 16 / 9;
 }
 
+.register-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(12, 21, 38, 0.75);
+  backdrop-filter: blur(12px);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  z-index: 50;
+}
+
+.register-modal {
+  background: linear-gradient(180deg, #ffffff, #f8fafc);
+  border-radius: 18px;
+  border: 1px solid rgba(12, 21, 38, 0.08);
+  width: min(960px, 100%);
+  max-height: 92vh;
+  overflow: auto;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.2);
+  padding: 28px;
+}
+
+.register-modal__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 12px;
+}
+
+.register-modal__meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 10px 0 4px;
+  flex-wrap: wrap;
+}
+
+.register-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.register-footer__left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.register-footer__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.register-form {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.register-form-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.register-form input,
+.register-form select,
+.register-form textarea {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font: inherit;
+  background: #f8fafc;
+  color: inherit;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.register-form input:focus,
+.register-form select:focus,
+.register-form textarea:focus {
+  outline: none;
+  border-color: rgba(233, 93, 42, 0.6);
+  box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.12);
+  background: #ffffff;
+}
+
+.checkbox-control {
+  display: flex;
+  align-items: center;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+}
+
+.checkbox-label input {
+  width: 18px;
+  height: 18px;
+}
+
+.register-field-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.register-required {
+  color: #e95d2a;
+  font-weight: 700;
+}
+
+html[data-theme="dark"] .register-modal {
+  background: linear-gradient(180deg, #0f192d, #0c1526);
+  border-color: #1f2a40;
+  color: #e8edf7;
+}
+
+html[data-theme="dark"] .register-modal__header,
+html[data-theme="dark"] .register-modal__footer {
+  border-color: #1f2a40;
+}
+
 @media (max-width: 720px) {
   .event-card-grid {
     grid-auto-columns: 85%;
