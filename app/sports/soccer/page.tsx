@@ -5,87 +5,91 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { PageShell } from "@/components/page-shell";
+import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
-import type { Soccer } from "@/lib/supabase/types";
-import { SoccerTournaments } from "./tournaments";
+import type { Event, Soccer } from "@/lib/supabase/types";
 
+type SportEvent = Event & { image?: string };
 type SoccerCard = Soccer & { image?: string };
 
-const fallbackItems: SoccerCard[] = [
-  {
-    id: "clinic-1",
-    title: "Finishing & First Touch Clinic",
-    type: "clinic",
-    start_date: "2026-02-15",
-    time_info: "Sunday 2:00 PM",
-    location: "Newman Field 5",
-    description: "Small-group reps on striking, first touch, and decision making.",
-    cta_label: "Save your spot",
-    cta_url: "/events",
-    level: "All levels",
-    image: "/forever5/newman5.png",
-  },
-  {
-    id: "league-1",
-    title: "Spring 7v7 League",
-    type: "league",
-    start_date: "2026-03-10",
-    time_info: "Tuesday nights",
-    location: "Aldrich",
-    description: "8-week season with playoffs. Rosters up to 12.",
-    cta_label: "Register team",
-    cta_url: "/register",
-    level: "Competitive / Coed",
-    image: "/forever5/newman5.png",
-  },
-  {
-    id: "pickup-1",
-    title: "Saturday Pickup",
-    type: "pickup",
-    start_date: null,
-    time_info: "10:00 AM",
-    location: "Newman Field 5",
-    description: "Open play, rotating teams, all levels welcome.",
-    cta_label: "RSVP",
-    cta_url: "/events",
-    level: "Open",
-    image: "/forever5/newman5.png",
-  },
-];
-
+const fallbackSoccer: SoccerCard[] = [];
 const imageFallbacks = ["/forever5/newman5.png", "/basketball/champst2025.jpeg", "/PickleTourneyCourt6.png"];
 
 export default function SoccerPage() {
-  const [items, setItems] = useState<SoccerCard[]>(fallbackItems);
-  const [loading, setLoading] = useState(false);
+  const [soccerItems, setSoccerItems] = useState<SoccerCard[]>(fallbackSoccer);
+  const [events, setEvents] = useState<SportEvent[]>([]);
+  const [loadingSoccer, setLoadingSoccer] = useState(false);
+  const [loadingEvents, setLoadingEvents] = useState(false);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalSlug, setModalSlug] = useState<string | null>(null);
+  const [modalTitle, setModalTitle] = useState<string | null>(null);
 
   useEffect(() => {
-    const load = async () => {
+    const loadSoccer = async () => {
       if (!supabase) return;
-      setLoading(true);
+      setLoadingSoccer(true);
       const { data, error } = await supabase
         .from("soccer")
-        .select("id,title,type,start_date,end_date,time_info,location,description,cta_label,cta_url,image_url,level")
-        .order("start_date", { ascending: true, nullsFirst: false });
+        .select("id,title,type,start_date,end_date,time_info,location,description,cta_label,cta_url,image_url,level");
       if (!error && data) {
         const mapped = (data as Soccer[]).map((row, idx) => ({
           ...row,
           image: row.image_url || imageFallbacks[idx % imageFallbacks.length],
         }));
-        setItems(mapped);
+        setSoccerItems(mapped);
       }
-      setLoading(false);
+      setLoadingSoccer(false);
     };
-    load();
+    const loadEvents = async () => {
+      if (!supabase) return;
+      setLoadingEvents(true);
+      const { data, error } = await supabase
+        .from("events")
+        .select("id,title,start_date,end_date,time_info,location,description,status,registration_program_slug,image_url,sport_slug")
+        .order("start_date", { ascending: true, nullsFirst: false });
+      if (!error && data) {
+        const filtered = (data as Event[]).filter((row) => row.sport_slug === "soccer");
+        const fallbackAll = filtered.length > 0 ? filtered : (data as Event[]);
+        const mapped = fallbackAll.map((row) => ({
+          ...row,
+          image: row.image_url || undefined,
+        }));
+        setEvents(mapped);
+      }
+      setLoadingEvents(false);
+    };
+    loadSoccer();
+    loadEvents();
   }, []);
 
   const byType = useMemo(() => {
-    const clinics = items.filter((i) => i.type === "clinic");
-    const leagues = items.filter((i) => i.type === "league");
-    const pickup = items.filter((i) => i.type === "pickup");
+    const clinics = soccerItems.filter((i) => i.type === "clinic");
+    const leagues = soccerItems.filter((i) => i.type === "league");
+    const pickup = soccerItems.filter((i) => i.type === "pickup");
     return { clinics, leagues, pickup };
-  }, [items]);
+  }, [soccerItems]);
+
+  const formatDate = (value?: string | null) => {
+    if (!value) return "Date TBD";
+    const parts = value.split("-").map(Number);
+    if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return "Date TBD";
+    const [year, month, day] = parts;
+    const date = new Date(Date.UTC(year, month - 1, day));
+    return date.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      timeZone: "UTC",
+    });
+  };
+
+  const openModal = (slug?: string | null, title?: string) => {
+    if (!slug) return;
+    setModalSlug(slug);
+    setModalTitle(title ?? null);
+    setModalOpen(true);
+  };
 
   const renderCards = (list: SoccerCard[]) => {
     if (!list || list.length === 0) {
@@ -134,14 +138,17 @@ export default function SoccerPage() {
         <div className="soccer-hero__grid">
           <div className="soccer-hero__copy">
             <div className="cta-row">
-              <Link className="button primary" href="#join">
-                Join a league
+              <Link className="button primary" href="#clinics">
+                Clinics
+              </Link>
+              <Link className="button ghost" href="#join">
+                Leagues
               </Link>
               <Link className="button ghost" href="#pickup">
-                Find pickup
+                Pickup
               </Link>
-              <Link className="button ghost" href="#tournaments">
-                Tournaments
+              <Link className="button ghost" href="#events">
+                Events & Tournaments
               </Link>
             </div>
           </div>
@@ -164,7 +171,7 @@ export default function SoccerPage() {
         headingLevel="h2"
         className="soccer-section"
       >
-        {loading ? <p className="muted">Loading clinics...</p> : renderCards(byType.clinics)}
+        {loadingSoccer ? <p className="muted">Loading clinics...</p> : renderCards(byType.clinics)}
       </Section>
 
       <Section
@@ -175,7 +182,7 @@ export default function SoccerPage() {
         headingLevel="h2"
         className="soccer-section"
       >
-        {loading ? <p className="muted">Loading leagues...</p> : renderCards(byType.leagues)}
+        {loadingSoccer ? <p className="muted">Loading leagues...</p> : renderCards(byType.leagues)}
       </Section>
 
       <Section
@@ -186,19 +193,61 @@ export default function SoccerPage() {
         headingLevel="h2"
         className="soccer-section"
       >
-        {loading ? <p className="muted">Loading pickup...</p> : renderCards(byType.pickup)}
+        {loadingSoccer ? <p className="muted">Loading pickup...</p> : renderCards(byType.pickup)}
       </Section>
 
       <Section
-        id="tournaments"
-        eyebrow="Cups"
-        title="Tournaments"
-        description="Weekend cups and seasonal brackets."
+        id="events"
+        eyebrow="Events"
+        title="Events & Tournaments"
+        description="Soccer tournaments, leagues, and showcases."
         headingLevel="h2"
-        className="soccer-section"
+        className="sport-event-section"
       >
-        <SoccerTournaments />
+        {loadingEvents ? <p className="muted">Loading events...</p> : null}
+        {!loadingEvents && events.length === 0 ? (
+          <p className="muted">No soccer events yet. Check back soon.</p>
+        ) : null}
+        {!loadingEvents && events.length > 0 ? (
+          <div className="sport-event-list">
+            {events.map((ev) => (
+              <article key={ev.id} className="sport-event-card">
+                <div className="sport-event-card__body">
+                  <p className="eyebrow">Soccer</p>
+                  <h3>{ev.title}</h3>
+                  <p className="sport-event__meta">
+                    <span>{ev.location || "Location TBD"}</span>
+                    <span>•</span>
+                    <span>{ev.time_info || formatDate(ev.start_date)}</span>
+                  </p>
+                  <p className="muted">{ev.description || "Details coming soon."}</p>
+                  <div className="sport-event__actions">
+                    <button
+                      className="button primary"
+                      type="button"
+                      disabled={!ev.registration_program_slug}
+                      onClick={() => openModal(ev.registration_program_slug, ev.title)}
+                    >
+                      {ev.registration_program_slug ? "Sign up" : "Registration coming soon"}
+                    </button>
+                  </div>
+                </div>
+                {ev.image ? (
+                  <div className="sport-event-card__media">
+                    <img src={ev.image} alt="" />
+                  </div>
+                ) : null}
+              </article>
+            ))}
+          </div>
+        ) : null}
       </Section>
+      <RegistrationModal
+        open={modalOpen}
+        programSlug={modalSlug}
+        contextTitle={modalTitle ?? undefined}
+        onClose={() => setModalOpen(false)}
+      />
     </PageShell>
   );
 }

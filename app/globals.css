@@ -881,6 +881,37 @@ html[data-contrast="high"] .font-controls__value {
   background-position: center;
 }
 
+.event-card__image--interactive {
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.event-card__image--interactive::after {
+  content: "View details";
+  position: absolute;
+  inset: auto 10px 10px auto;
+  background: rgba(12, 21, 38, 0.8);
+  color: #f8fafc;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.event-card__image--interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.16);
+}
+
+.event-card__image--interactive:hover::after {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .event-card__body {
   padding: 16px;
   display: flex;
@@ -2037,6 +2068,190 @@ html[data-contrast="high"] .events-jump select {
   gap: 8px;
 }
 
+.event-detail-backdrop {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(70% 70% at 50% 12%, rgba(12, 21, 38, 0.52), rgba(10, 16, 28, 0.9));
+  backdrop-filter: blur(12px);
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  z-index: 55;
+}
+
+.event-detail {
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  width: min(1100px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.16);
+  padding: 26px;
+}
+
+.event-detail__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding-bottom: 12px;
+}
+
+.event-detail__header h2 {
+  margin: 6px 0;
+  letter-spacing: -0.01em;
+}
+
+.event-detail__header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.event-detail__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 10px;
+}
+
+.event-detail__layout {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.event-detail__info {
+  background: rgba(15, 23, 42, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.event-detail__info h3 {
+  margin: 0 0 4px;
+}
+
+.event-detail__list {
+  background: rgba(15, 23, 42, 0.02);
+  border: 1px dashed rgba(15, 23, 42, 0.18);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.event-detail__list h4 {
+  margin: 0 0 6px;
+}
+
+.event-detail__list ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  color: #475569;
+}
+
+.event-detail__media {
+  display: grid;
+  gap: 12px;
+}
+
+.event-detail__flyer,
+.event-detail__gallery {
+  background: rgba(15, 23, 42, 0.02);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 200px;
+}
+
+.event-detail__media-label {
+  padding: 10px 12px 0;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.event-detail__flyer img,
+.event-detail__gallery img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.event-detail__media-empty {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  color: #475569;
+  text-align: center;
+}
+
+html[data-theme="dark"] .event-detail {
+  background: linear-gradient(180deg, #0f172a, #0b1224);
+  color: #e8edf7;
+  border-color: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.4);
+}
+
+html[data-theme="dark"] .event-detail__info {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+html[data-theme="dark"] .event-detail__list {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="dark"] .event-detail__list ul {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .event-detail__flyer,
+html[data-theme="dark"] .event-detail__gallery {
+  background: rgba(255, 255, 255, 0.02);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+html[data-theme="dark"] .event-detail__media-label {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .event-detail__media-empty {
+  color: #cbd5e1;
+}
+
+@media (max-width: 960px) {
+  .event-detail__layout {
+    grid-template-columns: 1fr;
+  }
+
+  .event-detail {
+    width: min(960px, 100%);
+  }
+
+  .event-detail__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .event-detail__header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
 .register-form {
   margin-top: 16px;
   display: flex;
@@ -2346,6 +2561,106 @@ html[data-contrast="high"] .event-card-simple {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+/* Sport event layout */
+.sport-event-section {
+  padding-top: 32px;
+}
+
+.sport-event {
+  background: #0f192d;
+  color: #ffffff;
+  border-radius: 18px;
+  padding: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: var(--glow);
+}
+
+.sport-event__grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+.sport-event__body h2 {
+  margin: 6px 0;
+  font-size: clamp(28px, 4vw, 38px);
+  letter-spacing: -0.01em;
+}
+
+.sport-event__meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-weight: 700;
+}
+
+.sport-event__actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 12px 0 16px;
+}
+
+.sport-event__info {
+  margin-top: 12px;
+}
+
+.sport-event__info h3 {
+  margin: 0 0 6px;
+}
+
+.sport-event__media {
+  display: grid;
+  gap: 10px;
+}
+
+.sport-event__media img,
+.sport-event__media-secondary img {
+  width: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #0c1526;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sport-event__media-secondary {
+  display: grid;
+}
+
+.sport-event-list {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.sport-event-card {
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 14px;
+  padding: 14px;
+  align-items: center;
+}
+
+.sport-event-card__media img {
+  width: 100%;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.sport-event-card__body h3 {
+  margin: 4px 0;
+}
+
+@media (max-width: 960px) {
+  .sport-event__grid,
+  .sport-event-card {
+    grid-template-columns: 1fr;
+  }
 }
 
 .soccer-card__body {

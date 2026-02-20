@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { PageShell } from "@/components/page-shell";
+import { EventDetailModal } from "@/components/event-detail-modal";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
@@ -32,6 +33,7 @@ export default function EventsPage() {
   const [modalSlug, setModalSlug] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [detailEvent, setDetailEvent] = useState<EventItem | null>(null);
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -93,6 +95,12 @@ export default function EventsPage() {
     }
     if (startDate) return startDate.toLocaleDateString(undefined, opts);
     return "";
+  };
+
+  const primaryDateLabel = (event: EventItem) => {
+    const dateRange = formatDateRange(event.start_date, event.end_date);
+    const timeInfo = event.time_info?.trim();
+    return timeInfo || dateRange || "Date TBD";
   };
 
   const statusLabel = (status?: string | null) => {
@@ -171,16 +179,23 @@ export default function EventsPage() {
   };
 
   const renderEventCard = (event: EventItem) => {
-    const dateRange = formatDateRange(event.start_date, event.end_date);
-    const timeInfo = event.time_info?.trim();
-    const primaryDate = timeInfo || dateRange || "Date TBD";
+    const primaryDate = primaryDateLabel(event);
 
     return (
       <article key={event.id} className="event-card event-card--full">
         <div
-          className="event-card__image"
+          className="event-card__image event-card__image--interactive"
           style={{ backgroundImage: event.image ? `url(${event.image})` : undefined }}
-          aria-hidden
+          role="button"
+          tabIndex={0}
+          aria-label={`Open details for ${event.title}`}
+          onClick={() => setDetailEvent(event)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              setDetailEvent(event);
+            }
+          }}
         />
         <div className="event-card__body">
           <div className="event-card__header">
@@ -318,6 +333,26 @@ export default function EventsPage() {
         programSlug={modalSlug}
         contextTitle={modalTitle ?? undefined}
         onClose={() => setModalOpen(false)}
+      />
+      <EventDetailModal
+        open={Boolean(detailEvent)}
+        event={detailEvent}
+        dateLabel={detailEvent ? primaryDateLabel(detailEvent) : undefined}
+        onClose={() => setDetailEvent(null)}
+        onRegister={(event) => {
+          if (!event.registration_program_slug) {
+            setMessage("Registration for this event is not available yet.");
+            return;
+          }
+          if (!userId) {
+            router.push("/account");
+            return;
+          }
+          setDetailEvent(null);
+          setModalSlug(event.registration_program_slug);
+          setModalTitle(event.title);
+          setModalOpen(true);
+        }}
       />
     </PageShell>
   );
