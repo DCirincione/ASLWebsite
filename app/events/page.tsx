@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -163,15 +163,15 @@ export default function EventsPage() {
     const featuredFallback = ordered.slice(0, 4);
 
     return {
-      aldrichEvents: (aldrich.length > 0 ? aldrich : featuredFallback).map((ev, idx) => ({
+      aldrichEvents: (aldrich.length > 0 ? aldrich : featuredFallback).map((ev) => ({
         ...ev,
         image: ensureImage(ev),
       })),
-      featuredEvents: (featured.length > 0 ? featured : featuredFallback).map((ev, idx) => ({
+      featuredEvents: (featured.length > 0 ? featured : featuredFallback).map((ev) => ({
         ...ev,
         image: ensureImage(ev),
       })),
-      allEvents: ordered.map((ev, idx) => ({
+      allEvents: ordered.map((ev) => ({
         ...ev,
         image: ensureImage(ev),
       })),
@@ -185,7 +185,6 @@ export default function EventsPage() {
       <article key={event.id} className="event-card event-card--full">
         <div
           className="event-card__image event-card__image--interactive"
-          style={{ backgroundImage: event.image ? `url(${event.image})` : undefined }}
           role="button"
           tabIndex={0}
           aria-label={`Open details for ${event.title}`}
@@ -196,7 +195,17 @@ export default function EventsPage() {
               setDetailEvent(event);
             }
           }}
-        />
+        >
+          {event.image ? (
+            <Image
+              src={event.image}
+              alt=""
+              fill
+              sizes="(max-width: 900px) 100vw, 360px"
+              style={{ objectFit: "cover" }}
+            />
+          ) : null}
+        </div>
         <div className="event-card__body">
           <div className="event-card__header">
             <h3 className="event-card__title">{event.title}</h3>

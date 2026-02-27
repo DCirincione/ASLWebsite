@@ -69,7 +69,9 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
   }, [open, router]);
 
   useEffect(() => {
-    if (!open || !programSlug || !supabase) return;
+    if (!open || !programSlug) return;
+    const client = supabase;
+    if (!client) return;
     const load = async () => {
       setLoadingProgram(true);
       setStatus({ type: "idle" });
@@ -78,7 +80,7 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
       setValues({});
       setFiles({});
 
-      const { data: programRow, error: programError } = await supabase
+      const { data: programRow, error: programError } = await client
         .from("registration_programs")
         .select("id,slug,name,sport_slug,waiver_url")
         .eq("slug", programSlug)
@@ -91,7 +93,7 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
         return;
       }
 
-      const { data: fieldRows, error: fieldError } = await supabase
+      const { data: fieldRows, error: fieldError } = await client
         .from("registration_fields")
         .select("id,label,name,type,required,options,placeholder,help,order")
         .eq("program_id", programRow.id)
@@ -159,7 +161,8 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!supabase) {
+    const client = supabase;
+    if (!client) {
       setStatus({ type: "error", message: "Supabase is not configured." });
       return;
     }
@@ -189,7 +192,7 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
       const storedPaths: string[] = [];
       for (const file of fileList) {
         const path = `${program.slug}/${crypto.randomUUID()}-${file.name}`;
-        const { data, error } = await supabase.storage.from("signups").upload(path, file, {
+        const { data, error } = await client.storage.from("signups").upload(path, file, {
           cacheControl: "3600",
           upsert: false,
         });
@@ -204,7 +207,7 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
       answers[fieldName] = storedPaths.length === 1 ? storedPaths[0] : storedPaths;
     }
 
-    const { error } = await supabase.from("registration_submissions").insert({
+    const { error } = await client.from("registration_submissions").insert({
       program_id: program.id,
       sport_slug: program.sport_slug,
       user_id: userId,

@@ -249,6 +249,114 @@ export type SoccerUpdate = {
   level?: string | null;
 };
 
+export type RegistrationProgram = {
+  id: string;
+  slug: string;
+  name: string;
+  sport_slug?: string | null;
+  waiver_url?: string | null;
+  active?: boolean | null;
+  created_at?: string | null;
+};
+
+export type RegistrationProgramInsert = {
+  id?: string;
+  slug: string;
+  name: string;
+  sport_slug?: string | null;
+  waiver_url?: string | null;
+  active?: boolean | null;
+  created_at?: string | null;
+};
+
+export type RegistrationProgramUpdate = {
+  id?: string;
+  slug?: string;
+  name?: string;
+  sport_slug?: string | null;
+  waiver_url?: string | null;
+  active?: boolean | null;
+  created_at?: string | null;
+};
+
+export type RegistrationField = {
+  id: string;
+  program_id: string;
+  label: string;
+  name: string;
+  type: "text" | "email" | "tel" | "number" | "select" | "textarea" | "checkbox" | "file";
+  required: boolean;
+  options?: string[] | null;
+  placeholder?: string | null;
+  help?: string | null;
+  order?: number | null;
+  created_at?: string | null;
+};
+
+export type RegistrationFieldInsert = {
+  id?: string;
+  program_id: string;
+  label: string;
+  name: string;
+  type: "text" | "email" | "tel" | "number" | "select" | "textarea" | "checkbox" | "file";
+  required?: boolean;
+  options?: string[] | null;
+  placeholder?: string | null;
+  help?: string | null;
+  order?: number | null;
+  created_at?: string | null;
+};
+
+export type RegistrationFieldUpdate = {
+  id?: string;
+  program_id?: string;
+  label?: string;
+  name?: string;
+  type?: "text" | "email" | "tel" | "number" | "select" | "textarea" | "checkbox" | "file";
+  required?: boolean;
+  options?: string[] | null;
+  placeholder?: string | null;
+  help?: string | null;
+  order?: number | null;
+  created_at?: string | null;
+};
+
+export type RegistrationSubmission = {
+  id: string;
+  program_id: string;
+  sport_slug?: string | null;
+  user_id: string;
+  answers?: Record<string, unknown> | null;
+  attachments?: string[] | null;
+  waiver_accepted?: boolean | null;
+  referral_source?: string | null;
+  created_at?: string | null;
+};
+
+export type RegistrationSubmissionInsert = {
+  id?: string;
+  program_id: string;
+  sport_slug?: string | null;
+  user_id: string;
+  answers?: Record<string, unknown> | null;
+  attachments?: string[] | null;
+  waiver_accepted?: boolean | null;
+  referral_source?: string | null;
+  created_at?: string | null;
+};
+
+export type RegistrationSubmissionUpdate = {
+  id?: string;
+  program_id?: string;
+  sport_slug?: string | null;
+  user_id?: string;
+  answers?: Record<string, unknown> | null;
+  attachments?: string[] | null;
+  waiver_accepted?: boolean | null;
+  referral_source?: string | null;
+  created_at?: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -298,6 +406,24 @@ export type Database = {
         Row: Soccer;
         Insert: SoccerInsert;
         Update: SoccerUpdate;
+        Relationships: [];
+      };
+      registration_programs: {
+        Row: RegistrationProgram;
+        Insert: RegistrationProgramInsert;
+        Update: RegistrationProgramUpdate;
+        Relationships: [];
+      };
+      registration_fields: {
+        Row: RegistrationField;
+        Insert: RegistrationFieldInsert;
+        Update: RegistrationFieldUpdate;
+        Relationships: [];
+      };
+      registration_submissions: {
+        Row: RegistrationSubmission;
+        Insert: RegistrationSubmissionInsert;
+        Update: RegistrationSubmissionUpdate;
         Relationships: [];
       };
     };
