@@ -13,20 +13,20 @@ import type { Event } from "@/lib/supabase/types";
 type SportEvent = Event & { image?: string };
 type EventBucket = "clinic" | "league" | "pickup" | "tournament" | "other";
 
-const imageFallbacks = ["/forever5/newman5.png", "/basketball/champst2025.jpeg", "/PickleTourneyCourt6.png"];
+const imageFallbacks = ["/basketball/champst2025.jpeg", "/forever5/newman5.png", "/PickleTourneyCourt6.png"];
 
 const bucketFromSlug = (registrationSlug?: string | null): EventBucket => {
   const value = (registrationSlug ?? "").trim().toLowerCase();
 
-  if (value.startsWith("soccer-clinic")) return "clinic";
-  if (value.startsWith("soccer-league")) return "league";
-  if (value.startsWith("soccer-pickup")) return "pickup";
-  if (value.startsWith("soccer-tournament")) return "tournament";
+  if (value.startsWith("basketball-clinic")) return "clinic";
+  if (value.startsWith("basketball-league")) return "league";
+  if (value.startsWith("basketball-pickup")) return "pickup";
+  if (value.startsWith("basketball-tournament")) return "tournament";
 
   return "other";
 };
 
-export default function SoccerPage() {
+export default function BasketballPage() {
   const [events, setEvents] = useState<SportEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -43,12 +43,10 @@ export default function SoccerPage() {
         .order("start_date", { ascending: true, nullsFirst: false });
 
       if (!error && data) {
-        const soccerOnly = (data as Event[]).filter((row) =>
-          ["soccer-clinic", "soccer-league", "soccer-pickup", "soccer-tournament", "soccer-event"].some((prefix) =>
-            (row.registration_program_slug ?? "").trim().toLowerCase().startsWith(prefix)
-          )
+        const basketballOnly = (data as Event[]).filter((row) =>
+          (row.registration_program_slug ?? "").trim().toLowerCase().startsWith("basketball-")
         );
-        const mapped = soccerOnly.map((row) => ({
+        const mapped = basketballOnly.map((row) => ({
           ...row,
           image: row.image_url || undefined,
         }));
@@ -143,10 +141,10 @@ export default function SoccerPage() {
   return (
     <PageShell>
       <Section
-        id="soccer-hero"
-        eyebrow="Soccer"
-        title="Play Soccer with Aldrich"
-        description="Leagues, pickup, and tournaments for every level. Form a team or jump into weekly runs."
+        id="basketball-hero"
+        eyebrow="Basketball"
+        title="Play Basketball with Aldrich"
+        description="Leagues, pickup, and tournaments for every level. Build your squad or join a run."
         headingLevel="h1"
         className="soccer-hero"
       >
@@ -171,7 +169,7 @@ export default function SoccerPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/sports_images/soccer/soccerLogoTest.png" alt="Aldrich Soccer" fill priority />
+            <Image src="/basketball/champst2025.jpeg" alt="Aldrich Basketball" fill priority />
           </div>
         </div>
       </Section>
@@ -180,7 +178,7 @@ export default function SoccerPage() {
         id="clinics"
         eyebrow="Clinics"
         title="Skill Clinics"
-        description="Targeted, small-sided sessions led by Aldrich coaches."
+        description="Position-specific sessions and game-speed reps led by Aldrich coaches."
         headingLevel="h2"
         className="soccer-section"
       >
@@ -191,7 +189,7 @@ export default function SoccerPage() {
         id="join"
         eyebrow="Leagues"
         title="League Play"
-        description="Pick your format and night. Captains can register teams or add free agents."
+        description="Join seasonal leagues and register full teams or free agents."
         headingLevel="h2"
         className="soccer-section"
       >
@@ -201,8 +199,8 @@ export default function SoccerPage() {
       <Section
         id="pickup"
         eyebrow="Pickup"
-        title="Pickup Sessions"
-        description="Weekly runs with a host, pinnies, and rotating teams."
+        title="Pickup Runs"
+        description="Consistent weekly runs with organized rotations and hosts."
         headingLevel="h2"
         className="soccer-section"
       >
@@ -213,7 +211,7 @@ export default function SoccerPage() {
         id="tournaments"
         eyebrow="Tournaments"
         title="Tournament Play"
-        description="Weekend cups, showcases, and knockout brackets."
+        description="Weekend brackets, showcase games, and championship runs."
         headingLevel="h2"
         className="soccer-section"
       >
@@ -223,19 +221,21 @@ export default function SoccerPage() {
       <Section
         id="events"
         eyebrow="Events"
-        title="Featured Soccer Events"
-        description="One-off showcases and community soccer days."
+        title="Featured Basketball Events"
+        description="One-off showcases and community basketball days."
         headingLevel="h2"
         className="sport-event-section"
       >
         {loadingEvents ? <p className="muted">Loading events...</p> : null}
-        {!loadingEvents && events.length === 0 ? <p className="muted">No soccer events yet. Check back soon.</p> : null}
+        {!loadingEvents && events.length === 0 ? (
+          <p className="muted">No basketball events yet. Check back soon.</p>
+        ) : null}
         {!loadingEvents && events.length > 0 ? (
           <div className="sport-event-list">
             {events.map((ev) => (
               <article key={ev.id} className="sport-event-card">
                 <div className="sport-event-card__body">
-                  <p className="eyebrow">Soccer</p>
+                  <p className="eyebrow">Basketball</p>
                   <h3>{ev.title}</h3>
                   <p className="sport-event__meta">
                     <span>{ev.location || "Location TBD"}</span>

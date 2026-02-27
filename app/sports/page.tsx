@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { PageShell } from "@/components/page-shell";
@@ -10,7 +10,21 @@ import type { Sport } from "@/lib/supabase/types";
 
 type SportCard = Sport & { image?: string; activities?: string; slug: string };
 
-const toSlug = (value: string) => value.toLowerCase().replace(/\s+/g, "-");
+const toSlug = (value: string) =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+const sportRouteBySlug: Record<string, string> = {
+  baseball: "baseball",
+  "baseball-softball": "baseball",
+  basketball: "basketball",
+  pickleball: "pickleball",
+  "run-club": "run-club",
+  soccer: "soccer",
+  "youth-soccer": "youth-soccer",
+};
 
 const fallbackSports: SportCard[] = [
   { id: "baseball", slug: "baseball", title: "Baseball", players_per_team: 9, gender: "open", short_description: "Diamond leagues, tourneys, and skills." },
@@ -74,10 +88,20 @@ export default function SportsPage() {
     loadSports();
   }, []);
 
-  const filtered = useMemo(() => {
-    if (selected === "all") return sports;
-    return sports.filter((s) => s.slug === selected || toSlug(s.title) === selected);
-  }, [selected, sports]);
+  const scrollToSport = (value: string) => {
+    const scrollToIdWithOffset = (id: string) => {
+      const target = document.getElementById(id);
+      if (!target) return;
+      const top = target.getBoundingClientRect().top + window.scrollY - 200;
+      window.scrollTo({ top: Math.max(top, 0), behavior: "smooth" });
+    };
+
+    if (value === "all") {
+      scrollToIdWithOffset("sports-page");
+      return;
+    }
+    scrollToIdWithOffset(value);
+  };
 
   const options = [
     { value: "all", label: "All Sports" },
@@ -104,7 +128,11 @@ export default function SportsPage() {
           <select
             id="sports-select"
             value={selected}
-            onChange={(e) => setSelected(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSelected(value);
+              scrollToSport(value);
+            }}
           >
             {options.map((o) => (
               <option key={o.value} value={o.value}>
@@ -115,8 +143,9 @@ export default function SportsPage() {
         </div>
 
         <div className="sports-stack">
-          {filtered.map((sport, idx) => {
+          {sports.map((sport, idx) => {
             const id = sport.slug ?? toSlug(sport.title);
+            const sportRoute = sportRouteBySlug[id] ?? sportRouteBySlug[toSlug(sport.title)];
             const activities =
               sport.short_description ||
               activityLabels[id] ||
@@ -137,12 +166,19 @@ export default function SportsPage() {
               >
                 <div className="sport-card__overlay">
                   <div className="sport-card__content">
-                    {sport.slug === "soccer" ? (
-                      <Link className="sport-card__cta" href={`/sports/${id}`}>
+                    {sportRoute ? (
+                      <Link className="sport-card__cta" href={`/sports/${sportRoute}`}>
                         Play {sport.title}
                       </Link>
                     ) : (
-                      <button className="sport-card__cta" type="button" onClick={() => setSelected(sport.slug)}>
+                      <button
+                        className="sport-card__cta"
+                        type="button"
+                        onClick={() => {
+                          setSelected(sport.slug);
+                          scrollToSport(sport.slug);
+                        }}
+                      >
                         Play {sport.title}
                       </button>
                     )}

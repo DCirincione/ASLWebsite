@@ -151,6 +151,12 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
     };
   }, [fields, files, values]);
 
+  const orderedFields = useMemo(() => {
+    const primary = fields.filter((field) => field.type !== "checkbox" && field.type !== "file");
+    const trailing = fields.filter((field) => field.type === "file" || field.type === "checkbox");
+    return [...primary, ...trailing];
+  }, [fields]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!supabase) {
@@ -249,7 +255,7 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
         {!loadingProgram && program && fields.length > 0 ? (
           <form className="register-form" onSubmit={handleSubmit}>
             <div className="register-form-grid">
-              {fields.map((field) => {
+              {orderedFields.map((field) => {
                 const value = values[field.name] ?? (field.type === "checkbox" ? false : "");
                 const id = `field-${field.id}`;
                 const label = (
@@ -302,7 +308,7 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
 
                 if (field.type === "checkbox") {
                   return (
-                    <div className="form-control checkbox-control" key={field.id}>
+                    <div className="form-control checkbox-control register-form-control--end" key={field.id}>
                       <label className="checkbox-label">
                         <input
                           id={id}
@@ -324,7 +330,7 @@ export function RegistrationModal({ open, programSlug, contextTitle, onClose, on
 
                 if (field.type === "file") {
                   return (
-                    <div className="form-control" key={field.id}>
+                    <div className="form-control register-form-control--end" key={field.id}>
                       <label htmlFor={id}>{label}</label>
                       <input
                         id={id}
