@@ -2005,7 +2005,8 @@ html[data-contrast="high"] .events-jump select {
 }
 
 .event-card--full .event-card__image {
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
+  min-height: 200px;
 }
 
 .register-modal-backdrop {

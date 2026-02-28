@@ -224,6 +224,13 @@ export default function EventsPage() {
           {event.description ? <p className="muted">{event.description}</p> : null}
           <div className="event-card__actions">
             <button
+              className="button ghost"
+              type="button"
+              onClick={() => setDetailEvent(event)}
+            >
+              View Details
+            </button>
+            <button
               className="button primary"
               type="button"
               onClick={() => {
