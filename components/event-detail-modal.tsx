@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+
+import { supabase } from "@/lib/supabase/client";
 
 type EventDetail = {
   id: string;
@@ -10,7 +12,6 @@ type EventDetail = {
   time_info?: string | null;
   location?: string | null;
   description?: string | null;
-  status?: "scheduled" | "potential" | "tbd" | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
   registration_program_slug?: string | null;
@@ -53,6 +54,11 @@ const formatDateRange = (start?: string | null, end?: string | null) => {
 };
 
 export function EventDetailModal({ open, event, dateLabel, onClose, onRegister }: EventDetailModalProps) {
+  const [flyerImageUrl, setFlyerImageUrl] = useState<string | null>(null);
+  const [flyerEventPhotoUrl, setFlyerEventPhotoUrl] = useState<string | null>(null);
+  const [flyerDetails, setFlyerDetails] = useState<string | null>(null);
+  const [hasFlyerMatch, setHasFlyerMatch] = useState(false);
+
   useEffect(() => {
     if (!open) return;
     const handleKey = (evt: KeyboardEvent) => {
@@ -62,14 +68,89 @@ export function EventDetailModal({ open, event, dateLabel, onClose, onRegister }
     return () => window.removeEventListener("keydown", handleKey);
   }, [open, onClose]);
 
+  useEffect(() => {
+    if (!open || !event) return;
+    const client = supabase;
+    if (!client) return;
+    let cancelled = false;
+    const normalize = (value?: string | null) => (value ?? "").trim().toLowerCase();
+    const toFlyerCandidates = (slug?: string | null) => {
+      const normalized = normalize(slug);
+      if (!normalized) return [];
+
+      const candidates = new Set<string>();
+      candidates.add(normalized);
+      candidates.add(`${normalized}-flyer`);
+
+      // Allow shared flyer keys like "youth-soccer-flyer" for "youth-soccer-league"
+      const suffixes = ["-league", "-clinic", "-pickup", "-tournament", "-event"];
+      for (const suffix of suffixes) {
+        if (normalized.endsWith(suffix)) {
+          const base = normalized.slice(0, -suffix.length);
+          if (base) {
+            candidates.add(base);
+            candidates.add(`${base}-flyer`);
+          }
+        }
+      }
+      return Array.from(candidates);
+    };
+
+    const loadFlyer = async () => {
+      const { data, error } = await client
+        .from("flyers")
+        .select("*");
+
+      if (cancelled) return;
+      if (error || !data) {
+        setFlyerImageUrl(null);
+        setFlyerEventPhotoUrl(null);
+        setFlyerDetails(null);
+        setHasFlyerMatch(false);
+        return;
+      }
+
+      const rows = data as Array<{
+        flyer_name?: string | null;
+        flyer_image_url?: string | null;
+        event_photo_url?: string | null;
+        image_url?: string | null;
+        details?: string | null;
+      }>;
+
+      const slugKey = normalize(event.registration_program_slug);
+      const titleKey = normalize(event.title);
+      const slugCandidates = toFlyerCandidates(event.registration_program_slug);
+
+      const match =
+        rows.find((row) => slugCandidates.includes(normalize(row.flyer_name))) ||
+        rows.find((row) => normalize(row.flyer_name) === slugKey) ||
+        rows.find((row) => normalize(row.flyer_name) === titleKey) ||
+        null;
+
+      const matchedFlyerImage = match?.flyer_image_url?.trim() || match?.image_url?.trim() || null;
+      const matchedEventPhoto = match?.event_photo_url?.trim() || null;
+
+      setFlyerImageUrl(matchedFlyerImage);
+      setFlyerEventPhotoUrl(matchedEventPhoto);
+      setFlyerDetails(match?.details ?? null);
+      setHasFlyerMatch(Boolean(match));
+    };
+
+    loadFlyer();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, event]);
+
   if (!open || !event) return null;
 
   const primaryDate = dateLabel || event.time_info?.trim() || formatDateRange(event.start_date, event.end_date) || "Date TBD";
-  const statusLabel =
-    event.status === "potential" ? "Potential" : event.status === "tbd" ? "TBD" : "Scheduled";
-  const statusClass =
-    event.status === "potential" ? "pill pill--amber" : event.status === "tbd" ? "pill pill--muted" : "pill pill--green";
-  const image = event.image || event.image_url || undefined;
+  const flyerImage = hasFlyerMatch ? (flyerImageUrl || undefined) : (event.image || event.image_url || undefined);
+  const eventPhoto = hasFlyerMatch
+    ? (flyerEventPhotoUrl || flyerImage || undefined)
+    : (event.image || event.image_url || undefined);
+  const moreInfo = flyerDetails || event.description || null;
 
   return (
     <div
@@ -108,7 +189,6 @@ export function EventDetailModal({ open, event, dateLabel, onClose, onRegister }
         </div>
 
         <div className="event-detail__meta">
-          <span className={statusClass}>{statusLabel}</span>
           <span className="pill pill--muted">{primaryDate}</span>
           <span className="pill pill--muted">{event.location || "Location TBD"}</span>
         </div>
@@ -116,8 +196,8 @@ export function EventDetailModal({ open, event, dateLabel, onClose, onRegister }
         <div className="event-detail__layout">
           <div className="event-detail__info">
             <h3>More information</h3>
-            {event.description ? (
-              <p>{event.description}</p>
+            {moreInfo ? (
+              <p>{moreInfo}</p>
             ) : (
               <p className="muted">Event details will be added soon.</p>
             )}
@@ -134,8 +214,8 @@ export function EventDetailModal({ open, event, dateLabel, onClose, onRegister }
           <div className="event-detail__media">
             <div className="event-detail__flyer">
               <div className="event-detail__media-label">Flyer / Info Sheet</div>
-              {image ? (
-                <img src={image} alt={`${event.title} flyer`} />
+              {flyerImage ? (
+                <img src={flyerImage} alt={`${event.title} flyer`} />
               ) : (
                 <div className="event-detail__media-empty">
                   <p>Drop a flyer image here when it is ready.</p>
@@ -144,8 +224,8 @@ export function EventDetailModal({ open, event, dateLabel, onClose, onRegister }
             </div>
             <div className="event-detail__gallery">
               <div className="event-detail__media-label">Event photos</div>
-              {image ? (
-                <img src={image} alt={`${event.title} photo`} />
+              {eventPhoto ? (
+                <img src={eventPhoto} alt={`${event.title} photo`} />
               ) : (
                 <div className="event-detail__media-empty">
                   <p>Save space for player or venue photos.</p>

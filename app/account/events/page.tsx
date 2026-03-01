@@ -16,7 +16,6 @@ const fallbackEvents: Event[] = [
     time_info: "8:00 AM tip-off",
     location: "Central Sports Complex",
     description: "Fast-paced half-court games for every division.",
-    status: "scheduled",
   },
   {
     id: "fallback-2",
@@ -26,7 +25,6 @@ const fallbackEvents: Event[] = [
     time_info: "Weeknight doubles",
     location: "Riverside Courts",
     description: "Round-robin league with playoffs and prizes.",
-    status: "potential",
   },
 ];
 
@@ -78,7 +76,7 @@ export default function AccountEventsPage() {
 
       const { data: eventData, error: eventsError } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,status,host_type")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type")
         .in("id", eventIds);
 
       if (eventsError) {
@@ -118,18 +116,6 @@ export default function AccountEventsPage() {
     }
     if (startDate) return startDate.toLocaleDateString(undefined, opts);
     return "";
-  };
-
-  const statusLabel = (status?: string | null) => {
-    if (status === "potential") return "Potential";
-    if (status === "tbd") return "TBD";
-    return "Scheduled";
-  };
-
-  const statusClass = (status?: string | null) => {
-    if (status === "potential") return "pill pill--amber";
-    if (status === "tbd") return "pill pill--muted";
-    return "pill pill--green";
   };
 
   const list = events ?? [];
@@ -179,7 +165,6 @@ export default function AccountEventsPage() {
                   <article key={event.id} className="event-card-simple">
                     <div className="event-card__header">
                       <h3>{event.title}</h3>
-                      <span className={statusClass(event.status)}>{statusLabel(event.status)}</span>
                     </div>
                     <div className="event-card__meta">
                       {dateToShow ? <p className="muted">Date: {dateToShow}</p> : null}

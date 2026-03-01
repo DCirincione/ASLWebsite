@@ -41,7 +41,7 @@ export default function BaseballPage() {
       setLoadingEvents(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,status,registration_program_slug,image_url")
+        .select("id,title,start_date,end_date,time_info,location,description,registration_program_slug,image_url")
         .order("start_date", { ascending: true, nullsFirst: false });
 
       if (!error && data) {

@@ -357,6 +357,33 @@ export type RegistrationSubmissionUpdate = {
   created_at?: string | null;
 };
 
+export type Flyer = {
+  id: string;
+  flyer_name: string;
+  event_photo_url?: string | null;
+  details?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type FlyerInsert = {
+  id?: string;
+  flyer_name: string;
+  event_photo_url?: string | null;
+  details?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type FlyerUpdate = {
+  id?: string;
+  flyer_name?: string;
+  event_photo_url?: string | null;
+  details?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -424,6 +451,12 @@ export type Database = {
         Row: RegistrationSubmission;
         Insert: RegistrationSubmissionInsert;
         Update: RegistrationSubmissionUpdate;
+        Relationships: [];
+      };
+      flyers: {
+        Row: Flyer;
+        Insert: FlyerInsert;
+        Update: FlyerUpdate;
         Relationships: [];
       };
     };

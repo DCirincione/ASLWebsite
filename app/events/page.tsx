@@ -17,7 +17,6 @@ type EventItem = {
   time_info?: string | null;
   location?: string | null;
   description?: string | null;
-  status?: "scheduled" | "potential" | "tbd" | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
   registration_program_slug?: string | null;
@@ -41,7 +40,7 @@ export default function EventsPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,status,host_type,image_url,registration_program_slug")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,registration_program_slug")
         .order("start_date", { ascending: true, nullsFirst: false });
       if (!error && data) {
         setEvents(data as EventItem[]);
@@ -103,18 +102,6 @@ export default function EventsPage() {
     return timeInfo || dateRange || "Date TBD";
   };
 
-  const statusLabel = (status?: string | null) => {
-    if (status === "potential") return "Potential";
-    if (status === "tbd") return "TBD";
-    return "Scheduled";
-  };
-
-  const statusClass = (status?: string | null) => {
-    if (status === "potential") return "pill pill--amber";
-    if (status === "tbd") return "pill pill--muted";
-    return "pill pill--green";
-  };
-
   const handleJump = (targetId: string) => {
     const el = document.getElementById(targetId);
     if (el) {
@@ -139,14 +126,13 @@ export default function EventsPage() {
     const heuristicAldrich = (event: EventItem) => {
       const titleMatch = event.title?.toLowerCase().includes("aldrich");
       const locationMatch = event.location?.toLowerCase().includes("aldrich");
-      const clearlyScheduled = event.status === "scheduled";
-      return Boolean(titleMatch || locationMatch || clearlyScheduled);
+      return Boolean(titleMatch || locationMatch);
     };
 
     const heuristicFeatured = (event: EventItem) => {
       const text = `${event.title ?? ""} ${event.description ?? ""}`.toLowerCase();
       const keywords = ["charity", "fundraiser", "benefit", "partner", "with", "hosted by", "vs"];
-      return keywords.some((kw) => text.includes(kw)) || event.status === "potential";
+      return keywords.some((kw) => text.includes(kw));
     };
 
     const aldrich = ordered.filter(
@@ -209,7 +195,6 @@ export default function EventsPage() {
         <div className="event-card__body">
           <div className="event-card__header">
             <h3 className="event-card__title">{event.title}</h3>
-            <span className={statusClass(event.status)}>{statusLabel(event.status)}</span>
           </div>
           <div className="event-card__meta">
             <div className="event-card__meta-row">

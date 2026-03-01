@@ -1973,7 +1973,7 @@ html[data-contrast="high"] .events-jump select {
 .event-card-grid {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(280px, 1fr);
+  grid-auto-columns: minmax(300px, 300px);
   gap: 16px;
   margin-top: 18px;
   padding: 4px;
