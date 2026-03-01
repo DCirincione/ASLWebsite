@@ -2575,7 +2575,8 @@ html[data-contrast="high"] .event-card-simple {
 
 /* Sport event layout */
 .sport-event-section {
-  padding-top: 32px;
+  padding-top: 20px;
+  padding-bottom: 20px;
 }
 
 .sport-event {
@@ -2761,6 +2762,11 @@ html[data-contrast="high"] .sport-event-card .sport-event__meta {
 
 .pickup-card {
   margin-bottom: 10px;
+}
+
+.soccer-section {
+  padding-top: 20px;
+  padding-bottom: 20px;
 }
 
 .soccer-section .list--grid {
