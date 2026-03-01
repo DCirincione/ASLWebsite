@@ -14,8 +14,6 @@ import type { Event } from "@/lib/supabase/types";
 type SportEvent = Event & { image?: string };
 type EventBucket = "homerun_derby" | "clinic" | "league" | "tournament" | "other";
 
-const imageFallbacks = ["/ASLLogo.png", "/sundayLeague/champs2025.jpeg", "/Hero.jpg"];
-
 const bucketFromSlug = (registrationSlug?: string | null): EventBucket => {
   const value = (registrationSlug ?? "").trim().toLowerCase();
 
@@ -55,9 +53,9 @@ export default function BaseballPage() {
           );
         });
 
-        const mapped = baseballOnly.map((row, idx) => ({
+        const mapped = baseballOnly.map((row) => ({
           ...row,
-          image: row.image_url || imageFallbacks[idx % imageFallbacks.length],
+          image: row.image_url || undefined,
         }));
         setEvents(mapped);
       } else {
@@ -120,12 +118,14 @@ export default function BaseballPage() {
         {list.map((item, idx) => (
           <article key={item.id ?? idx} className="soccer-card">
             <div className="soccer-card__media">
-              <Image
-                src={item.image || imageFallbacks[idx % imageFallbacks.length]}
-                alt=""
-                fill
-                sizes="(max-width: 900px) 100vw, 33vw"
-              />
+              {item.image ? (
+                <Image
+                  src={item.image}
+                  alt=""
+                  fill
+                  sizes="(max-width: 900px) 100vw, 33vw"
+                />
+              ) : null}
             </div>
             <div className="soccer-card__body">
               <p className="list__title">{item.title}</p>
@@ -266,15 +266,17 @@ export default function BaseballPage() {
                     </button>
                   </div>
                 </div>
-                <div className="sport-event-card__media">
-                  <Image
-                    src={ev.image || imageFallbacks[idx % imageFallbacks.length]}
-                    alt=""
-                    width={480}
-                    height={300}
-                    sizes="(max-width: 960px) 100vw, 320px"
-                  />
-                </div>
+                {ev.image ? (
+                  <div className="sport-event-card__media">
+                    <Image
+                      src={ev.image}
+                      alt=""
+                      width={480}
+                      height={300}
+                      sizes="(max-width: 960px) 100vw, 320px"
+                    />
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>

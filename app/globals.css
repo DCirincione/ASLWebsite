@@ -2775,6 +2775,7 @@ html[data-contrast="high"] .sport-event-card .sport-event__meta {
   border-radius: 14px;
   padding: 14px;
   background: #ffffff;
+  margin-top: 28px;
   margin-bottom: 14px;
 }
 
@@ -2802,6 +2803,27 @@ html[data-contrast="high"] .sport-event-card .sport-event__meta {
 
 .run-club-overview__copy h3 {
   margin: 0;
+}
+
+html[data-theme="dark"] .run-club-overview {
+  background: #0f192d;
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .run-club-overview__flyer img {
+  background: #0c1526;
+  border-color: #1f2a40;
+}
+
+html[data-contrast="high"] .run-club-overview {
+  background: #000000;
+  border-color: #f8fafc;
+  box-shadow: none;
+}
+
+html[data-contrast="high"] .run-club-overview__flyer img {
+  background: #000000;
+  border-color: #f8fafc;
 }
 
 @media (max-width: 900px) {

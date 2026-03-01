@@ -12,20 +12,20 @@ import { supabase } from "@/lib/supabase/client";
 import type { Event } from "@/lib/supabase/types";
 
 type SportEvent = Event & { image?: string };
-type EventBucket = "clinic" | "league" | "pickup" | "tournament" | "other";
+type EventBucket = "league" | "event" | "other";
+
+const eventSlug = (registrationSlug?: string | null) => (registrationSlug ?? "").trim().toLowerCase();
 
 const bucketFromSlug = (registrationSlug?: string | null): EventBucket => {
-  const value = (registrationSlug ?? "").trim().toLowerCase();
+  const value = eventSlug(registrationSlug);
 
-  if (value.startsWith("soccer-clinic")) return "clinic";
-  if (value.startsWith("soccer-league")) return "league";
-  if (value.startsWith("soccer-pickup")) return "pickup";
-  if (value.startsWith("soccer-tournament")) return "tournament";
+  if (value.startsWith("football-league") || value.startsWith("youth-football-league")) return "league";
+  if (value.startsWith("football-event") || value.startsWith("youth-football-event")) return "event";
 
   return "other";
 };
 
-export default function SoccerPage() {
+export default function FlagFootballPage() {
   const [events, setEvents] = useState<SportEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
@@ -43,12 +43,16 @@ export default function SoccerPage() {
         .order("start_date", { ascending: true, nullsFirst: false });
 
       if (!error && data) {
-        const soccerOnly = (data as Event[]).filter((row) =>
-          ["soccer-clinic", "soccer-league", "soccer-pickup", "soccer-tournament", "soccer-event"].some((prefix) =>
-            (row.registration_program_slug ?? "").trim().toLowerCase().startsWith(prefix)
-          )
-        );
-        const mapped = soccerOnly.map((row) => ({
+        const flagFootballOnly = (data as Event[]).filter((row) => {
+          const slug = eventSlug(row.registration_program_slug);
+          return (
+            slug.startsWith("football-event") ||
+            slug.startsWith("football-league") ||
+            slug.startsWith("youth-football-league") ||
+            slug.startsWith("youth-football-event")
+          );
+        });
+        const mapped = flagFootballOnly.map((row) => ({
           ...row,
           image: row.image_url || undefined,
         }));
@@ -63,11 +67,12 @@ export default function SoccerPage() {
   }, []);
 
   const byType = useMemo(() => {
-    const clinics = events.filter((ev) => bucketFromSlug(ev.registration_program_slug) === "clinic");
     const leagues = events.filter((ev) => bucketFromSlug(ev.registration_program_slug) === "league");
-    const pickup = events.filter((ev) => bucketFromSlug(ev.registration_program_slug) === "pickup");
-    const tournaments = events.filter((ev) => bucketFromSlug(ev.registration_program_slug) === "tournament");
-    return { clinics, leagues, pickup, tournaments };
+    const featuredEvents = events.filter((ev) => {
+      const slug = eventSlug(ev.registration_program_slug);
+      return bucketFromSlug(slug) === "event" || slug.startsWith("youth-football-league");
+    });
+    return { leagues, featuredEvents };
   }, [events]);
 
   const formatDate = (value?: string | null) => {
@@ -126,11 +131,7 @@ export default function SoccerPage() {
               <p className="list__title">{item.title}</p>
               <p className="muted">{primaryTimeLabel(item)}</p>
               <div className="cta-row">
-                <button
-                  className="button ghost"
-                  type="button"
-                  onClick={() => setDetailEvent(item)}
-                >
+                <button className="button ghost" type="button" onClick={() => setDetailEvent(item)}>
                   View Details
                 </button>
                 <button
@@ -152,27 +153,18 @@ export default function SoccerPage() {
   return (
     <PageShell>
       <Section
-        id="soccer-hero"
-        eyebrow="Soccer"
-        title="Play Soccer with Aldrich"
-        description="Leagues, pickup, and tournaments for every level. Form a team or jump into weekly runs."
+        id="flag-football-hero"
+        eyebrow="Flag Football"
+        title="Play Flag Football with Aldrich"
+        description="Leagues and special football events for all levels."
         headingLevel="h1"
         className="soccer-hero"
       >
         <div className="soccer-hero__grid">
           <div className="soccer-hero__copy">
             <div className="cta-row">
-              <Link className="button primary" href="#clinics">
-                Clinics
-              </Link>
-              <Link className="button ghost" href="#join">
+              <Link className="button primary" href="#leagues">
                 Leagues
-              </Link>
-              <Link className="button ghost" href="#pickup">
-                Pickup
-              </Link>
-              <Link className="button ghost" href="#tournaments">
-                Tournaments
               </Link>
               <Link className="button ghost" href="#events">
                 Events
@@ -180,27 +172,16 @@ export default function SoccerPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/sports_images/soccer/soccerLogoTest.png" alt="Aldrich Soccer" fill priority />
+            <Image src="/football/flag.jpg" alt="Aldrich Flag Football" fill priority />
           </div>
         </div>
       </Section>
 
       <Section
-        id="clinics"
-        eyebrow="Clinics"
-        title="Skill Clinics"
-        description="Targeted, small-sided sessions led by Aldrich coaches."
-        headingLevel="h2"
-        className="soccer-section"
-      >
-        {loadingEvents ? <p className="muted">Loading clinics...</p> : renderCards(byType.clinics)}
-      </Section>
-
-      <Section
-        id="join"
+        id="leagues"
         eyebrow="Leagues"
         title="League Play"
-        description="Pick your format and night. Captains can register teams or add free agents."
+        description="Season schedules with standings and playoff nights."
         headingLevel="h2"
         className="soccer-section"
       >
@@ -208,53 +189,29 @@ export default function SoccerPage() {
       </Section>
 
       <Section
-        id="pickup"
-        eyebrow="Pickup"
-        title="Pickup Sessions"
-        description="Weekly runs with a host, pinnies, and rotating teams."
-        headingLevel="h2"
-        className="soccer-section"
-      >
-        {loadingEvents ? <p className="muted">Loading pickup...</p> : renderCards(byType.pickup)}
-      </Section>
-
-      <Section
-        id="tournaments"
-        eyebrow="Tournaments"
-        title="Tournament Play"
-        description="Weekend cups, showcases, and knockout brackets."
-        headingLevel="h2"
-        className="soccer-section"
-      >
-        {loadingEvents ? <p className="muted">Loading tournaments...</p> : renderCards(byType.tournaments)}
-      </Section>
-
-      <Section
         id="events"
         eyebrow="Events"
-        title="Featured Soccer Events"
-        description="One-off showcases and community soccer days."
+        title="Featured Flag Football Events"
+        description="Highlights from upcoming flag football events."
         headingLevel="h2"
         className="sport-event-section"
       >
         {loadingEvents ? <p className="muted">Loading events...</p> : null}
-        {!loadingEvents && events.length === 0 ? <p className="muted">No soccer events yet. Check back soon.</p> : null}
-        {!loadingEvents && events.length > 0 ? (
+        {!loadingEvents && byType.featuredEvents.length === 0 ? (
+          <p className="muted">No flag football events yet. Check back soon.</p>
+        ) : null}
+        {!loadingEvents && byType.featuredEvents.length > 0 ? (
           <div className="sport-event-list">
-            {events.map((ev) => (
+            {byType.featuredEvents.map((ev) => (
               <article key={ev.id} className="sport-event-card">
                 <div className="sport-event-card__body">
-                  <p className="eyebrow">Soccer</p>
+                  <p className="eyebrow">Flag Football</p>
                   <h3>{ev.title}</h3>
                   <p className="sport-event__meta">
                     <span>{primaryTimeLabel(ev)}</span>
                   </p>
                   <div className="sport-event__actions">
-                    <button
-                      className="button ghost"
-                      type="button"
-                      onClick={() => setDetailEvent(ev)}
-                    >
+                    <button className="button ghost" type="button" onClick={() => setDetailEvent(ev)}>
                       View Details
                     </button>
                     <button
@@ -269,7 +226,13 @@ export default function SoccerPage() {
                 </div>
                 {ev.image ? (
                   <div className="sport-event-card__media">
-                    <Image src={ev.image} alt="" width={480} height={300} sizes="(max-width: 960px) 100vw, 320px" />
+                    <Image
+                      src={ev.image}
+                      alt=""
+                      width={480}
+                      height={300}
+                      sizes="(max-width: 960px) 100vw, 320px"
+                    />
                   </div>
                 ) : null}
               </article>

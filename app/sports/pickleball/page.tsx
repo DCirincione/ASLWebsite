@@ -14,8 +14,6 @@ import type { Event } from "@/lib/supabase/types";
 type SportEvent = Event & { image?: string };
 type EventBucket = "league" | "tournament" | "other";
 
-const imageFallbacks = ["/sundayLeague/champs2025.jpeg", "/ASLLogo.png", "/Hero.jpg"];
-
 const bucketFromSlug = (registrationSlug?: string | null): EventBucket => {
   const value = (registrationSlug ?? "").trim().toLowerCase();
 
@@ -46,9 +44,9 @@ export default function PickleballPage() {
         const pickleballOnly = (data as Event[]).filter((row) =>
           (row.registration_program_slug ?? "").trim().toLowerCase().startsWith("pickleball-")
         );
-        const mapped = pickleballOnly.map((row, idx) => ({
+        const mapped = pickleballOnly.map((row) => ({
           ...row,
-          image: row.image_url || imageFallbacks[idx % imageFallbacks.length],
+          image: row.image_url || undefined,
         }));
         setEvents(mapped);
       } else {
@@ -109,12 +107,14 @@ export default function PickleballPage() {
         {list.map((item, idx) => (
           <article key={item.id ?? idx} className="soccer-card">
             <div className="soccer-card__media">
-              <Image
-                src={item.image || imageFallbacks[idx % imageFallbacks.length]}
-                alt=""
-                fill
-                sizes="(max-width: 900px) 100vw, 33vw"
-              />
+              {item.image ? (
+                <Image
+                  src={item.image}
+                  alt=""
+                  fill
+                  sizes="(max-width: 900px) 100vw, 33vw"
+                />
+              ) : null}
             </div>
             <div className="soccer-card__body">
               <p className="list__title">{item.title}</p>
@@ -205,7 +205,7 @@ export default function PickleballPage() {
         ) : null}
         {!loadingEvents && events.length > 0 ? (
           <div className="sport-event-list">
-            {events.map((ev, idx) => (
+            {events.map((ev) => (
               <article key={ev.id} className="sport-event-card">
                 <div className="sport-event-card__body">
                   <p className="eyebrow">Pickleball</p>
@@ -227,15 +227,17 @@ export default function PickleballPage() {
                     </button>
                   </div>
                 </div>
-                <div className="sport-event-card__media">
-                  <Image
-                    src={ev.image || imageFallbacks[idx % imageFallbacks.length]}
-                    alt=""
-                    width={480}
-                    height={300}
-                    sizes="(max-width: 960px) 100vw, 320px"
-                  />
-                </div>
+                {ev.image ? (
+                  <div className="sport-event-card__media">
+                    <Image
+                      src={ev.image}
+                      alt=""
+                      width={480}
+                      height={300}
+                      sizes="(max-width: 960px) 100vw, 320px"
+                    />
+                  </div>
+                ) : null}
               </article>
             ))}
           </div>

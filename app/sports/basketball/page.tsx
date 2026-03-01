@@ -14,8 +14,6 @@ import type { Event } from "@/lib/supabase/types";
 type SportEvent = Event & { image?: string };
 type EventBucket = "clinic" | "league" | "pickup" | "tournament" | "other";
 
-const imageFallbacks = ["/basketball/champst2025.jpeg", "/forever5/newman5.png", "/PickleTourneyCourt6.png"];
-
 const bucketFromSlug = (registrationSlug?: string | null): EventBucket => {
   const value = (registrationSlug ?? "").trim().toLowerCase();
 
@@ -113,12 +111,14 @@ export default function BasketballPage() {
         {list.map((item, idx) => (
           <article key={item.id ?? idx} className="soccer-card">
             <div className="soccer-card__media">
-              <Image
-                src={item.image || imageFallbacks[idx % imageFallbacks.length]}
-                alt=""
-                fill
-                sizes="(max-width: 900px) 100vw, 33vw"
-              />
+              {item.image ? (
+                <Image
+                  src={item.image}
+                  alt=""
+                  fill
+                  sizes="(max-width: 900px) 100vw, 33vw"
+                />
+              ) : null}
             </div>
             <div className="soccer-card__body">
               <p className="list__title">{item.title}</p>

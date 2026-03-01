@@ -20,6 +20,9 @@ const sportRouteBySlug: Record<string, string> = {
   baseball: "baseball",
   "baseball-softball": "baseball",
   basketball: "basketball",
+  "flag-football": "flag-football",
+  golf: "golf",
+  "mini-golf": "mini-golf",
   pickleball: "pickleball",
   "run-club": "run-club",
   soccer: "soccer",
@@ -29,7 +32,6 @@ const sportRouteBySlug: Record<string, string> = {
 const fallbackSports: SportCard[] = [
   { id: "baseball", slug: "baseball", title: "Baseball", players_per_team: 9, gender: "open", short_description: "Diamond leagues, tourneys, and skills." },
   { id: "basketball", slug: "basketball", title: "Basketball", players_per_team: 5, gender: "open", short_description: "5v5 leagues, 3v3 nights, clinics." },
-  { id: "esports", slug: "esports", title: "Esports", players_per_team: null, gender: "open", short_description: "Seasonal ladders and LAN nights." },
   { id: "flag-football", slug: "flag-football", title: "Flag Football", players_per_team: 7, gender: "coed", short_description: "Non-contact leagues and tourneys." },
   { id: "golf", slug: "golf", title: "Golf", players_per_team: 4, gender: "open", short_description: "Scrambles, outings, and skins." },
   { id: "mini-golf", slug: "mini-golf", title: "Mini-Golf", players_per_team: 4, gender: "open", short_description: "Casual putt-putt meetups." },

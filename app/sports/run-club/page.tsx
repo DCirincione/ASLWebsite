@@ -13,8 +13,6 @@ import type { Event } from "@/lib/supabase/types";
 
 type SportEvent = Event & { image?: string };
 
-const imageFallbacks = ["/Hero.jpg", "/ASLLogo.png", "/sundayLeague/champs2025.jpeg"];
-
 export default function RunClubPage() {
   const [events, setEvents] = useState<SportEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
@@ -36,9 +34,9 @@ export default function RunClubPage() {
         const runClubOnly = (data as Event[]).filter(
           (row) => (row.registration_program_slug ?? "").trim().toLowerCase() === "run-club"
         );
-        const mapped = runClubOnly.map((row, idx) => ({
+        const mapped = runClubOnly.map((row) => ({
           ...row,
-          image: row.image_url || imageFallbacks[idx % imageFallbacks.length],
+          image: row.image_url || undefined,
         }));
         setEvents(mapped);
       } else {
@@ -93,12 +91,14 @@ export default function RunClubPage() {
         {events.map((item, idx) => (
           <article key={item.id ?? idx} className="soccer-card">
             <div className="soccer-card__media">
-              <Image
-                src={item.image || imageFallbacks[idx % imageFallbacks.length]}
-                alt=""
-                fill
-                sizes="(max-width: 900px) 100vw, 33vw"
-              />
+              {item.image ? (
+                <Image
+                  src={item.image}
+                  alt=""
+                  fill
+                  sizes="(max-width: 900px) 100vw, 33vw"
+                />
+              ) : null}
             </div>
             <div className="soccer-card__body">
               <p className="list__title">{item.title}</p>
