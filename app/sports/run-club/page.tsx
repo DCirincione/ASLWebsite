@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { EventDetailModal } from "@/components/event-detail-modal";
 import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
@@ -20,6 +21,7 @@ export default function RunClubPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalSlug, setModalSlug] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string | null>(null);
+  const [detailEvent, setDetailEvent] = useState<SportEvent | null>(null);
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -76,6 +78,11 @@ export default function RunClubPage() {
     setModalOpen(true);
   };
 
+  const primaryTimeLabel = (event: SportEvent) => {
+    const time = event.time_info?.trim();
+    return time || formatDateRange(event.start_date, event.end_date) || "Date TBD";
+  };
+
   const renderCards = () => {
     if (!events || events.length === 0) {
       return <p className="muted">No runs posted yet.</p>;
@@ -95,10 +102,11 @@ export default function RunClubPage() {
             </div>
             <div className="soccer-card__body">
               <p className="list__title">{item.title}</p>
-              <p className="muted">{[item.time_info, item.location].filter(Boolean).join(" • ")}</p>
-              <p className="muted">{formatDateRange(item.start_date, item.end_date)}</p>
-              <p className="muted">{item.description || "Details coming soon."}</p>
+              <p className="muted">{primaryTimeLabel(item)}</p>
               <div className="cta-row">
+                <button className="button ghost" type="button" onClick={() => setDetailEvent(item)}>
+                  View Details
+                </button>
                 <button
                   className="button primary"
                   type="button"
@@ -107,9 +115,6 @@ export default function RunClubPage() {
                 >
                   {item.registration_program_slug ? "Sign up" : "Registration coming soon"}
                 </button>
-                <Link className="button ghost" href="/community">
-                  Find teammates
-                </Link>
               </div>
             </div>
           </article>
@@ -182,6 +187,13 @@ export default function RunClubPage() {
         programSlug={modalSlug}
         contextTitle={modalTitle ?? undefined}
         onClose={() => setModalOpen(false)}
+      />
+      <EventDetailModal
+        open={Boolean(detailEvent)}
+        event={detailEvent}
+        dateLabel={detailEvent ? primaryTimeLabel(detailEvent) : undefined}
+        onClose={() => setDetailEvent(null)}
+        onRegister={(event) => openModal(event.registration_program_slug, event.title)}
       />
     </PageShell>
   );

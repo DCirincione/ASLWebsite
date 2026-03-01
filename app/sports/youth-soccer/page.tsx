@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
+import { EventDetailModal } from "@/components/event-detail-modal";
 import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
@@ -30,6 +31,7 @@ export default function YouthSoccerPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalSlug, setModalSlug] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string | null>(null);
+  const [detailEvent, setDetailEvent] = useState<SportEvent | null>(null);
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -94,6 +96,11 @@ export default function YouthSoccerPage() {
     setModalOpen(true);
   };
 
+  const primaryTimeLabel = (event: SportEvent) => {
+    const time = event.time_info?.trim();
+    return time || formatDateRange(event.start_date, event.end_date) || "Date TBD";
+  };
+
   const renderCards = (list: SportEvent[]) => {
     if (!list || list.length === 0) {
       return <p className="muted">No items posted yet.</p>;
@@ -113,10 +120,11 @@ export default function YouthSoccerPage() {
             </div>
             <div className="soccer-card__body">
               <p className="list__title">{item.title}</p>
-              <p className="muted">{[item.time_info, item.location].filter(Boolean).join(" • ")}</p>
-              <p className="muted">{formatDateRange(item.start_date, item.end_date)}</p>
-              <p className="muted">{item.description || "Details coming soon."}</p>
+              <p className="muted">{primaryTimeLabel(item)}</p>
               <div className="cta-row">
+                <button className="button ghost" type="button" onClick={() => setDetailEvent(item)}>
+                  View Details
+                </button>
                 <button
                   className="button primary"
                   type="button"
@@ -125,9 +133,6 @@ export default function YouthSoccerPage() {
                 >
                   {item.registration_program_slug ? "Sign up" : "Registration coming soon"}
                 </button>
-                <Link className="button ghost" href="/community">
-                  Find teammates
-                </Link>
               </div>
             </div>
           </article>
@@ -206,12 +211,12 @@ export default function YouthSoccerPage() {
                   <p className="eyebrow">Youth Soccer</p>
                   <h3>{ev.title}</h3>
                   <p className="sport-event__meta">
-                    <span>{ev.location || "Location TBD"}</span>
-                    <span>•</span>
-                    <span>{ev.time_info || formatDateRange(ev.start_date, ev.end_date)}</span>
+                    <span>{primaryTimeLabel(ev)}</span>
                   </p>
-                  <p className="muted">{ev.description || "Details coming soon."}</p>
                   <div className="sport-event__actions">
+                    <button className="button ghost" type="button" onClick={() => setDetailEvent(ev)}>
+                      View Details
+                    </button>
                     <button
                       className="button primary"
                       type="button"
@@ -242,6 +247,13 @@ export default function YouthSoccerPage() {
         programSlug={modalSlug}
         contextTitle={modalTitle ?? undefined}
         onClose={() => setModalOpen(false)}
+      />
+      <EventDetailModal
+        open={Boolean(detailEvent)}
+        event={detailEvent}
+        dateLabel={detailEvent ? primaryTimeLabel(detailEvent) : undefined}
+        onClose={() => setDetailEvent(null)}
+        onRegister={(event) => openModal(event.registration_program_slug, event.title)}
       />
     </PageShell>
   );
