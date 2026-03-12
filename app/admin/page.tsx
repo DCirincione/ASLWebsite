@@ -10,6 +10,18 @@ import type { Event } from "@/lib/supabase/types";
 type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type FormStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
 type AdminModule = "none" | "events" | "sports" | "registrations" | "users" | "flyers" | "settings";
+type HostType = NonNullable<Event["host_type"]>;
+type EventFormState = {
+  title: string;
+  start_date: string;
+  end_date: string;
+  time_info: string;
+  location: string;
+  description: string;
+  host_type: HostType;
+  image_url: string;
+  registration_program_slug: string;
+};
 
 export default function AdminPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
@@ -21,7 +33,7 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formStatus, setFormStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<EventFormState>({
     title: "",
     start_date: "",
     end_date: "",
@@ -32,7 +44,7 @@ export default function AdminPage() {
     image_url: "",
     registration_program_slug: "",
   });
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<EventFormState>({
     title: "",
     start_date: "",
     end_date: "",
@@ -138,7 +150,7 @@ export default function AdminPage() {
     void loadAccess();
   }, []);
 
-  const update = (key: keyof typeof form, value: string) => {
+  const update = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -176,7 +188,7 @@ export default function AdminPage() {
     setEditingId(null);
   };
 
-  const updateEdit = (key: keyof typeof editForm, value: string) => {
+  const updateEdit = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setEditForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -398,7 +410,7 @@ export default function AdminPage() {
                     <select
                       id="event-host-type"
                       value={form.host_type}
-                      onChange={(e) => update("host_type", e.target.value)}
+                      onChange={(e) => update("host_type", e.target.value as HostType)}
                     >
                       <option value="aldrich">Aldrich</option>
                       <option value="featured">Featured</option>
@@ -542,7 +554,7 @@ export default function AdminPage() {
                               <select
                                 id={`edit-host-${event.id}`}
                                 value={editForm.host_type}
-                                onChange={(e) => updateEdit("host_type", e.target.value)}
+                                onChange={(e) => updateEdit("host_type", e.target.value as HostType)}
                               >
                                 <option value="aldrich">Aldrich</option>
                                 <option value="featured">Featured</option>
