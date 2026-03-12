@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { supabase } from "@/lib/supabase/client";
@@ -11,6 +11,8 @@ type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type FormStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
 type AdminModule = "none" | "events" | "sports" | "registrations" | "users" | "flyers" | "settings";
 type HostType = NonNullable<Event["host_type"]>;
+type ImageInputMode = "url" | "upload";
+const EVENT_IMAGE_BUCKET = "event-images";
 type EventFormState = {
   title: string;
   start_date: string;
@@ -30,7 +32,11 @@ export default function AdminPage() {
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const [uploadingCreateImage, setUploadingCreateImage] = useState(false);
+  const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [createImageMode, setCreateImageMode] = useState<ImageInputMode>("url");
+  const [editImageMode, setEditImageMode] = useState<ImageInputMode>("url");
   const [formStatus, setFormStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [form, setForm] = useState<EventFormState>({
@@ -166,6 +172,7 @@ export default function AdminPage() {
       image_url: "",
       registration_program_slug: "",
     });
+    setCreateImageMode("url");
   };
 
   const startEditing = (event: Event) => {
@@ -181,6 +188,7 @@ export default function AdminPage() {
       image_url: event.image_url ?? "",
       registration_program_slug: event.registration_program_slug ?? "",
     });
+    setEditImageMode("url");
     setFormStatus({ type: "idle" });
   };
 
@@ -226,6 +234,49 @@ export default function AdminPage() {
     setFormStatus({ type: "success", message: "Event created." });
     resetForm();
     await loadEvents();
+  };
+
+  const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, "_");
+
+  const uploadEventImage = async (file: File) => {
+    if (!supabase) {
+      throw new Error("Supabase is not configured.");
+    }
+    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+    const path = `events/${crypto.randomUUID()}-${safeFileName(file.name.replace(new RegExp(`\\.${ext}$`, "i"), ""))}.${ext}`;
+    const { data, error } = await supabase.storage.from(EVENT_IMAGE_BUCKET).upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
+    if (error) throw error;
+
+    const finalPath = data?.path ?? path;
+    const { data: publicUrlData } = supabase.storage.from(EVENT_IMAGE_BUCKET).getPublicUrl(finalPath);
+    return publicUrlData.publicUrl;
+  };
+
+  const handleCreateImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setFormStatus({ type: "error", message: "Please select a valid image file." });
+      return;
+    }
+    try {
+      setUploadingCreateImage(true);
+      const publicUrl = await uploadEventImage(file);
+      update("image_url", publicUrl);
+      setFormStatus({ type: "success", message: "Image uploaded and URL added." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload image.";
+      setFormStatus({
+        type: "error",
+        message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})`,
+      });
+    } finally {
+      setUploadingCreateImage(false);
+      e.target.value = "";
+    }
   };
 
   const handleDeleteEvent = async (eventId: string, title: string) => {
@@ -277,6 +328,30 @@ export default function AdminPage() {
     setFormStatus({ type: "success", message: "Event updated." });
     setEditingId(null);
     await loadEvents();
+  };
+
+  const handleEditImageUpload = async (eventId: string, e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setFormStatus({ type: "error", message: "Please select a valid image file." });
+      return;
+    }
+    try {
+      setUploadingEditImageId(eventId);
+      const publicUrl = await uploadEventImage(file);
+      updateEdit("image_url", publicUrl);
+      setFormStatus({ type: "success", message: "Image uploaded for this event." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload image.";
+      setFormStatus({
+        type: "error",
+        message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})`,
+      });
+    } finally {
+      setUploadingEditImageId(null);
+      e.target.value = "";
+    }
   };
 
   const dateLabel = (start?: string | null, end?: string | null) => {
@@ -419,13 +494,40 @@ export default function AdminPage() {
                     </select>
                   </div>
                   <div className="form-control">
-                    <label htmlFor="event-image">Image URL</label>
-                    <input
-                      id="event-image"
-                      value={form.image_url}
-                      onChange={(e) => update("image_url", e.target.value)}
-                    />
+                    <label htmlFor="event-image-mode">Image Source</label>
+                    <select
+                      id="event-image-mode"
+                      value={createImageMode}
+                      onChange={(e) => setCreateImageMode(e.target.value as ImageInputMode)}
+                    >
+                      <option value="url">Use image URL</option>
+                      <option value="upload">Upload image file</option>
+                    </select>
                   </div>
+                  {createImageMode === "url" ? (
+                    <div className="form-control">
+                      <label htmlFor="event-image">Image URL</label>
+                      <input
+                        id="event-image"
+                        value={form.image_url}
+                        onChange={(e) => update("image_url", e.target.value)}
+                      />
+                    </div>
+                  ) : (
+                    <div className="form-control">
+                      <label htmlFor="event-image-upload">Upload image</label>
+                      <input
+                        id="event-image-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleCreateImageUpload}
+                        disabled={uploadingCreateImage}
+                      />
+                      <p className="form-help muted">
+                        Uploads to the {EVENT_IMAGE_BUCKET} storage bucket.
+                      </p>
+                    </div>
+                  )}
                   <div className="form-control">
                     <label htmlFor="event-program-slug">Registration program slug</label>
                     <input
@@ -563,13 +665,40 @@ export default function AdminPage() {
                               </select>
                             </div>
                             <div className="form-control">
-                              <label htmlFor={`edit-image-${event.id}`}>Image URL</label>
-                              <input
-                                id={`edit-image-${event.id}`}
-                                value={editForm.image_url}
-                                onChange={(e) => updateEdit("image_url", e.target.value)}
-                              />
+                              <label htmlFor={`edit-image-mode-${event.id}`}>Image Source</label>
+                              <select
+                                id={`edit-image-mode-${event.id}`}
+                                value={editImageMode}
+                                onChange={(e) => setEditImageMode(e.target.value as ImageInputMode)}
+                              >
+                                <option value="url">Use image URL</option>
+                                <option value="upload">Upload image file</option>
+                              </select>
                             </div>
+                            {editImageMode === "url" ? (
+                              <div className="form-control">
+                                <label htmlFor={`edit-image-${event.id}`}>Image URL</label>
+                                <input
+                                  id={`edit-image-${event.id}`}
+                                  value={editForm.image_url}
+                                  onChange={(e) => updateEdit("image_url", e.target.value)}
+                                />
+                              </div>
+                            ) : (
+                              <div className="form-control">
+                                <label htmlFor={`edit-image-upload-${event.id}`}>Upload image</label>
+                                <input
+                                  id={`edit-image-upload-${event.id}`}
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => void handleEditImageUpload(event.id, e)}
+                                  disabled={uploadingEditImageId === event.id}
+                                />
+                                <p className="form-help muted">
+                                  Uploads to the {EVENT_IMAGE_BUCKET} storage bucket.
+                                </p>
+                              </div>
+                            )}
                             <div className="form-control">
                               <label htmlFor={`edit-slug-${event.id}`}>Registration program slug</label>
                               <input
