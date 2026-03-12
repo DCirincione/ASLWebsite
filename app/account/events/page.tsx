@@ -28,8 +28,13 @@ const fallbackEvents: Event[] = [
   },
 ];
 
-type SignupRow = {
-  event_id: string;
+type SubmissionRow = {
+  program_id: string;
+};
+
+type ProgramRow = {
+  id: string;
+  slug: string | null;
 };
 
 export default function AccountEventsPage() {
@@ -55,20 +60,45 @@ export default function AccountEventsPage() {
         return;
       }
 
-      const { data: signups, error: signupsError } = await supabase
-        .from("event_signups")
-        .select("event_id")
+      const { data: submissions, error: submissionsError } = await supabase
+        .from("registration_submissions")
+        .select("program_id")
         .eq("user_id", userId);
 
-      if (signupsError) {
+      if (submissionsError) {
         setEvents(fallbackEvents);
         setStatus("ready");
         setError("Could not load your saved events yet.");
         return;
       }
 
-      const eventIds = (signups as SignupRow[]).map((row) => row.event_id).filter(Boolean);
-      if (eventIds.length === 0) {
+      const programIds = Array.from(
+        new Set((submissions as SubmissionRow[]).map((row) => row.program_id).filter(Boolean))
+      );
+
+      if (programIds.length === 0) {
+        setEvents([]);
+        setStatus("ready");
+        return;
+      }
+
+      const { data: programs, error: programsError } = await supabase
+        .from("registration_programs")
+        .select("id,slug")
+        .in("id", programIds);
+
+      if (programsError) {
+        setEvents(fallbackEvents);
+        setStatus("ready");
+        setError("Could not load your saved events yet.");
+        return;
+      }
+
+      const registrationSlugs = Array.from(
+        new Set((programs as ProgramRow[]).map((row) => row.slug?.trim()).filter(Boolean))
+      ) as string[];
+
+      if (registrationSlugs.length === 0) {
         setEvents([]);
         setStatus("ready");
         return;
@@ -76,8 +106,8 @@ export default function AccountEventsPage() {
 
       const { data: eventData, error: eventsError } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,host_type")
-        .in("id", eventIds);
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,registration_program_slug")
+        .in("registration_program_slug", registrationSlugs);
 
       if (eventsError) {
         setEvents(fallbackEvents);

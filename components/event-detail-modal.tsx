@@ -22,6 +22,7 @@ type EventDetailModalProps = {
   open: boolean;
   event: EventDetail | null;
   dateLabel?: string;
+  isRegistered?: boolean;
   onClose: () => void;
   onRegister?: (event: EventDetail) => void;
 };
@@ -53,7 +54,7 @@ const formatDateRange = (start?: string | null, end?: string | null) => {
   return "";
 };
 
-export function EventDetailModal({ open, event, dateLabel, onClose, onRegister }: EventDetailModalProps) {
+export function EventDetailModal({ open, event, dateLabel, isRegistered = false, onClose, onRegister }: EventDetailModalProps) {
   const [flyerImageUrl, setFlyerImageUrl] = useState<string | null>(null);
   const [flyerEventPhotoUrl, setFlyerEventPhotoUrl] = useState<string | null>(null);
   const [flyerDetails, setFlyerDetails] = useState<string | null>(null);
@@ -172,13 +173,19 @@ export function EventDetailModal({ open, event, dateLabel, onClose, onRegister }
           </div>
           <div className="event-detail__header-actions">
             {event.registration_program_slug ? (
-              <button
-                className="button primary"
-                type="button"
-                onClick={() => onRegister?.(event)}
-              >
-                Sign up
-              </button>
+              isRegistered ? (
+                <button className="button primary" type="button" disabled>
+                  Registered
+                </button>
+              ) : (
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => onRegister?.(event)}
+                >
+                  Sign up
+                </button>
+              )
             ) : (
               <span className="muted">Registration coming soon</span>
             )}

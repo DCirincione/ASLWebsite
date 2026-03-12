@@ -9,6 +9,7 @@ import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
+import { useRegisteredProgramSlugs } from "@/lib/supabase/use-registered-program-slugs";
 import type { Event } from "@/lib/supabase/types";
 
 type SportEvent = Event & { image?: string };
@@ -20,6 +21,7 @@ export default function RunClubPage() {
   const [modalSlug, setModalSlug] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string | null>(null);
   const [detailEvent, setDetailEvent] = useState<SportEvent | null>(null);
+  const { isRegisteredSlug, refreshRegisteredSlugs } = useRegisteredProgramSlugs();
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -70,8 +72,9 @@ export default function RunClubPage() {
   };
 
   const openModal = (slug?: string | null, title?: string) => {
-    if (!slug) return;
-    setModalSlug(slug);
+    const normalizedSlug = slug?.trim();
+    if (!normalizedSlug || isRegisteredSlug(normalizedSlug)) return;
+    setModalSlug(normalizedSlug);
     setModalTitle(title ?? null);
     setModalOpen(true);
   };
@@ -110,10 +113,10 @@ export default function RunClubPage() {
                 <button
                   className="button primary"
                   type="button"
-                  disabled={!item.registration_program_slug}
+                  disabled={!item.registration_program_slug || isRegisteredSlug(item.registration_program_slug)}
                   onClick={() => openModal(item.registration_program_slug, item.title)}
                 >
-                  {item.registration_program_slug ? "Sign up" : "Registration coming soon"}
+                  {!item.registration_program_slug ? "Registration coming soon" : isRegisteredSlug(item.registration_program_slug) ? "Registered" : "Sign up"}
                 </button>
               </div>
             </div>
@@ -187,11 +190,13 @@ export default function RunClubPage() {
         programSlug={modalSlug}
         contextTitle={modalTitle ?? undefined}
         onClose={() => setModalOpen(false)}
+        onSubmitted={refreshRegisteredSlugs}
       />
       <EventDetailModal
         open={Boolean(detailEvent)}
         event={detailEvent}
         dateLabel={detailEvent ? primaryTimeLabel(detailEvent) : undefined}
+        isRegistered={isRegisteredSlug(detailEvent?.registration_program_slug)}
         onClose={() => setDetailEvent(null)}
         onRegister={(event) => openModal(event.registration_program_slug, event.title)}
       />
