@@ -58,6 +58,14 @@ type ContactMessage = {
   message: string;
   created_at?: string | null;
 };
+type UserDirectoryRecord = {
+  id: string;
+  name: string;
+  role?: "player" | "admin" | "owner" | null;
+  age?: number | null;
+  sports?: string[] | null;
+  created_at?: string | null;
+};
 
 export default function AdminPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
@@ -83,6 +91,10 @@ export default function AdminPage() {
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   const [loadingContactMessages, setLoadingContactMessages] = useState(false);
   const [contactMessagesError, setContactMessagesError] = useState<string | null>(null);
+  const [users, setUsers] = useState<UserDirectoryRecord[]>([]);
+  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [usersError, setUsersError] = useState<string | null>(null);
+  const [usersSearch, setUsersSearch] = useState("");
   const [autoFillingCreateArticle, setAutoFillingCreateArticle] = useState(false);
   const [autoFillingEditArticleId, setAutoFillingEditArticleId] = useState<string | null>(null);
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
@@ -165,8 +177,8 @@ export default function AdminPage() {
     {
       id: "users",
       title: "Users",
-      description: "Manage user profiles and roles.",
-      enabled: false,
+      description: "View all users from the profiles table.",
+      enabled: true,
     },
     {
       id: "flyers",
@@ -354,6 +366,26 @@ export default function AdminPage() {
 
     setRegistrations(resolved);
     setLoadingRegistrations(false);
+  };
+
+  const loadUsers = async () => {
+    if (!supabase) return;
+    setLoadingUsers(true);
+    setUsersError(null);
+
+    const { data, error } = await supabase
+      .from("profiles")
+      .select("id,name,role,age,sports")
+      .order("name", { ascending: true });
+
+    if (error) {
+      setUsers([]);
+      setUsersError(error.message ?? "Could not load users.");
+    } else {
+      setUsers((data ?? []) as UserDirectoryRecord[]);
+    }
+
+    setLoadingUsers(false);
   };
 
   useEffect(() => {
@@ -608,6 +640,9 @@ export default function AdminPage() {
     }
     if (module === "contact") {
       void loadContactMessages();
+    }
+    if (module === "users") {
+      void loadUsers();
     }
   };
 
@@ -907,6 +942,16 @@ export default function AdminPage() {
     acc[key] = (acc[key] ?? 0) + 1;
     return acc;
   }, {});
+
+  const filteredUsers = users.filter((user) => {
+    const term = usersSearch.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      user.name.toLowerCase().includes(term) ||
+      user.id.toLowerCase().includes(term) ||
+      (user.role ?? "player").toLowerCase().includes(term)
+    );
+  });
 
   return (
     <div className="account-page">
@@ -1575,6 +1620,54 @@ export default function AdminPage() {
                             {row.submitted_at ? (
                               <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
                             ) : null}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              </>
+            ) : null}
+            {activeModule === "users" ? (
+              <>
+                <section className="account-card">
+                  <h2>Users</h2>
+                  <p className="muted">Accounts from the profiles table.</p>
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>All Profiles</h2>
+                      <p className="muted">Read-only view.</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => void loadUsers()} disabled={loadingUsers}>
+                      {loadingUsers ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  <div className="form-control" style={{ marginTop: 12 }}>
+                    <label htmlFor="users-search">Search users</label>
+                    <input
+                      id="users-search"
+                      value={usersSearch}
+                      onChange={(e) => setUsersSearch(e.target.value)}
+                      placeholder="Name, role, or user ID"
+                    />
+                  </div>
+                  {usersError ? <p className="form-help error">{usersError}</p> : null}
+                  {loadingUsers ? <p className="muted">Loading users...</p> : null}
+                  {!loadingUsers && filteredUsers.length === 0 ? <p className="muted">No users found.</p> : null}
+                  {!loadingUsers && filteredUsers.length > 0 ? (
+                    <div className="event-list">
+                      {filteredUsers.map((user) => (
+                        <article key={user.id} className="event-card-simple">
+                          <div className="event-card__header">
+                            <h3>{user.name || "Unnamed user"}</h3>
+                          </div>
+                          <div className="event-card__meta">
+                            <p className="muted">Role: {user.role ?? "player"}</p>
+                            <p className="muted">Age: {user.age ?? "N/A"}</p>
+                            <p className="muted">Sports: {user.sports?.length ? user.sports.join(", ") : "N/A"}</p>
+                            <p className="muted">User ID: {user.id}</p>
                           </div>
                         </article>
                       ))}
