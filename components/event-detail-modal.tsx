@@ -54,6 +54,12 @@ const formatDateRange = (start?: string | null, end?: string | null) => {
   return "";
 };
 
+const formatSingleDate = (value?: string | null) => {
+  const date = parseDateUTC(value);
+  if (!date) return null;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+};
+
 export function EventDetailModal({ open, event, dateLabel, isRegistered = false, onClose, onRegister }: EventDetailModalProps) {
   const [flyerImageUrl, setFlyerImageUrl] = useState<string | null>(null);
   const [flyerEventPhotoUrl, setFlyerEventPhotoUrl] = useState<string | null>(null);
@@ -146,7 +152,10 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
 
   if (!open || !event) return null;
 
-  const primaryDate = dateLabel || event.time_info?.trim() || formatDateRange(event.start_date, event.end_date) || "Date TBD";
+  const dateRange = formatDateRange(event.start_date, event.end_date) || dateLabel || "Date TBD";
+  const timeInfo = event.time_info?.trim() || null;
+  const startDateLabel = formatSingleDate(event.start_date);
+  const endDateLabel = formatSingleDate(event.end_date);
   const flyerImage = hasFlyerMatch ? (flyerImageUrl || undefined) : (event.image || event.image_url || undefined);
   const eventPhoto = hasFlyerMatch
     ? (flyerEventPhotoUrl || flyerImage || undefined)
@@ -196,7 +205,8 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
         </div>
 
         <div className="event-detail__meta">
-          <span className="pill pill--muted">{primaryDate}</span>
+          <span className="pill pill--muted">{dateRange}</span>
+          {timeInfo ? <span className="pill pill--muted">{timeInfo}</span> : null}
           <span className="pill pill--muted">{event.location || "Location TBD"}</span>
         </div>
 
@@ -208,6 +218,14 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
             ) : (
               <p className="muted">Event details will be added soon.</p>
             )}
+            <div className="event-detail__list">
+              <h4>Schedule</h4>
+              <ul>
+                <li>Start date: {startDateLabel || "TBD"}</li>
+                <li>End date: {endDateLabel || startDateLabel || "TBD"}</li>
+                {timeInfo ? <li>Time: {timeInfo}</li> : null}
+              </ul>
+            </div>
           </div>
 
           <div className="event-detail__media">

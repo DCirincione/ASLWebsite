@@ -81,7 +81,9 @@ export default function RunClubPage() {
 
   const primaryTimeLabel = (event: SportEvent) => {
     const time = event.time_info?.trim();
-    return time || formatDateRange(event.start_date, event.end_date) || "Date TBD";
+    const dateRange = formatDateRange(event.start_date, event.end_date);
+    if (dateRange && time) return dateRange + " • " + time;
+    return dateRange || time || "Date TBD";
   };
 
   const renderCards = () => {

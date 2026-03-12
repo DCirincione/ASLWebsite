@@ -101,7 +101,8 @@ export default function EventsPage() {
   const primaryDateLabel = (event: EventItem) => {
     const dateRange = formatDateRange(event.start_date, event.end_date);
     const timeInfo = event.time_info?.trim();
-    return timeInfo || dateRange || "Date TBD";
+    if (dateRange && timeInfo) return `${dateRange} • ${timeInfo}`;
+    return dateRange || timeInfo || "Date TBD";
   };
 
   const handleJump = (targetId: string) => {
