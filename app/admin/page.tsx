@@ -41,6 +41,16 @@ type CommunityArticle = {
   date?: string;
   image?: string;
 };
+type RegistrationRecord = {
+  id: string;
+  submitted_at?: string | null;
+  user_id: string;
+  user_name: string;
+  program_id: string;
+  program_name: string;
+  program_slug: string;
+  event_title: string;
+};
 type ContactMessage = {
   id: string;
   name: string;
@@ -67,6 +77,9 @@ export default function AdminPage() {
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [communityArticles, setCommunityArticles] = useState<CommunityArticle[]>([]);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
+  const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
+  const [loadingRegistrations, setLoadingRegistrations] = useState(false);
+  const [registrationsError, setRegistrationsError] = useState<string | null>(null);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   const [loadingContactMessages, setLoadingContactMessages] = useState(false);
   const [contactMessagesError, setContactMessagesError] = useState<string | null>(null);
@@ -147,7 +160,7 @@ export default function AdminPage() {
       id: "registrations",
       title: "Registrations",
       description: "Review and manage event signups.",
-      enabled: false,
+      enabled: true,
     },
     {
       id: "users",
@@ -245,6 +258,102 @@ export default function AdminPage() {
     }
 
     setLoadingContactMessages(false);
+  };
+
+  const loadRegistrations = async () => {
+    if (!supabase) return;
+    setLoadingRegistrations(true);
+    setRegistrationsError(null);
+
+    const { data: submissionData, error: submissionError } = await supabase
+      .from("registration_submissions")
+      .select("id,program_id,user_id,created_at")
+      .order("created_at", { ascending: false });
+
+    if (submissionError) {
+      setRegistrations([]);
+      setRegistrationsError(submissionError.message ?? "Could not load registrations.");
+      setLoadingRegistrations(false);
+      return;
+    }
+
+    const submissions = (submissionData ?? []) as Array<{
+      id: string;
+      program_id: string;
+      user_id: string;
+      created_at?: string | null;
+    }>;
+
+    if (submissions.length === 0) {
+      setRegistrations([]);
+      setLoadingRegistrations(false);
+      return;
+    }
+
+    const programIds = Array.from(new Set(submissions.map((row) => row.program_id).filter(Boolean)));
+    const userIds = Array.from(new Set(submissions.map((row) => row.user_id).filter(Boolean)));
+
+    const [{ data: programsData, error: programsError }, { data: profilesData, error: profilesError }] =
+      await Promise.all([
+        supabase
+          .from("registration_programs")
+          .select("id,name,slug")
+          .in("id", programIds),
+        supabase
+          .from("profiles")
+          .select("id,name")
+          .in("id", userIds),
+      ]);
+
+    if (programsError || profilesError) {
+      setRegistrations([]);
+      setRegistrationsError(programsError?.message || profilesError?.message || "Could not load registrations.");
+      setLoadingRegistrations(false);
+      return;
+    }
+
+    const programs = (programsData ?? []) as Array<{ id: string; name: string; slug: string }>;
+    const profiles = (profilesData ?? []) as Array<{ id: string; name: string | null }>;
+    const programById = new Map(programs.map((row) => [row.id, row]));
+    const profileById = new Map(profiles.map((row) => [row.id, row]));
+    const slugs = Array.from(new Set(programs.map((row) => row.slug).filter(Boolean)));
+
+    const { data: eventsData, error: eventsError } = await supabase
+      .from("events")
+      .select("id,title,registration_program_slug")
+      .in("registration_program_slug", slugs);
+
+    if (eventsError) {
+      setRegistrations([]);
+      setRegistrationsError(eventsError.message ?? "Could not load registrations.");
+      setLoadingRegistrations(false);
+      return;
+    }
+
+    const eventBySlug = new Map(
+      ((eventsData ?? []) as Array<{ id: string; title: string; registration_program_slug?: string | null }>)
+        .filter((row) => row.registration_program_slug)
+        .map((row) => [row.registration_program_slug as string, row.title])
+    );
+
+    const resolved: RegistrationRecord[] = submissions.map((row) => {
+      const program = programById.get(row.program_id);
+      const profile = profileById.get(row.user_id);
+      const slug = program?.slug ?? "";
+      return {
+        id: row.id,
+        submitted_at: row.created_at ?? null,
+        user_id: row.user_id,
+        user_name: profile?.name?.trim() || "Unknown user",
+        program_id: row.program_id,
+        program_name: program?.name ?? "Unknown program",
+        program_slug: slug,
+        event_title: eventBySlug.get(slug) ?? program?.name ?? "Unknown event",
+      };
+    });
+
+    setRegistrations(resolved);
+    setLoadingRegistrations(false);
   };
 
   useEffect(() => {
@@ -489,6 +598,9 @@ export default function AdminPage() {
     setActiveModule(module);
     if (module === "events") {
       void loadEvents();
+    }
+    if (module === "registrations") {
+      void loadRegistrations();
     }
     if (module === "community") {
       void loadCommunityArticles();
@@ -789,6 +901,12 @@ export default function AdminPage() {
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleString();
   };
+
+  const registrationCountByEvent = registrations.reduce<Record<string, number>>((acc, row) => {
+    const key = row.event_title || "Unknown event";
+    acc[key] = (acc[key] ?? 0) + 1;
+    return acc;
+  }, {});
 
   return (
     <div className="account-page">
@@ -1394,6 +1512,70 @@ export default function AdminPage() {
                               </div>
                             </div>
                           ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              </>
+            ) : null}
+            {activeModule === "registrations" ? (
+              <>
+                <section className="account-card">
+                  <h2>Event Registrations</h2>
+                  <p className="muted">See who signed up for which event.</p>
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Registration Summary</h2>
+                      <p className="muted">Count of signups by event.</p>
+                    </div>
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => void loadRegistrations()}
+                      disabled={loadingRegistrations}
+                    >
+                      {loadingRegistrations ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  {registrationsError ? <p className="form-help error">{registrationsError}</p> : null}
+                  {loadingRegistrations ? <p className="muted">Loading registrations...</p> : null}
+                  {!loadingRegistrations && registrations.length === 0 ? (
+                    <p className="muted">No registrations found.</p>
+                  ) : null}
+                  {!loadingRegistrations && registrations.length > 0 ? (
+                    <ul className="list" style={{ display: "grid", gap: 8 }}>
+                      {Object.entries(registrationCountByEvent)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([eventTitle, count]) => (
+                          <li key={eventTitle} className="team-card">
+                            <div className="team-card__info">
+                              <p className="list__title">{eventTitle}</p>
+                              <p className="muted">{count} signup{count === 1 ? "" : "s"}</p>
+                            </div>
+                          </li>
+                        ))}
+                    </ul>
+                  ) : null}
+                </section>
+                <section className="account-card">
+                  <h2>All Signups</h2>
+                  {!loadingRegistrations && registrations.length > 0 ? (
+                    <div className="event-list">
+                      {registrations.map((row) => (
+                        <article key={row.id} className="event-card-simple">
+                          <div className="event-card__header">
+                            <h3>{row.event_title}</h3>
+                          </div>
+                          <div className="event-card__meta">
+                            <p className="muted">User: {row.user_name}</p>
+                            <p className="muted">Program: {row.program_name}</p>
+                            {row.submitted_at ? (
+                              <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
+                            ) : null}
+                          </div>
                         </article>
                       ))}
                     </div>

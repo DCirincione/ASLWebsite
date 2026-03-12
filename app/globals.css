@@ -2334,6 +2334,69 @@ html[data-theme="dark"] .register-modal__footer {
   border-color: #1f2a40;
 }
 
+html[data-theme="dark"] .register-form .form-control label,
+html[data-theme="dark"] .register-form .register-field-label {
+  color: #e8edf7;
+}
+
+html[data-theme="dark"] .register-form input,
+html[data-theme="dark"] .register-form select,
+html[data-theme="dark"] .register-form textarea {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #1f2a40;
+  color: #e8edf7;
+}
+
+html[data-theme="dark"] .register-form input::placeholder,
+html[data-theme="dark"] .register-form textarea::placeholder {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .register-form input:focus,
+html[data-theme="dark"] .register-form select:focus,
+html[data-theme="dark"] .register-form textarea:focus {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(233, 93, 42, 0.7);
+  box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.2);
+}
+
+html[data-contrast="high"] .register-modal {
+  background: #000000;
+  border-color: #f8fafc;
+  color: #f8fafc;
+}
+
+html[data-contrast="high"] .register-modal__header,
+html[data-contrast="high"] .register-modal__footer {
+  border-color: #f8fafc;
+}
+
+html[data-contrast="high"] .register-form .form-control label,
+html[data-contrast="high"] .register-form .register-field-label {
+  color: #f8fafc;
+}
+
+html[data-contrast="high"] .register-form input,
+html[data-contrast="high"] .register-form select,
+html[data-contrast="high"] .register-form textarea {
+  background: #000000;
+  border-color: #f8fafc;
+  color: #f8fafc;
+}
+
+html[data-contrast="high"] .register-form input::placeholder,
+html[data-contrast="high"] .register-form textarea::placeholder {
+  color: #cbd5e1;
+}
+
+html[data-contrast="high"] .register-form input:focus,
+html[data-contrast="high"] .register-form select:focus,
+html[data-contrast="high"] .register-form textarea:focus {
+  border-color: #f8fafc;
+  box-shadow: 0 0 0 3px rgba(248, 250, 252, 0.35);
+  background: #000000;
+}
+
 @media (max-width: 720px) {
   .event-card-grid {
     grid-auto-columns: 85%;
