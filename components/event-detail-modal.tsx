@@ -208,14 +208,6 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
             ) : (
               <p className="muted">Event details will be added soon.</p>
             )}
-            <div className="event-detail__list">
-              <h4>Notes</h4>
-              <ul>
-                <li>Use this space for rules, schedules, and FAQ once they are ready.</li>
-                <li>You can add flyers or extra pictures on the right-hand media slots.</li>
-                <li>Share this with partners to gather final copy and assets.</li>
-              </ul>
-            </div>
           </div>
 
           <div className="event-detail__media">
