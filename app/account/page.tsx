@@ -2,11 +2,11 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { supabase } from "@/lib/supabase/client";
-import type { Friend, Profile, TeamMembership } from "@/lib/supabase/types";
+import type { Event, Friend, Profile, TeamMembership } from "@/lib/supabase/types";
 
 type ProfileData = Profile & {
   team_memberships: TeamMembership[];
@@ -46,6 +46,36 @@ const fallbackProfile: ProfileData = {
   friends: [],
 };
 
+const fallbackEvents: Event[] = [
+  {
+    id: "fallback-1",
+    title: "3v3 Basketball Tournament",
+    start_date: "2024-03-15",
+    end_date: "2024-03-15",
+    time_info: "8:00 AM tip-off",
+    location: "Central Sports Complex",
+    description: "Fast-paced half-court games for every division.",
+  },
+  {
+    id: "fallback-2",
+    title: "Pickleball League",
+    start_date: "2024-03-20",
+    end_date: "2024-04-20",
+    time_info: "Weeknight doubles",
+    location: "Riverside Courts",
+    description: "Round-robin league with playoffs and prizes.",
+  },
+];
+
+type SubmissionRow = {
+  program_id: string;
+};
+
+type ProgramRow = {
+  id: string;
+  slug: string | null;
+};
+
 export default function AccountPage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
@@ -59,6 +89,9 @@ export default function AccountPage() {
   // Teams
   const [teams, setTeams] = useState<TeamMembership[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
+  const [registeredEvents, setRegisteredEvents] = useState<Event[] | null>(null);
+  const [eventsStatus, setEventsStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [eventsError, setEventsError] = useState<string | null>(null);
 
   // Friends
   const [friends, setFriends] = useState<FriendWithAvatar[]>([]);
@@ -118,7 +151,7 @@ export default function AccountPage() {
     let dataUrl: string;
     try {
       dataUrl = await readAsDataUrl();
-    } catch (err) {
+    } catch {
       setAvatarError("Unable to read image file.");
       setUploadingAvatar(false);
       return;
@@ -199,6 +232,80 @@ export default function AccountPage() {
     loadTeams();
   }, [userId]);
 
+  // Load registered events
+  useEffect(() => {
+    const loadEvents = async () => {
+      setEventsError(null);
+      if (!supabase || !userId) {
+        setRegisteredEvents([]);
+        setEventsStatus("ready");
+        return;
+      }
+
+      setEventsStatus("loading");
+      const { data: submissions, error: submissionsError } = await supabase
+        .from("registration_submissions")
+        .select("program_id")
+        .eq("user_id", userId);
+
+      if (submissionsError) {
+        setRegisteredEvents(fallbackEvents);
+        setEventsStatus("ready");
+        setEventsError("Could not load your saved events yet.");
+        return;
+      }
+
+      const programIds = Array.from(
+        new Set((submissions as SubmissionRow[]).map((row) => row.program_id).filter(Boolean))
+      );
+
+      if (programIds.length === 0) {
+        setRegisteredEvents([]);
+        setEventsStatus("ready");
+        return;
+      }
+
+      const { data: programs, error: programsError } = await supabase
+        .from("registration_programs")
+        .select("id,slug")
+        .in("id", programIds);
+
+      if (programsError) {
+        setRegisteredEvents(fallbackEvents);
+        setEventsStatus("ready");
+        setEventsError("Could not load your saved events yet.");
+        return;
+      }
+
+      const registrationSlugs = Array.from(
+        new Set((programs as ProgramRow[]).map((row) => row.slug?.trim()).filter(Boolean))
+      ) as string[];
+
+      if (registrationSlugs.length === 0) {
+        setRegisteredEvents([]);
+        setEventsStatus("ready");
+        return;
+      }
+
+      const { data: eventData, error: eventError } = await supabase
+        .from("events")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,registration_program_slug")
+        .in("registration_program_slug", registrationSlugs);
+
+      if (eventError) {
+        setRegisteredEvents(fallbackEvents);
+        setEventsStatus("ready");
+        setEventsError("Could not load event details. Showing sample schedule.");
+        return;
+      }
+
+      setRegisteredEvents((eventData ?? []) as Event[]);
+      setEventsStatus("ready");
+    };
+
+    loadEvents();
+  }, [userId]);
+
   // Load friend requests + accepted friends
   useEffect(() => {
     const client = supabase;
@@ -256,19 +363,7 @@ export default function AccountPage() {
     loadFriendsData();
   }, [userId]);
 
-  // Search with debounce
-  useEffect(() => {
-    if (!search) {
-      setSearchResults([]);
-      return;
-    }
-    const handle = setTimeout(() => {
-      void doSearch(search.trim());
-    }, 250);
-    return () => clearTimeout(handle);
-  }, [search]);
-
-  const doSearch = async (term: string) => {
+  const doSearch = useCallback(async (term: string) => {
     if (!supabase) return;
     if (!term) {
       setSearchResults([]);
@@ -292,7 +387,16 @@ export default function AccountPage() {
       setSearchResults([]);
     }
     setSearchLoading(false);
-  };
+  }, [friends, requests, userId]);
+
+  // Search with debounce
+  useEffect(() => {
+    if (!search) return;
+    const handle = setTimeout(() => {
+      void doSearch(search.trim());
+    }, 250);
+    return () => clearTimeout(handle);
+  }, [search, doSearch]);
 
   const sendRequest = async (receiverId: string) => {
     if (!supabase || !userId) return;
@@ -347,6 +451,33 @@ export default function AccountPage() {
     [requests, userId]
   );
 
+  const parseDateUTC = (value?: string | null) => {
+    if (!value) return null;
+    const parts = value.split("-").map(Number);
+    if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
+    const [year, month, day] = parts;
+    return new Date(Date.UTC(year, month - 1, day));
+  };
+
+  const formatDateRange = (start?: string | null, end?: string | null) => {
+    if (!start && !end) return "";
+    const startDate = parseDateUTC(start);
+    const endDate = parseDateUTC(end);
+    const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
+    if (startDate && endDate) {
+      const sameMonth = startDate.getMonth() === endDate.getMonth();
+      const sameYear = startDate.getFullYear() === endDate.getFullYear();
+      const startStr = startDate.toLocaleDateString(undefined, opts);
+      const endStr = endDate.toLocaleDateString(
+        undefined,
+        sameMonth && sameYear ? { day: "numeric", timeZone: "UTC" } : opts
+      );
+      return `${startStr} – ${endStr}`;
+    }
+    if (startDate) return startDate.toLocaleDateString(undefined, opts);
+    return "";
+  };
+
   if (status === "loading") {
     return (
       <div className="account-page">
@@ -388,7 +519,7 @@ export default function AccountPage() {
             <div className="account-header__text">
               <p className="eyebrow">Account</p>
               <h1>{data.name}</h1>
-              <p className="muted">Manage your profile, teams, and friends.</p>
+              <p className="muted">Manage your profile, events, teams, and friends.</p>
               <div className="avatar-upload">
                 <input
                   ref={fileInputRef}
@@ -425,6 +556,53 @@ export default function AccountPage() {
             <Stat label="Skill (1-10)" value={data.skill_level} />
             <Stat label="Positions" value={data.positions?.join(", ") ?? "—"} />
             <Stat label="Sports" value={data.sports?.join(", ") ?? "—"} />
+          </div>
+        </section>
+
+        <section className="account-card" id="events">
+          <div className="account-card__header">
+            <div>
+              <h2>My Events</h2>
+              <p className="muted">Events you have signed up for.</p>
+            </div>
+          </div>
+          {eventsError ? (
+            <p className="muted" role="status" aria-live="polite">
+              {eventsError}
+            </p>
+          ) : null}
+          {eventsStatus === "loading" ? (
+            <p className="muted">Loading your events...</p>
+          ) : (registeredEvents ?? []).length === 0 ? (
+            <p className="muted">
+              No events yet. <Link href="/events">Browse upcoming events</Link> to join.
+            </p>
+          ) : (
+            <div className="event-list">
+              {(registeredEvents ?? []).map((event) => {
+                const dateRange = formatDateRange(event.start_date, event.end_date);
+                const primaryDate = event.time_info?.trim() || null;
+                const fallbackDate = primaryDate ? null : dateRange;
+                const dateToShow = primaryDate || fallbackDate || null;
+                return (
+                  <article key={event.id} className="event-card-simple">
+                    <div className="event-card__header">
+                      <h3>{event.title}</h3>
+                    </div>
+                    <div className="event-card__meta">
+                      {dateToShow ? <p className="muted">Date: {dateToShow}</p> : null}
+                      {event.location ? <p className="muted">Location: {event.location}</p> : null}
+                    </div>
+                    {event.description ? <p className="muted">{event.description}</p> : null}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+          <div style={{ marginTop: 12 }}>
+            <Link className="button primary" href="/events">
+              Browse Events
+            </Link>
           </div>
         </section>
 
@@ -479,7 +657,13 @@ export default function AccountPage() {
                 <input
                   id="friend-search"
                   value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSearch(value);
+                    if (!value.trim()) {
+                      setSearchResults([]);
+                    }
+                  }}
                   placeholder="Search by name"
                   autoComplete="off"
                 />
@@ -517,6 +701,28 @@ export default function AccountPage() {
             </p>
           ) : null}
 
+          <section className="account-card" style={{ marginTop: 12 }}>
+            <h3>Your friends</h3>
+            {friends.length === 0 ? (
+            <p className="muted">No friends yet. Connect with players in your sports.</p>
+            ) : (
+              <ul className="list list--grid">
+                {friends.map((friend) => (
+                  <li key={friend.id} className="team-card">
+                    <div className="team-card__logo">
+                      <img src={friend.avatar_url ?? "/avatar-placeholder.svg"} alt="" />
+                    </div>
+                    <div className="team-card__info">
+                      <p className="list__title">{friend.name}</p>
+                    </div>
+                    <Link className="button ghost" href={`/profiles/${friend.id}`}>
+                      View Profile
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
           <section className="account-card" style={{ marginTop: 12 }}>
             <h3>Friend requests</h3>
             {pendingIncoming.length === 0 && pendingOutgoing.length === 0 ? (
@@ -592,29 +798,6 @@ export default function AccountPage() {
                   </>
                 ) : null}
               </>
-            )}
-          </section>
-
-          <section className="account-card" style={{ marginTop: 12 }}>
-            <h3>Your friends</h3>
-            {friends.length === 0 ? (
-            <p className="muted">No friends yet. Connect with players in your sports.</p>
-            ) : (
-              <ul className="list list--grid">
-                {friends.map((friend) => (
-                  <li key={friend.id} className="team-card">
-                    <div className="team-card__logo">
-                      <img src={(friend as any).avatar_url ?? "/avatar-placeholder.svg"} alt="" />
-                    </div>
-                    <div className="team-card__info">
-                      <p className="list__title">{friend.name}</p>
-                    </div>
-                    <Link className="button ghost" href={`/profiles/${friend.id}`}>
-                      View Profile
-                    </Link>
-                  </li>
-                ))}
-              </ul>
             )}
           </section>
           {error ? <p className="form-help error">{error}</p> : null}

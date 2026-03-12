@@ -2,6 +2,7 @@ export type Profile = {
   id: string;
   name: string;
   age: number | null;
+  role?: "player" | "admin" | "owner" | null;
   avatar_url?: string | null;
   positions: string[] | null;
   skill_level: number | null;
@@ -15,6 +16,7 @@ export type ProfileInsert = {
   id?: string;
   name: string;
   age?: number | null;
+  role?: "player" | "admin" | "owner" | null;
   avatar_url?: string | null;
   positions?: string[] | null;
   skill_level?: number | null;
@@ -28,6 +30,7 @@ export type ProfileUpdate = {
   id?: string;
   name?: string;
   age?: number | null;
+  role?: "player" | "admin" | "owner" | null;
   avatar_url?: string | null;
   positions?: string[] | null;
   skill_level?: number | null;

@@ -22,6 +22,7 @@ export function SiteHeader() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<"signup" | "signin">("signup");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [profileRole, setProfileRole] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
@@ -36,32 +37,31 @@ export function SiteHeader() {
     const client = supabase;
     if (!client) return;
 
+    const loadHeaderProfile = async (uid: string) => {
+      const { data: profile } = await client
+        .from("profiles")
+        .select("avatar_url,role")
+        .eq("id", uid)
+        .maybeSingle();
+      setAvatarUrl(profile?.avatar_url ?? null);
+      setProfileRole(profile?.role ?? null);
+    };
+
     client.auth.getSession().then(async ({ data }) => {
       const session = data.session;
       setIsAuthenticated(Boolean(session));
       if (session?.user?.id) {
-        const { data: profile } = await client
-          .from("profiles")
-          .select("avatar_url")
-          .eq("id", session.user.id)
-          .maybeSingle();
-        setAvatarUrl(profile?.avatar_url ?? null);
+        await loadHeaderProfile(session.user.id);
       }
     });
 
     const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
       setIsAuthenticated(Boolean(session));
       if (session?.user?.id) {
-        client
-          .from("profiles")
-          .select("avatar_url")
-          .eq("id", session.user.id)
-          .maybeSingle()
-          .then(({ data: profile }) => {
-            setAvatarUrl(profile?.avatar_url ?? null);
-          });
+        void loadHeaderProfile(session.user.id);
       } else {
         setAvatarUrl(null);
+        setProfileRole(null);
       }
     });
 
@@ -132,6 +132,8 @@ export function SiteHeader() {
     return () => window.removeEventListener("resize", handleResize);
   }, [isMobileNavOpen]);
 
+  const canAccessAdmin = profileRole === "admin" || profileRole === "owner";
+
   return (
     <>
       <header className="site-header">
@@ -165,7 +167,7 @@ export function SiteHeader() {
                   <Link href="/account" className="nav__link" onClick={() => setIsMobileNavOpen(false)}>
                     Account
                   </Link>
-                  <Link href="/account/events" className="nav__link" onClick={() => setIsMobileNavOpen(false)}>
+                  <Link href="/account#events" className="nav__link" onClick={() => setIsMobileNavOpen(false)}>
                     My Events
                   </Link>
                 </>
@@ -204,9 +206,11 @@ export function SiteHeader() {
                     <Link href="/account#profile" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                       My Profile
                     </Link>
-                    <Link href="/account/events" role="menuitem" onClick={() => setIsMenuOpen(false)}>
-                      My Events
-                    </Link>
+                    {canAccessAdmin ? (
+                      <Link href="/admin" role="menuitem" onClick={() => setIsMenuOpen(false)}>
+                        Admin Dashboard
+                      </Link>
+                    ) : null}
                     <Link href="/account#settings" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                       Settings
                     </Link>
