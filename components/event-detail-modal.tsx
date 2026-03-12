@@ -41,6 +41,9 @@ const formatDateRange = (start?: string | null, end?: string | null) => {
   const endDate = parseDateUTC(end);
   const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
   if (startDate && endDate) {
+    if (startDate.getTime() === endDate.getTime()) {
+      return startDate.toLocaleDateString(undefined, opts);
+    }
     const sameMonth = startDate.getMonth() === endDate.getMonth();
     const sameYear = startDate.getFullYear() === endDate.getFullYear();
     const startStr = startDate.toLocaleDateString(undefined, opts);
