@@ -387,6 +387,30 @@ export type FlyerUpdate = {
   updated_at?: string | null;
 };
 
+export type ContactMessage = {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  created_at?: string | null;
+};
+
+export type ContactMessageInsert = {
+  id?: string;
+  name: string;
+  email: string;
+  message: string;
+  created_at?: string | null;
+};
+
+export type ContactMessageUpdate = {
+  id?: string;
+  name?: string;
+  email?: string;
+  message?: string;
+  created_at?: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -460,6 +484,12 @@ export type Database = {
         Row: Flyer;
         Insert: FlyerInsert;
         Update: FlyerUpdate;
+        Relationships: [];
+      };
+      contact_messages: {
+        Row: ContactMessage;
+        Insert: ContactMessageInsert;
+        Update: ContactMessageUpdate;
         Relationships: [];
       };
     };

@@ -13,6 +13,7 @@ type AdminModule =
   | "none"
   | "events"
   | "community"
+  | "contact"
   | "sports"
   | "registrations"
   | "users"
@@ -40,6 +41,13 @@ type CommunityArticle = {
   date?: string;
   image?: string;
 };
+type ContactMessage = {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  created_at?: string | null;
+};
 
 export default function AdminPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
@@ -59,6 +67,9 @@ export default function AdminPage() {
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [communityArticles, setCommunityArticles] = useState<CommunityArticle[]>([]);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
+  const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
+  const [loadingContactMessages, setLoadingContactMessages] = useState(false);
+  const [contactMessagesError, setContactMessagesError] = useState<string | null>(null);
   const [autoFillingCreateArticle, setAutoFillingCreateArticle] = useState(false);
   const [autoFillingEditArticleId, setAutoFillingEditArticleId] = useState<string | null>(null);
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
@@ -118,6 +129,12 @@ export default function AdminPage() {
       id: "community",
       title: "Community",
       description: "Add featured community/news articles.",
+      enabled: true,
+    },
+    {
+      id: "contact",
+      title: "Contact Messages",
+      description: "Review inbound contact form submissions.",
       enabled: true,
     },
     {
@@ -208,6 +225,26 @@ export default function AdminPage() {
     } catch {
       setCommunityContentStatus({ type: "error", message: "Could not load community intro." });
     }
+  };
+
+  const loadContactMessages = async () => {
+    if (!supabase) return;
+    setLoadingContactMessages(true);
+    setContactMessagesError(null);
+
+    const { data, error } = await supabase
+      .from("contact_messages")
+      .select("id,name,email,message,created_at")
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      setContactMessages([]);
+      setContactMessagesError(error.message ?? "Could not load contact messages.");
+    } else {
+      setContactMessages((data ?? []) as ContactMessage[]);
+    }
+
+    setLoadingContactMessages(false);
   };
 
   useEffect(() => {
@@ -456,6 +493,9 @@ export default function AdminPage() {
     if (module === "community") {
       void loadCommunityArticles();
       void loadCommunityContent();
+    }
+    if (module === "contact") {
+      void loadContactMessages();
     }
   };
 
@@ -741,6 +781,13 @@ export default function AdminPage() {
     } catch {
       setCommunityContentStatus({ type: "error", message: "Could not update intro block." });
     }
+  };
+
+  const formatMessageDate = (value?: string | null) => {
+    if (!value) return "Unknown date";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return value;
+    return date.toLocaleString();
   };
 
   return (
@@ -1347,6 +1394,51 @@ export default function AdminPage() {
                               </div>
                             </div>
                           ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
+              </>
+            ) : null}
+            {activeModule === "contact" ? (
+              <>
+                <section className="account-card">
+                  <h2>Contact Messages</h2>
+                  <p className="muted">Messages sent from the public contact form.</p>
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Inbox</h2>
+                      <p className="muted">Latest messages appear first.</p>
+                    </div>
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => void loadContactMessages()}
+                      disabled={loadingContactMessages}
+                    >
+                      {loadingContactMessages ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  {contactMessagesError ? <p className="form-help error">{contactMessagesError}</p> : null}
+                  {loadingContactMessages ? <p className="muted">Loading messages...</p> : null}
+                  {!loadingContactMessages && contactMessages.length === 0 ? (
+                    <p className="muted">No contact messages yet.</p>
+                  ) : null}
+                  {!loadingContactMessages && contactMessages.length > 0 ? (
+                    <div className="event-list">
+                      {contactMessages.map((message) => (
+                        <article key={message.id} className="event-card-simple">
+                          <div className="event-card__header">
+                            <h3>{message.name}</h3>
+                          </div>
+                          <div className="event-card__meta">
+                            <p className="muted">Email: {message.email}</p>
+                            <p className="muted">Received: {formatMessageDate(message.created_at)}</p>
+                          </div>
+                          <p className="muted">{message.message}</p>
                         </article>
                       ))}
                     </div>

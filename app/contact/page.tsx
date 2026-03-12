@@ -1,9 +1,57 @@
+"use client";
+
 import Link from "next/link";
+import { useState, type FormEvent } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
+import { supabase } from "@/lib/supabase/client";
+
+type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
 
 export default function ContactPage() {
+  const [status, setStatus] = useState<Status>({ type: "idle" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    message: "",
+  });
+
+  const update = (key: keyof typeof form, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) {
+      setStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+
+    const name = form.name.trim();
+    const email = form.email.trim();
+    const message = form.message.trim();
+    if (!name || !email || !message) {
+      setStatus({ type: "error", message: "Name, email, and message are required." });
+      return;
+    }
+
+    setStatus({ type: "loading" });
+    const { error } = await supabase.from("contact_messages").insert({
+      name,
+      email,
+      message,
+    });
+
+    if (error) {
+      setStatus({ type: "error", message: error.message ?? "Could not send message." });
+      return;
+    }
+
+    setStatus({ type: "success", message: "Message sent. We will get back to you soon." });
+    setForm({ name: "", email: "", message: "" });
+  };
+
   return (
     <PageShell>
       <Section
@@ -16,22 +64,46 @@ export default function ContactPage() {
         <div className="contact-grid">
           <div className="contact-card">
             <h3>Send us a Message</h3>
-            <form className="contact-form">
+            <form className="contact-form" onSubmit={handleSubmit}>
               <label className="form-control">
                 <span>Name</span>
-                <input type="text" name="name" placeholder="Your name" />
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Your name"
+                  value={form.name}
+                  onChange={(e) => update("name", e.target.value)}
+                  required
+                />
               </label>
               <label className="form-control">
                 <span>Email</span>
-                <input type="email" name="email" placeholder="you@email.com" />
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="you@email.com"
+                  value={form.email}
+                  onChange={(e) => update("email", e.target.value)}
+                  required
+                />
               </label>
               <label className="form-control">
                 <span>Message</span>
-                <textarea name="message" rows={4} placeholder="Your message" />
+                <textarea
+                  name="message"
+                  rows={4}
+                  placeholder="Your message"
+                  value={form.message}
+                  onChange={(e) => update("message", e.target.value)}
+                  required
+                />
               </label>
-              <button className="button primary" type="submit">
-                Send Message
+              <button className="button primary" type="submit" disabled={status.type === "loading"}>
+                {status.type === "loading" ? "Sending..." : "Send Message"}
               </button>
+              {status.message ? (
+                <p className={`form-help ${status.type === "error" ? "error" : "muted"}`}>{status.message}</p>
+              ) : null}
             </form>
           </div>
 
