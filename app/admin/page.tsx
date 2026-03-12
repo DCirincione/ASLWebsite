@@ -9,7 +9,15 @@ import type { Event } from "@/lib/supabase/types";
 
 type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type FormStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
-type AdminModule = "none" | "events" | "sports" | "registrations" | "users" | "flyers" | "settings";
+type AdminModule =
+  | "none"
+  | "events"
+  | "community"
+  | "sports"
+  | "registrations"
+  | "users"
+  | "flyers"
+  | "settings";
 type HostType = NonNullable<Event["host_type"]>;
 type ImageInputMode = "url" | "upload";
 const EVENT_IMAGE_BUCKET = "event-images";
@@ -23,6 +31,14 @@ type EventFormState = {
   host_type: HostType;
   image_url: string;
   registration_program_slug: string;
+};
+type CommunityArticle = {
+  id: string;
+  title: string;
+  blurb: string;
+  href: string;
+  date?: string;
+  image?: string;
 };
 
 export default function AdminPage() {
@@ -38,7 +54,32 @@ export default function AdminPage() {
   const [createImageMode, setCreateImageMode] = useState<ImageInputMode>("url");
   const [editImageMode, setEditImageMode] = useState<ImageInputMode>("url");
   const [formStatus, setFormStatus] = useState<FormStatus>({ type: "idle" });
+  const [communityStatus, setCommunityStatus] = useState<FormStatus>({ type: "idle" });
+  const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [communityArticles, setCommunityArticles] = useState<CommunityArticle[]>([]);
+  const [loadingCommunity, setLoadingCommunity] = useState(false);
+  const [autoFillingCreateArticle, setAutoFillingCreateArticle] = useState(false);
+  const [autoFillingEditArticleId, setAutoFillingEditArticleId] = useState<string | null>(null);
+  const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+  const [communityForm, setCommunityForm] = useState({
+    title: "",
+    blurb: "",
+    href: "",
+    date: "",
+    image: "",
+  });
+  const [communityEditForm, setCommunityEditForm] = useState({
+    title: "",
+    blurb: "",
+    href: "",
+    date: "",
+    image: "",
+  });
+  const [communityContentForm, setCommunityContentForm] = useState({
+    boardTitle: "",
+    body: "",
+  });
   const [form, setForm] = useState<EventFormState>({
     title: "",
     start_date: "",
@@ -71,6 +112,12 @@ export default function AdminPage() {
       id: "events",
       title: "Events",
       description: "Create, edit, and remove site events.",
+      enabled: true,
+    },
+    {
+      id: "community",
+      title: "Community",
+      description: "Add featured community/news articles.",
       enabled: true,
     },
     {
@@ -121,6 +168,46 @@ export default function AdminPage() {
       setEventsError(error?.message ?? "Could not load events.");
     }
     setLoadingEvents(false);
+  };
+
+  const loadCommunityArticles = async () => {
+    setLoadingCommunity(true);
+    setCommunityStatus({ type: "idle" });
+    try {
+      const response = await fetch("/api/admin/community-articles");
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunityStatus({ type: "error", message: json?.error ?? "Could not load community articles." });
+        setCommunityArticles([]);
+      } else {
+        setCommunityArticles((json?.articles ?? []) as CommunityArticle[]);
+      }
+    } catch {
+      setCommunityStatus({ type: "error", message: "Could not load community articles." });
+      setCommunityArticles([]);
+    } finally {
+      setLoadingCommunity(false);
+    }
+  };
+
+  const loadCommunityContent = async () => {
+    setCommunityContentStatus({ type: "idle" });
+    try {
+      const response = await fetch("/api/admin/community-content");
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunityContentStatus({ type: "error", message: json?.error ?? "Could not load community intro." });
+        return;
+      }
+      const content = (json?.content ?? {}) as { boardTitle?: string; paragraphs?: string[] };
+      const paragraphs = Array.isArray(content.paragraphs) ? content.paragraphs : [];
+      setCommunityContentForm({
+        boardTitle: content.boardTitle ?? "",
+        body: paragraphs.join("\n\n"),
+      });
+    } catch {
+      setCommunityContentStatus({ type: "error", message: "Could not load community intro." });
+    }
   };
 
   useEffect(() => {
@@ -365,6 +452,294 @@ export default function AdminPage() {
     setActiveModule(module);
     if (module === "events") {
       void loadEvents();
+    }
+    if (module === "community") {
+      void loadCommunityArticles();
+      void loadCommunityContent();
+    }
+  };
+
+  const updateCommunity = (key: keyof typeof communityForm, value: string) => {
+    setCommunityForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const resetCommunityForm = () => {
+    setCommunityForm({
+      title: "",
+      blurb: "",
+      href: "",
+      date: "",
+      image: "",
+    });
+  };
+
+  const updateCommunityEdit = (key: keyof typeof communityEditForm, value: string) => {
+    setCommunityEditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateCommunityContent = (key: keyof typeof communityContentForm, value: string) => {
+    setCommunityContentForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const getAccessToken = async () => {
+    if (!supabase) return null;
+    const { data: sessionData } = await supabase.auth.getSession();
+    return sessionData.session?.access_token ?? null;
+  };
+
+  const handleCreateCommunityArticle = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) {
+      setCommunityStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+    if (!communityForm.title.trim() || !communityForm.blurb.trim() || !communityForm.href.trim()) {
+      setCommunityStatus({ type: "error", message: "Title, blurb, and article link are required." });
+      return;
+    }
+
+    setCommunityStatus({ type: "loading" });
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setCommunityStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    const payload = {
+      title: communityForm.title.trim(),
+      blurb: communityForm.blurb.trim(),
+      href: communityForm.href.trim(),
+      date: communityForm.date.trim(),
+      image: communityForm.image.trim(),
+    };
+
+    try {
+      const response = await fetch("/api/admin/community-articles", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunityStatus({ type: "error", message: json?.error ?? "Could not save article." });
+        return;
+      }
+      setCommunityStatus({ type: "success", message: "Community article added." });
+      resetCommunityForm();
+      setCommunityArticles((json?.articles ?? []) as CommunityArticle[]);
+    } catch {
+      setCommunityStatus({ type: "error", message: "Could not save article." });
+    }
+  };
+
+  const autoFillArticleFields = async (href: string) => {
+    if (!supabase) return null;
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setCommunityStatus({ type: "error", message: "Sign in again to continue." });
+      return null;
+    }
+
+    const response = await fetch("/api/admin/community-article-preview", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ href }),
+    });
+    const json = await response.json();
+    if (!response.ok) {
+      setCommunityStatus({ type: "error", message: json?.error ?? "Could not auto-fill from URL." });
+      return null;
+    }
+    return json as { title?: string; blurb?: string; image?: string };
+  };
+
+  const handleAutoFillCreateArticle = async () => {
+    const href = communityForm.href.trim();
+    if (!href) {
+      setCommunityStatus({ type: "error", message: "Add an article link first." });
+      return;
+    }
+    setAutoFillingCreateArticle(true);
+    const preview = await autoFillArticleFields(href);
+    setAutoFillingCreateArticle(false);
+    if (!preview) return;
+
+    setCommunityForm((prev) => ({
+      ...prev,
+      title: preview.title?.trim() || prev.title,
+      blurb: preview.blurb?.trim() || prev.blurb,
+      image: preview.image?.trim() || prev.image,
+    }));
+    if (!preview.title && !preview.blurb && !preview.image) {
+      setCommunityStatus({ type: "error", message: "No metadata found for this link. Fill fields manually." });
+      return;
+    }
+    setCommunityStatus({ type: "success", message: "Auto-filled article details from URL." });
+  };
+
+  const startEditingCommunityArticle = (article: CommunityArticle) => {
+    setEditingArticleId(article.id);
+    setCommunityEditForm({
+      title: article.title ?? "",
+      blurb: article.blurb ?? "",
+      href: article.href ?? "",
+      date: article.date ?? "",
+      image: article.image ?? "",
+    });
+    setCommunityStatus({ type: "idle" });
+  };
+
+  const cancelEditingCommunityArticle = () => {
+    setEditingArticleId(null);
+  };
+
+  const handleSaveCommunityArticle = async (id: string) => {
+    if (!supabase) return;
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setCommunityStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    if (!communityEditForm.title.trim() || !communityEditForm.blurb.trim() || !communityEditForm.href.trim()) {
+      setCommunityStatus({ type: "error", message: "Title, blurb, and article link are required." });
+      return;
+    }
+
+    setCommunityStatus({ type: "loading" });
+    const payload = {
+      id,
+      title: communityEditForm.title.trim(),
+      blurb: communityEditForm.blurb.trim(),
+      href: communityEditForm.href.trim(),
+      date: communityEditForm.date.trim(),
+      image: communityEditForm.image.trim(),
+    };
+
+    try {
+      const response = await fetch("/api/admin/community-articles", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunityStatus({ type: "error", message: json?.error ?? "Could not update article." });
+        return;
+      }
+      setCommunityStatus({ type: "success", message: "Article updated." });
+      setCommunityArticles((json?.articles ?? []) as CommunityArticle[]);
+      setEditingArticleId(null);
+    } catch {
+      setCommunityStatus({ type: "error", message: "Could not update article." });
+    }
+  };
+
+  const handleAutoFillEditArticle = async (id: string) => {
+    const href = communityEditForm.href.trim();
+    if (!href) {
+      setCommunityStatus({ type: "error", message: "Add an article link first." });
+      return;
+    }
+    setAutoFillingEditArticleId(id);
+    const preview = await autoFillArticleFields(href);
+    setAutoFillingEditArticleId(null);
+    if (!preview) return;
+
+    setCommunityEditForm((prev) => ({
+      ...prev,
+      title: preview.title?.trim() || prev.title,
+      blurb: preview.blurb?.trim() || prev.blurb,
+      image: preview.image?.trim() || prev.image,
+    }));
+    if (!preview.title && !preview.blurb && !preview.image) {
+      setCommunityStatus({ type: "error", message: "No metadata found for this link. Fill fields manually." });
+      return;
+    }
+    setCommunityStatus({ type: "success", message: "Auto-filled article details from URL." });
+  };
+
+  const handleDeleteCommunityArticle = async (article: CommunityArticle) => {
+    if (!supabase) return;
+    const confirmed = window.confirm(`Delete article "${article.title}"?`);
+    if (!confirmed) return;
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setCommunityStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    setCommunityStatus({ type: "loading" });
+    try {
+      const response = await fetch("/api/admin/community-articles", {
+        method: "DELETE",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ id: article.id }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunityStatus({ type: "error", message: json?.error ?? "Could not delete article." });
+        return;
+      }
+      setCommunityStatus({ type: "success", message: "Article deleted." });
+      setCommunityArticles((json?.articles ?? []) as CommunityArticle[]);
+      if (editingArticleId === article.id) {
+        setEditingArticleId(null);
+      }
+    } catch {
+      setCommunityStatus({ type: "error", message: "Could not delete article." });
+    }
+  };
+
+  const handleSaveCommunityContent = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setCommunityContentStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    const boardTitle = communityContentForm.boardTitle.trim();
+    const body = communityContentForm.body.trim();
+    const paragraphs = body ? [body] : [];
+
+    if (!boardTitle || paragraphs.length === 0) {
+      setCommunityContentStatus({ type: "error", message: "Board title and at least one paragraph are required." });
+      return;
+    }
+
+    setCommunityContentStatus({ type: "loading" });
+    try {
+      const response = await fetch("/api/admin/community-content", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ boardTitle, paragraphs }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunityContentStatus({ type: "error", message: json?.error ?? "Could not update intro block." });
+        return;
+      }
+      setCommunityContentStatus({ type: "success", message: "Community intro block updated." });
+    } catch {
+      setCommunityContentStatus({ type: "error", message: "Could not update intro block." });
     }
   };
 
@@ -737,6 +1112,246 @@ export default function AdminPage() {
                 </div>
               ) : null}
             </section>
+              </>
+            ) : null}
+            {activeModule === "community" ? (
+              <>
+                <section className="account-card">
+                  <h2>Community Articles</h2>
+                  <p className="muted">Add featured articles shown on the Community page.</p>
+                </section>
+                <section className="account-card">
+                  <h2>Top Community Block</h2>
+                  <p className="muted">Edit the title and intro paragraphs shown at the top of the Community page.</p>
+                  <form className="register-form" onSubmit={handleSaveCommunityContent}>
+                    <div className="form-control">
+                      <label htmlFor="community-board-title">Block Title *</label>
+                      <input
+                        id="community-board-title"
+                        value={communityContentForm.boardTitle}
+                        onChange={(e) => updateCommunityContent("boardTitle", e.target.value)}
+                        required
+                      />
+                    </div>
+                    <div className="register-form-grid">
+                      <div className="form-control">
+                        <label htmlFor="community-paragraph-body">Paragraph Body *</label>
+                        <textarea
+                          id="community-paragraph-body"
+                          value={communityContentForm.body}
+                          onChange={(e) => updateCommunityContent("body", e.target.value)}
+                          rows={12}
+                          required
+                        />
+                      </div>
+                    </div>
+                    <p className="form-help muted">
+                      Add spacing manually with blank lines (press Enter twice).
+                    </p>
+                    <div className="cta-row">
+                      <button className="button primary" type="submit" disabled={communityContentStatus.type === "loading"}>
+                        {communityContentStatus.type === "loading" ? "Saving..." : "Save Top Block"}
+                      </button>
+                      <button className="button ghost" type="button" onClick={() => void loadCommunityContent()}>
+                        Reload
+                      </button>
+                    </div>
+                  </form>
+                  {communityContentStatus.message ? (
+                    <p className={`form-help ${communityContentStatus.type === "error" ? "error" : "muted"}`}>
+                      {communityContentStatus.message}
+                    </p>
+                  ) : null}
+                </section>
+                <section className="account-card">
+                  <h2>Add Article</h2>
+                  <form className="register-form" onSubmit={handleCreateCommunityArticle}>
+                    <div className="register-form-grid">
+                      <div className="form-control">
+                        <label htmlFor="community-title">Title *</label>
+                        <input
+                          id="community-title"
+                          value={communityForm.title}
+                          onChange={(e) => updateCommunity("title", e.target.value)}
+                          required
+                        />
+                      </div>
+                      <div className="form-control">
+                        <label htmlFor="community-link">Article Link *</label>
+                        <input
+                          id="community-link"
+                          value={communityForm.href}
+                          onChange={(e) => updateCommunity("href", e.target.value)}
+                          required
+                        />
+                        <button
+                          className="button ghost"
+                          type="button"
+                          onClick={() => void handleAutoFillCreateArticle()}
+                          disabled={autoFillingCreateArticle}
+                          style={{ marginTop: 8, alignSelf: "flex-start" }}
+                        >
+                          {autoFillingCreateArticle ? "Auto-filling..." : "Auto-fill from URL"}
+                        </button>
+                      </div>
+                      <div className="form-control">
+                        <label htmlFor="community-date">Date label</label>
+                        <input
+                          id="community-date"
+                          value={communityForm.date}
+                          onChange={(e) => updateCommunity("date", e.target.value)}
+                          placeholder="Aug 5, 2024"
+                        />
+                      </div>
+                      <div className="form-control">
+                        <label htmlFor="community-image">Image URL</label>
+                        <input
+                          id="community-image"
+                          value={communityForm.image}
+                          onChange={(e) => updateCommunity("image", e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="community-blurb">Blurb *</label>
+                      <textarea
+                        id="community-blurb"
+                        value={communityForm.blurb}
+                        onChange={(e) => updateCommunity("blurb", e.target.value)}
+                        rows={4}
+                        required
+                      />
+                    </div>
+                    <div className="cta-row">
+                      <button className="button primary" type="submit" disabled={communityStatus.type === "loading"}>
+                        {communityStatus.type === "loading" ? "Saving..." : "Add Article"}
+                      </button>
+                      <button className="button ghost" type="button" onClick={resetCommunityForm}>
+                        Reset
+                      </button>
+                    </div>
+                  </form>
+                  {communityStatus.message ? (
+                    <p className={`form-help ${communityStatus.type === "error" ? "error" : "muted"}`}>
+                      {communityStatus.message}
+                    </p>
+                  ) : null}
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Current Articles</h2>
+                      <p className="muted">These are loaded from the local articles source file.</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => void loadCommunityArticles()} disabled={loadingCommunity}>
+                      {loadingCommunity ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  {loadingCommunity ? <p className="muted">Loading articles...</p> : null}
+                  {!loadingCommunity && communityArticles.length === 0 ? (
+                    <p className="muted">No articles found.</p>
+                  ) : null}
+                  {!loadingCommunity && communityArticles.length > 0 ? (
+                    <div className="event-list">
+                      {communityArticles.map((article) => (
+                        <article key={article.id} className="event-card-simple">
+                          <div className="event-card__header">
+                            <h3>{article.title}</h3>
+                          </div>
+                          <div className="event-card__meta">
+                            {article.date ? <p className="muted">Date: {article.date}</p> : null}
+                            <p className="muted">Link: {article.href}</p>
+                          </div>
+                          <p className="muted">{article.blurb}</p>
+                          <div className="cta-row">
+                            <button className="button ghost" type="button" onClick={() => startEditingCommunityArticle(article)}>
+                              {editingArticleId === article.id ? "Editing" : "Edit"}
+                            </button>
+                            <button
+                              className="button ghost"
+                              type="button"
+                              onClick={() => void handleDeleteCommunityArticle(article)}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                          {editingArticleId === article.id ? (
+                            <div className="register-form" style={{ marginTop: 12 }}>
+                              <div className="register-form-grid">
+                                <div className="form-control">
+                                  <label htmlFor={`edit-community-title-${article.id}`}>Title *</label>
+                                  <input
+                                    id={`edit-community-title-${article.id}`}
+                                    value={communityEditForm.title}
+                                    onChange={(e) => updateCommunityEdit("title", e.target.value)}
+                                    required
+                                  />
+                                </div>
+                                <div className="form-control">
+                                  <label htmlFor={`edit-community-link-${article.id}`}>Article Link *</label>
+                                  <input
+                                    id={`edit-community-link-${article.id}`}
+                                    value={communityEditForm.href}
+                                    onChange={(e) => updateCommunityEdit("href", e.target.value)}
+                                    required
+                                  />
+                                  <button
+                                    className="button ghost"
+                                    type="button"
+                                    onClick={() => void handleAutoFillEditArticle(article.id)}
+                                    disabled={autoFillingEditArticleId === article.id}
+                                    style={{ marginTop: 8, alignSelf: "flex-start" }}
+                                  >
+                                    {autoFillingEditArticleId === article.id ? "Auto-filling..." : "Auto-fill from URL"}
+                                  </button>
+                                </div>
+                                <div className="form-control">
+                                  <label htmlFor={`edit-community-date-${article.id}`}>Date label</label>
+                                  <input
+                                    id={`edit-community-date-${article.id}`}
+                                    value={communityEditForm.date}
+                                    onChange={(e) => updateCommunityEdit("date", e.target.value)}
+                                  />
+                                </div>
+                                <div className="form-control">
+                                  <label htmlFor={`edit-community-image-${article.id}`}>Image URL</label>
+                                  <input
+                                    id={`edit-community-image-${article.id}`}
+                                    value={communityEditForm.image}
+                                    onChange={(e) => updateCommunityEdit("image", e.target.value)}
+                                  />
+                                </div>
+                              </div>
+                              <div className="form-control">
+                                <label htmlFor={`edit-community-blurb-${article.id}`}>Blurb *</label>
+                                <textarea
+                                  id={`edit-community-blurb-${article.id}`}
+                                  value={communityEditForm.blurb}
+                                  onChange={(e) => updateCommunityEdit("blurb", e.target.value)}
+                                  rows={3}
+                                  required
+                                />
+                              </div>
+                              <div className="cta-row">
+                                <button
+                                  className="button primary"
+                                  type="button"
+                                  onClick={() => void handleSaveCommunityArticle(article.id)}
+                                  disabled={communityStatus.type === "loading"}
+                                >
+                                  {communityStatus.type === "loading" ? "Saving..." : "Save"}
+                                </button>
+                                <button className="button ghost" type="button" onClick={cancelEditingCommunityArticle}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
               </>
             ) : null}
           </>
