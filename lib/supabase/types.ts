@@ -3,6 +3,9 @@ export type Profile = {
   name: string;
   age: number | null;
   role?: "player" | "admin" | "owner" | null;
+  suspended?: boolean | null;
+  suspended_at?: string | null;
+  suspension_reason?: string | null;
   avatar_url?: string | null;
   positions: string[] | null;
   skill_level: number | null;
@@ -17,6 +20,9 @@ export type ProfileInsert = {
   name: string;
   age?: number | null;
   role?: "player" | "admin" | "owner" | null;
+  suspended?: boolean | null;
+  suspended_at?: string | null;
+  suspension_reason?: string | null;
   avatar_url?: string | null;
   positions?: string[] | null;
   skill_level?: number | null;
@@ -31,6 +37,9 @@ export type ProfileUpdate = {
   name?: string;
   age?: number | null;
   role?: "player" | "admin" | "owner" | null;
+  suspended?: boolean | null;
+  suspended_at?: string | null;
+  suspension_reason?: string | null;
   avatar_url?: string | null;
   positions?: string[] | null;
   skill_level?: number | null;

@@ -64,12 +64,23 @@ type UserDirectoryRecord = {
   role?: "player" | "admin" | "owner" | null;
   age?: number | null;
   sports?: string[] | null;
+  suspended?: boolean | null;
+  suspended_at?: string | null;
+  suspension_reason?: string | null;
   created_at?: string | null;
+};
+type UserRole = "player" | "admin" | "owner";
+type UserManageForm = {
+  role: UserRole;
+  status: "active" | "suspended";
+  reason: string;
 };
 
 export default function AdminPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
   const [activeModule, setActiveModule] = useState<AdminModule>("none");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -95,6 +106,14 @@ export default function AdminPage() {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
   const [usersSearch, setUsersSearch] = useState("");
+  const [usersStatus, setUsersStatus] = useState<FormStatus>({ type: "idle" });
+  const [manageUser, setManageUser] = useState<UserDirectoryRecord | null>(null);
+  const [manageForm, setManageForm] = useState<UserManageForm>({
+    role: "player",
+    status: "active",
+    reason: "",
+  });
+  const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [autoFillingCreateArticle, setAutoFillingCreateArticle] = useState(false);
   const [autoFillingEditArticleId, setAutoFillingEditArticleId] = useState<string | null>(null);
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
@@ -372,10 +391,11 @@ export default function AdminPage() {
     if (!supabase) return;
     setLoadingUsers(true);
     setUsersError(null);
+    setUsersStatus({ type: "idle" });
 
     const { data, error } = await supabase
       .from("profiles")
-      .select("id,name,role,age,sports")
+      .select("id,name,role,age,sports,suspended,suspended_at,suspension_reason")
       .order("name", { ascending: true });
 
     if (error) {
@@ -402,6 +422,7 @@ export default function AdminPage() {
         setStatus("no-session");
         return;
       }
+      setCurrentUserId(userId);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -409,7 +430,8 @@ export default function AdminPage() {
         .eq("id", userId)
         .maybeSingle();
 
-      const role = profile?.role ?? null;
+      const role = (profile?.role ?? null) as UserRole | null;
+      setCurrentUserRole(role);
       if (role === "admin" || role === "owner") {
         setStatus("allowed");
         return;
@@ -420,6 +442,19 @@ export default function AdminPage() {
 
     void loadAccess();
   }, []);
+
+  useEffect(() => {
+    if (!manageUser) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeManageUser();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [manageUser]);
 
   const update = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -644,6 +679,61 @@ export default function AdminPage() {
     if (module === "users") {
       void loadUsers();
     }
+  };
+
+  const openManageUser = (user: UserDirectoryRecord) => {
+    setManageUser(user);
+    setManageForm({
+      role: (user.role ?? "player") as UserRole,
+      status: user.suspended ? "suspended" : "active",
+      reason: user.suspension_reason ?? "",
+    });
+    setUsersStatus({ type: "idle" });
+  };
+
+  const closeManageUser = () => {
+    setManageUser(null);
+    setManageForm({ role: "player", status: "active", reason: "" });
+  };
+
+  const saveManagedUser = async () => {
+    if (!supabase || !manageUser) return;
+
+    if (manageUser.id === currentUserId && manageForm.role !== currentUserRole) {
+      setUsersStatus({ type: "error", message: "You cannot change your own role." });
+      return;
+    }
+    if (manageUser.id === currentUserId && manageForm.status === "suspended") {
+      setUsersStatus({ type: "error", message: "You cannot suspend your own account." });
+      return;
+    }
+    if (currentUserRole !== "owner" && manageUser.role === "owner" && manageUser.id !== currentUserId) {
+      setUsersStatus({ type: "error", message: "Only owners can manage other owner accounts." });
+      return;
+    }
+
+    setSavingUserId(manageUser.id);
+    setUsersStatus({ type: "loading" });
+
+    const suspended = manageForm.status === "suspended";
+    const payload = {
+      role: manageForm.role,
+      suspended,
+      suspended_at: suspended ? new Date().toISOString() : null,
+      suspension_reason: suspended ? manageForm.reason.trim() || null : null,
+    };
+
+    const { error } = await supabase.from("profiles").update(payload).eq("id", manageUser.id);
+    setSavingUserId(null);
+
+    if (error) {
+      setUsersStatus({ type: "error", message: `Could not save user changes: ${error.message}` });
+      return;
+    }
+
+    setUsersStatus({ type: "success", message: "User updated." });
+    await loadUsers();
+    closeManageUser();
   };
 
   const updateCommunity = (key: keyof typeof communityForm, value: string) => {
@@ -1632,13 +1722,13 @@ export default function AdminPage() {
               <>
                 <section className="account-card">
                   <h2>Users</h2>
-                  <p className="muted">Accounts from the profiles table.</p>
+                  <p className="muted">Manage user roles and account status.</p>
                 </section>
                 <section className="account-card">
                   <div className="account-card__header">
                     <div>
-                      <h2>All Profiles</h2>
-                      <p className="muted">Read-only view.</p>
+                      <h2>User Directory</h2>
+                      <p className="muted">Admins and owners only.</p>
                     </div>
                     <button className="button ghost" type="button" onClick={() => void loadUsers()} disabled={loadingUsers}>
                       {loadingUsers ? "Refreshing..." : "Refresh"}
@@ -1654,26 +1744,155 @@ export default function AdminPage() {
                     />
                   </div>
                   {usersError ? <p className="form-help error">{usersError}</p> : null}
+                  {usersStatus.message ? (
+                    <p className={`form-help ${usersStatus.type === "error" ? "error" : "muted"}`}>{usersStatus.message}</p>
+                  ) : null}
                   {loadingUsers ? <p className="muted">Loading users...</p> : null}
                   {!loadingUsers && filteredUsers.length === 0 ? <p className="muted">No users found.</p> : null}
                   {!loadingUsers && filteredUsers.length > 0 ? (
-                    <div className="event-list">
-                      {filteredUsers.map((user) => (
-                        <article key={user.id} className="event-card-simple">
-                          <div className="event-card__header">
-                            <h3>{user.name || "Unnamed user"}</h3>
+                    <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "minmax(160px, 2fr) minmax(90px, 1fr) minmax(110px, 1fr) auto",
+                          gap: 12,
+                          padding: "10px 14px",
+                          borderBottom: "1px solid var(--border)",
+                          fontWeight: 700,
+                        }}
+                      >
+                        <span>USER</span>
+                        <span>ROLE</span>
+                        <span>STATUS</span>
+                        <span style={{ textAlign: "right" }}>ACTIONS</span>
+                      </div>
+                      {filteredUsers.map((user) => {
+                        const isSuspended = user.suspended === true;
+                        return (
+                          <div
+                            key={user.id}
+                            style={{
+                              display: "grid",
+                              gridTemplateColumns: "minmax(160px, 2fr) minmax(90px, 1fr) minmax(110px, 1fr) auto",
+                              gap: 12,
+                              padding: "12px 14px",
+                              borderBottom: "1px solid var(--border)",
+                              alignItems: "center",
+                            }}
+                          >
+                            <div>
+                              <p className="list__title">{user.name || "Unnamed user"}</p>
+                              <p className="muted">{user.id}</p>
+                            </div>
+                            <p style={{ margin: 0, textTransform: "capitalize" }}>{user.role ?? "player"}</p>
+                            <span className={`pill ${isSuspended ? "pill--amber" : "pill--green"}`}>
+                              {isSuspended ? "Suspended" : "Active"}
+                            </span>
+                            <div style={{ textAlign: "right" }}>
+                              <button className="button ghost" type="button" onClick={() => openManageUser(user)}>
+                                Manage
+                              </button>
+                            </div>
                           </div>
-                          <div className="event-card__meta">
-                            <p className="muted">Role: {user.role ?? "player"}</p>
-                            <p className="muted">Age: {user.age ?? "N/A"}</p>
-                            <p className="muted">Sports: {user.sports?.length ? user.sports.join(", ") : "N/A"}</p>
-                            <p className="muted">User ID: {user.id}</p>
-                          </div>
-                        </article>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : null}
                 </section>
+                {manageUser ? (
+                  <div
+                    className="event-detail-backdrop"
+                    role="dialog"
+                    aria-modal="true"
+                    onClick={(event) => {
+                      if (event.target === event.currentTarget) {
+                        closeManageUser();
+                      }
+                    }}
+                  >
+                    <article className="event-detail" style={{ width: "min(600px, 100%)" }}>
+                      <div className="event-detail__header">
+                        <div>
+                          <h2>Manage {manageUser.name || "User"}</h2>
+                        </div>
+                        <button className="button ghost" type="button" onClick={closeManageUser}>
+                          Close
+                        </button>
+                      </div>
+                      <div style={{ marginTop: 16, display: "grid", gap: 14 }}>
+                        <div className="form-control">
+                          <label>Status</label>
+                          <div className="cta-row">
+                            <button
+                              type="button"
+                              className={`button ${manageForm.status === "active" ? "primary" : "ghost"}`}
+                              onClick={() => setManageForm((prev) => ({ ...prev, status: "active" }))}
+                            >
+                              Activate
+                            </button>
+                            <button
+                              type="button"
+                              className={`button ${manageForm.status === "suspended" ? "primary" : "ghost"}`}
+                              onClick={() => setManageForm((prev) => ({ ...prev, status: "suspended" }))}
+                            >
+                              Suspend
+                            </button>
+                          </div>
+                        </div>
+                        <div className="form-control">
+                          <label>Role</label>
+                          <div className="cta-row">
+                            <button
+                              type="button"
+                              className={`button ${manageForm.role === "player" ? "primary" : "ghost"}`}
+                              onClick={() => setManageForm((prev) => ({ ...prev, role: "player" }))}
+                            >
+                              Player
+                            </button>
+                            <button
+                              type="button"
+                              className={`button ${manageForm.role === "admin" ? "primary" : "ghost"}`}
+                              onClick={() => setManageForm((prev) => ({ ...prev, role: "admin" }))}
+                            >
+                              Admin
+                            </button>
+                            <button
+                              type="button"
+                              className={`button ${manageForm.role === "owner" ? "primary" : "ghost"}`}
+                              onClick={() => setManageForm((prev) => ({ ...prev, role: "owner" }))}
+                            >
+                              Owner
+                            </button>
+                          </div>
+                        </div>
+                        {manageForm.status === "suspended" ? (
+                          <div className="form-control">
+                            <label htmlFor="suspension-reason">Suspension reason (optional)</label>
+                            <textarea
+                              id="suspension-reason"
+                              rows={3}
+                              value={manageForm.reason}
+                              onChange={(e) => setManageForm((prev) => ({ ...prev, reason: e.target.value }))}
+                            />
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="cta-row" style={{ marginTop: 18 }}>
+                        <button
+                          className="button primary"
+                          type="button"
+                          onClick={() => void saveManagedUser()}
+                          disabled={savingUserId === manageUser.id}
+                        >
+                          {savingUserId === manageUser.id ? "Saving..." : "Save Changes"}
+                        </button>
+                        <button className="button ghost" type="button" onClick={closeManageUser}>
+                          Cancel
+                        </button>
+                      </div>
+                    </article>
+                  </div>
+                ) : null}
               </>
             ) : null}
             {activeModule === "contact" ? (
