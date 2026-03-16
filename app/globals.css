@@ -1480,6 +1480,20 @@ html[data-contrast="high"] .font-controls__value {
   padding: 18px;
 }
 
+.account-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-card__header h2,
+.account-card__header h3,
+.account-card__header p {
+  margin-top: 0;
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
@@ -2978,6 +2992,10 @@ html[data-theme="dark"] .account-create-modal {
   border-color: #1f2a40;
 }
 
+html[data-theme="dark"] .account-form .form-control label {
+  color: #e8edf7;
+}
+
 html[data-theme="dark"] .account-form input,
 html[data-theme="dark"] .account-form textarea {
   background: rgba(255, 255, 255, 0.06);
@@ -2985,11 +3003,46 @@ html[data-theme="dark"] .account-form textarea {
   color: #e8edf7;
 }
 
+html[data-theme="dark"] .account-form input::placeholder,
+html[data-theme="dark"] .account-form textarea::placeholder {
+  color: #94a3b8;
+}
+
 html[data-theme="dark"] .account-form input:focus,
 html[data-theme="dark"] .account-form textarea:focus {
   border-color: rgba(233, 93, 42, 0.6);
   box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.2);
   background: rgba(255, 255, 255, 0.08);
+}
+
+html[data-contrast="high"] .account-create-modal,
+html[data-contrast="high"] .account-card {
+  background: #000000;
+  border-color: #f8fafc;
+  color: #f8fafc;
+}
+
+html[data-contrast="high"] .account-form .form-control label {
+  color: #f8fafc;
+}
+
+html[data-contrast="high"] .account-form input,
+html[data-contrast="high"] .account-form textarea {
+  background: #000000;
+  border-color: #f8fafc;
+  color: #f8fafc;
+}
+
+html[data-contrast="high"] .account-form input::placeholder,
+html[data-contrast="high"] .account-form textarea::placeholder {
+  color: #cbd5e1;
+}
+
+html[data-contrast="high"] .account-form input:focus,
+html[data-contrast="high"] .account-form textarea:focus {
+  border-color: #f8fafc;
+  box-shadow: 0 0 0 3px rgba(248, 250, 252, 0.35);
+  background: #000000;
 }
 
 .community-stack {

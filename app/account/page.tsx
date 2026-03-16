@@ -76,6 +76,35 @@ type ProgramRow = {
   slug: string | null;
 };
 
+type ProfileFormState = {
+  name: string;
+  age: string;
+  skill_level: string;
+  positions: string;
+  sports: string;
+  about: string;
+};
+
+type SaveStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
+
+const emptyProfileForm: ProfileFormState = {
+  name: "",
+  age: "",
+  skill_level: "",
+  positions: "",
+  sports: "",
+  about: "",
+};
+
+const toProfileFormState = (profile: Profile | null): ProfileFormState => ({
+  name: profile?.name ?? "",
+  age: profile?.age?.toString() ?? "",
+  skill_level: profile?.skill_level?.toString() ?? "",
+  positions: profile?.positions?.join(", ") ?? "",
+  sports: profile?.sports?.join(", ") ?? "",
+  about: profile?.about ?? "",
+});
+
 export default function AccountPage() {
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
@@ -84,6 +113,9 @@ export default function AccountPage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const [avatarSuccess, setAvatarSuccess] = useState<string | null>(null);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profileForm, setProfileForm] = useState<ProfileFormState>(emptyProfileForm);
+  const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>({ type: "idle" });
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Teams
@@ -174,6 +206,72 @@ export default function AccountPage() {
     fileInput.value = "";
   };
 
+  const updateProfileForm = (key: keyof ProfileFormState, value: string) => {
+    setProfileForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const parseOptionalNumber = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const num = Number(trimmed);
+    return Number.isNaN(num) ? null : num;
+  };
+
+  const parseArray = (value: string) =>
+    value
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+
+  const resetProfileEditor = useCallback((nextProfile?: Profile | null) => {
+    setProfileForm(toProfileFormState(nextProfile ?? profile));
+    setProfileSaveStatus({ type: "idle" });
+    setIsEditingProfile(false);
+  }, [profile]);
+
+  const saveProfile = async () => {
+    if (!supabase) {
+      setProfileSaveStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+    if (!userId) {
+      setProfileSaveStatus({ type: "error", message: "You need to be signed in to edit your profile." });
+      return;
+    }
+
+    const payload = {
+      name: profileForm.name.trim() || "Player",
+      age: parseOptionalNumber(profileForm.age),
+      skill_level: parseOptionalNumber(profileForm.skill_level),
+      positions: parseArray(profileForm.positions),
+      sports: parseArray(profileForm.sports),
+      about: profileForm.about.trim() || null,
+    };
+
+    setProfileSaveStatus({ type: "loading" });
+
+    const { error: updateError } = await supabase
+      .from("profiles")
+      .update(payload)
+      .eq("id", userId);
+
+    if (updateError) {
+      setProfileSaveStatus({ type: "error", message: updateError.message });
+      return;
+    }
+
+    setProfile((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        ...payload,
+      };
+    });
+    setProfileForm((prev) => ({ ...prev, name: payload.name, about: payload.about ?? "" }));
+    setProfileSaveStatus({ type: "success", message: "Profile updated." });
+    setIsEditingProfile(false);
+  };
+
   // Load profile and session
   useEffect(() => {
     const loadProfile = async () => {
@@ -212,6 +310,10 @@ export default function AccountPage() {
 
     loadProfile();
   }, []);
+
+  useEffect(() => {
+    setProfileForm(toProfileFormState(profile));
+  }, [profile]);
 
   // Load teams
   useEffect(() => {
@@ -523,43 +625,153 @@ export default function AccountPage() {
               <p className="eyebrow">Account</p>
               <h1>{data.name}</h1>
               <p className="muted">Manage your profile, events, teams, and friends.</p>
-              <div className="avatar-upload">
-                <input
-                  ref={fileInputRef}
-                  id="avatar-upload"
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarSelect}
-                  className="sr-only"
-                />
-                <button
-                  className="button ghost"
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingAvatar}
-                >
-                  {uploadingAvatar ? "Uploading..." : "Change photo"}
-                </button>
-                <p className="muted">JPG or PNG, max 5MB.</p>
-                {avatarError ? <p className="form-help error">{avatarError}</p> : null}
-                {avatarSuccess ? <p className="form-help success">{avatarSuccess}</p> : null}
-              </div>
             </div>
           </div>
-          <button className="button ghost" type="button" onClick={handleSignOut} disabled={signingOut}>
-            {signingOut ? "Signing out..." : "Sign out"}
-          </button>
+          <div className="account-create__actions">
+            {!isEditingProfile ? (
+              <button
+                className="button ghost"
+                type="button"
+                onClick={() => {
+                  setProfileForm(toProfileFormState(data));
+                  setProfileSaveStatus({ type: "idle" });
+                  setIsEditingProfile(true);
+                }}
+              >
+                Edit Profile
+              </button>
+            ) : null}
+            <button className="button ghost" type="button" onClick={handleSignOut} disabled={signingOut}>
+              {signingOut ? "Signing out..." : "Sign out"}
+            </button>
+          </div>
         </header>
 
         <section className="account-card" id="profile">
-          <h2>Profile</h2>
-          <p className="muted">{data.about}</p>
-          <div className="profile-grid">
-            <Stat label="Age" value={data.age} />
-            <Stat label="Skill (1-10)" value={data.skill_level} />
-            <Stat label="Positions" value={data.positions?.join(", ") ?? "—"} />
-            <Stat label="Sports" value={data.sports?.join(", ") ?? "—"} />
+          <div className="account-card__header">
+            <div>
+              <h2>Profile</h2>
+            </div>
+            {isEditingProfile ? (
+              <button className="button ghost" type="button" onClick={() => resetProfileEditor()}>
+                Cancel
+              </button>
+            ) : null}
           </div>
+
+          {isEditingProfile ? (
+            <form
+              className="account-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveProfile();
+              }}
+            >
+              <div className="form-grid">
+                <div className="form-control">
+                  <label htmlFor="profile-name">Name</label>
+                  <input
+                    id="profile-name"
+                    value={profileForm.name}
+                    onChange={(event) => updateProfileForm("name", event.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor="profile-age">Age</label>
+                  <input
+                    id="profile-age"
+                    value={profileForm.age}
+                    onChange={(event) => updateProfileForm("age", event.target.value)}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor="profile-skill">Skill (1-10)</label>
+                  <input
+                    id="profile-skill"
+                    value={profileForm.skill_level}
+                    onChange={(event) => updateProfileForm("skill_level", event.target.value)}
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor="profile-positions">Positions</label>
+                  <input
+                    id="profile-positions"
+                    value={profileForm.positions}
+                    onChange={(event) => updateProfileForm("positions", event.target.value)}
+                    placeholder="Forward, Wing"
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor="profile-sports">Sports</label>
+                  <input
+                    id="profile-sports"
+                    value={profileForm.sports}
+                    onChange={(event) => updateProfileForm("sports", event.target.value)}
+                    placeholder="Basketball, Flag Football"
+                  />
+                </div>
+              </div>
+              <div className="form-control">
+                <label>Photo</label>
+                <div className="avatar-upload">
+                  <input
+                    ref={fileInputRef}
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarSelect}
+                    className="sr-only"
+                  />
+                  <button
+                    className="button ghost"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingAvatar}
+                  >
+                    {uploadingAvatar ? "Uploading..." : "Edit Photo"}
+                  </button>
+                  <p className="muted">JPG or PNG, max 5MB.</p>
+                  {avatarError ? <p className="form-help error">{avatarError}</p> : null}
+                  {avatarSuccess ? <p className="form-help success">{avatarSuccess}</p> : null}
+                </div>
+              </div>
+              <div className="form-control">
+                <label htmlFor="profile-about">Bio</label>
+                <textarea
+                  id="profile-about"
+                  value={profileForm.about}
+                  onChange={(event) => updateProfileForm("about", event.target.value)}
+                  rows={4}
+                />
+              </div>
+              {profileSaveStatus.message ? (
+                <p className={`form-help ${profileSaveStatus.type === "error" ? "error" : profileSaveStatus.type === "success" ? "success" : ""}`}>
+                  {profileSaveStatus.message}
+                </p>
+              ) : null}
+              <div className="account-create__actions">
+                <button className="button primary" type="submit" disabled={profileSaveStatus.type === "loading"}>
+                  {profileSaveStatus.type === "loading" ? "Saving..." : "Save Profile"}
+                </button>
+                <button className="button ghost" type="button" onClick={() => resetProfileEditor()} disabled={profileSaveStatus.type === "loading"}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <>
+              <p className="muted">{data.about || "Add a bio so other players know how you play."}</p>
+              <div className="profile-grid">
+                <Stat label="Age" value={data.age} />
+                <Stat label="Skill (1-10)" value={data.skill_level} />
+                <Stat label="Positions" value={data.positions?.join(", ") ?? "—"} />
+                <Stat label="Sports" value={data.sports?.join(", ") ?? "—"} />
+              </div>
+            </>
+          )}
         </section>
 
         <section className="account-card" id="events">
