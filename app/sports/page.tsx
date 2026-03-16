@@ -8,7 +8,7 @@ import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
 import type { Sport } from "@/lib/supabase/types";
 
-type SportCard = Sport & { image?: string; activities?: string; slug: string };
+type SportCard = Sport & { activities?: string; slug: string };
 
 const toSlug = (value: string) =>
   value
@@ -30,18 +30,18 @@ const sportRouteBySlug: Record<string, string> = {
 };
 
 const fallbackSports: SportCard[] = [
-  { id: "baseball", slug: "baseball", title: "Baseball", players_per_team: 9, gender: "open", short_description: "Diamond leagues, tourneys, and skills." },
-  { id: "basketball", slug: "basketball", title: "Basketball", players_per_team: 5, gender: "open", short_description: "5v5 leagues, 3v3 nights, clinics." },
-  { id: "flag-football", slug: "flag-football", title: "Flag Football", players_per_team: 7, gender: "coed", short_description: "Non-contact leagues and tourneys." },
-  { id: "golf", slug: "golf", title: "Golf", players_per_team: 4, gender: "open", short_description: "Scrambles, outings, and skins." },
-  { id: "mini-golf", slug: "mini-golf", title: "Mini-Golf", players_per_team: 4, gender: "open", short_description: "Casual putt-putt meetups." },
-  { id: "pickleball", slug: "pickleball", title: "Pickleball", players_per_team: 2, gender: "coed", short_description: "Leagues, ladders, and tournaments." },
-  { id: "run-club", slug: "run-club", title: "Run Club", players_per_team: 1, gender: "open", short_description: "Group runs and race prep." },
-  { id: "soccer", slug: "soccer", title: "Soccer", players_per_team: 11, gender: "open", short_description: "Leagues, pickup, and cups." },
-  { id: "youth-soccer", slug: "youth-soccer", title: "Youth Soccer", players_per_team: 7, gender: "coed", short_description: "Small-sided youth play." },
+  { id: "baseball", slug: "baseball", title: "Baseball", players_per_team: 9, gender: "open", short_description: "Diamond leagues, tourneys, and skills.", image_url: "/baseball/champst2025.jpeg" },
+  { id: "basketball", slug: "basketball", title: "Basketball", players_per_team: 5, gender: "open", short_description: "5v5 leagues, 3v3 nights, clinics.", image_url: "/basketball/champst2025.jpeg" },
+  { id: "flag-football", slug: "flag-football", title: "Flag Football", players_per_team: 7, gender: "coed", short_description: "Non-contact leagues and tourneys.", image_url: "/football/flag.jpg" },
+  { id: "golf", slug: "golf", title: "Golf", players_per_team: 4, gender: "open", short_description: "Scrambles, outings, and skins.", image_url: "/golf/golf.jpg" },
+  { id: "mini-golf", slug: "mini-golf", title: "Mini-Golf", players_per_team: 4, gender: "open", short_description: "Casual putt-putt meetups.", image_url: "/golf/minigolf.jpg" },
+  { id: "pickleball", slug: "pickleball", title: "Pickleball", players_per_team: 2, gender: "coed", short_description: "Leagues, ladders, and tournaments.", image_url: "/PickleTourneyCourt6.png" },
+  { id: "run-club", slug: "run-club", title: "Run Club", players_per_team: 1, gender: "open", short_description: "Group runs and race prep.", image_url: "/run/runclub.jpg" },
+  { id: "soccer", slug: "soccer", title: "Soccer", players_per_team: 11, gender: "open", short_description: "Leagues, pickup, and cups.", image_url: "/forever5/newman5.png" },
+  { id: "youth-soccer", slug: "youth-soccer", title: "Youth Soccer", players_per_team: 7, gender: "coed", short_description: "Small-sided youth play.", image_url: "/forever5/newman5.png" },
 ];
 
-const sportImages: Record<string, string> = {
+const fallbackSportImages: Record<string, string> = {
   baseball: "/baseball/champst2025.jpeg",
   basketball: "/basketball/champst2025.jpeg",
   esports: "/esports/esports.jpg",
@@ -67,6 +67,9 @@ const activityLabels: Record<string, string> = {
   "youth-soccer": "Leagues • Clinics",
 };
 
+const getSportImageUrl = (sport: Pick<SportCard, "image_url" | "slug" | "title">) =>
+  sport.image_url || fallbackSportImages[sport.slug] || fallbackSportImages[toSlug(sport.title ?? "")] || undefined;
+
 export default function SportsPage() {
   const [sports, setSports] = useState<SportCard[]>(fallbackSports);
   const [selected, setSelected] = useState<string>("all");
@@ -81,7 +84,6 @@ export default function SportsPage() {
           return {
             ...sport,
             slug,
-            image: sportImages[slug] || sportImages[toSlug(sport.title ?? "")] || undefined,
           } as SportCard;
         });
         setSports(mapped);
@@ -153,7 +155,7 @@ export default function SportsPage() {
               activityLabels[id] ||
               activityLabels[toSlug(sport.title)] ||
               "Leagues • Pickup • Tournaments";
-            const bgImage = sport.image || sportImages[id];
+            const bgImage = getSportImageUrl(sport);
             const tone = idx % 2 === 0 ? "sport-card--primary" : "sport-card--secondary";
             return (
               <article

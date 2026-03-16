@@ -2452,7 +2452,7 @@ html[data-theme="dark"] .events-group {
 
 .sport-card {
   position: relative;
-  min-height: 220px;
+  height: clamp(260px, 30vw, 320px);
   border-radius: 18px;
   overflow: hidden;
   border: 2px solid var(--panel);
@@ -2462,6 +2462,7 @@ html[data-theme="dark"] .events-group {
     var(--panel);
   background-size: cover;
   background-position: center;
+  background-repeat: no-repeat;
   box-shadow: var(--glow);
 }
 
@@ -2510,7 +2511,7 @@ html[data-theme="dark"] .events-group {
 
 @media (max-width: 720px) {
   .sport-card {
-    min-height: 180px;
+    height: 220px;
   }
 }
 

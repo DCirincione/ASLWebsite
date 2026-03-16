@@ -189,6 +189,7 @@ export type Sport = {
   players_per_team?: number | null;
   gender?: "men" | "women" | "coed" | "open" | null;
   short_description?: string | null;
+  image_url?: string | null;
   created_at?: string | null;
 };
 
@@ -201,6 +202,7 @@ export type SportInsert = {
   players_per_team?: number | null;
   gender?: "men" | "women" | "coed" | "open" | null;
   short_description?: string | null;
+  image_url?: string | null;
   created_at?: string | null;
 };
 
@@ -213,6 +215,7 @@ export type SportUpdate = {
   players_per_team?: number | null;
   gender?: "men" | "women" | "coed" | "open" | null;
   short_description?: string | null;
+  image_url?: string | null;
   created_at?: string | null;
 };
 
