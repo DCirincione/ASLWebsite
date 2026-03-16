@@ -2499,7 +2499,15 @@ html[data-theme="dark"] .events-group {
   border: 3px solid #ffffff;
   border-radius: 18px;
   padding: 14px 22px;
-  cursor: default;
+  cursor: pointer;
+  transition: transform 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sport-card__cta:hover,
+.sport-card__cta:focus-visible {
+  transform: scale(1.05);
+  background: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 14px 35px rgba(0, 0, 0, 0.18);
 }
 
 .sport-card__meta {
