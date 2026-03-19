@@ -22,6 +22,18 @@ type AdminModule =
 type HostType = NonNullable<Event["host_type"]>;
 type ImageInputMode = "url" | "upload";
 const EVENT_IMAGE_BUCKET = "event-images";
+type RegistrationFieldType = "text" | "email" | "tel" | "number" | "select" | "textarea" | "checkbox" | "file";
+type RegistrationFieldEditor = {
+  id: string;
+  label: string;
+  name: string;
+  type: RegistrationFieldType;
+  required: boolean;
+  placeholder: string;
+  help: string;
+  optionsText: string;
+  expanded: boolean;
+};
 type EventFormState = {
   title: string;
   start_date: string;
@@ -36,7 +48,8 @@ type EventFormState = {
   waiver_url: string;
   allow_multiple_registrations: boolean;
   registration_limit: string;
-  registration_schema: string;
+  require_waiver: boolean;
+  registration_fields: RegistrationFieldEditor[];
 };
 type CommunityArticle = {
   id: string;
@@ -79,6 +92,98 @@ type UserManageForm = {
   role: UserRole;
   status: "active" | "suspended";
   reason: string;
+};
+
+const FIELD_TYPE_OPTIONS: RegistrationFieldType[] = [
+  "text",
+  "email",
+  "tel",
+  "number",
+  "select",
+  "textarea",
+  "checkbox",
+  "file",
+];
+
+const slugifyFieldName = (value: string) =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+
+const createEmptyRegistrationField = (): RegistrationFieldEditor => ({
+  id: crypto.randomUUID(),
+  label: "",
+  name: "",
+  type: "text",
+  required: false,
+  placeholder: "",
+  help: "",
+  optionsText: "",
+  expanded: true,
+});
+
+const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick<EventFormState, "require_waiver" | "registration_fields"> => {
+  const schema = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  const rawFields = Array.isArray(schema?.fields) ? schema.fields : Array.isArray(value) ? value : [];
+  const registrationFields = rawFields.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const field = entry as Record<string, unknown>;
+    const type = FIELD_TYPE_OPTIONS.includes(field.type as RegistrationFieldType) ? (field.type as RegistrationFieldType) : "text";
+    return [{
+      id: typeof field.id === "string" && field.id ? field.id : crypto.randomUUID(),
+      label: typeof field.label === "string" ? field.label : "",
+      name: typeof field.name === "string" ? field.name : "",
+      type,
+      required: Boolean(field.required),
+      placeholder: typeof field.placeholder === "string" ? field.placeholder : "",
+      help: typeof field.help === "string" ? field.help : "",
+      optionsText: Array.isArray(field.options) ? field.options.filter((option): option is string => typeof option === "string").join("\n") : "",
+      expanded: false,
+    }];
+  });
+
+  return {
+    require_waiver: Boolean(schema?.require_waiver),
+    registration_fields: registrationFields,
+  };
+};
+
+const buildRegistrationSchema = (formState: EventFormState) => {
+  const fields = formState.registration_fields
+    .map((field) => {
+      const label = field.label.trim();
+      const name = field.name.trim() || slugifyFieldName(label);
+      if (!label || !name) return null;
+      return {
+        id: field.id,
+        label,
+        name,
+        type: field.type,
+        required: field.required,
+        placeholder: field.placeholder.trim() || undefined,
+        help: field.help.trim() || undefined,
+        options: field.type === "select"
+          ? field.optionsText.split("\n").map((option) => option.trim()).filter(Boolean)
+          : undefined,
+      };
+    })
+    .filter(Boolean);
+
+  if (!formState.require_waiver && fields.length === 0) {
+    return null;
+  }
+
+  return {
+    require_waiver: formState.require_waiver,
+    fields,
+  };
+};
+
+const registrationSchemaPreview = (formState: EventFormState) => {
+  const schema = buildRegistrationSchema(formState);
+  return schema ? JSON.stringify(schema, null, 2) : "";
 };
 
 export default function AdminPage() {
@@ -154,7 +259,8 @@ export default function AdminPage() {
     waiver_url: "",
     allow_multiple_registrations: false,
     registration_limit: "",
-    registration_schema: "",
+    require_waiver: false,
+    registration_fields: [],
   });
   const [editForm, setEditForm] = useState<EventFormState>({
     title: "",
@@ -170,7 +276,8 @@ export default function AdminPage() {
     waiver_url: "",
     allow_multiple_registrations: false,
     registration_limit: "",
-    registration_schema: "",
+    require_waiver: false,
+    registration_fields: [],
   });
   const adminModules: Array<{
     id: Exclude<AdminModule, "none">;
@@ -455,16 +562,6 @@ export default function AdminPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const parseRegistrationSchema = (raw: string) => {
-    const value = raw.trim();
-    if (!value) return null;
-    try {
-      return JSON.parse(value);
-    } catch {
-      throw new Error("Registration schema must be valid JSON.");
-    }
-  };
-
   const resetForm = () => {
     setForm({
       title: "",
@@ -480,12 +577,14 @@ export default function AdminPage() {
       waiver_url: "",
       allow_multiple_registrations: false,
       registration_limit: "",
-      registration_schema: "",
+      require_waiver: false,
+      registration_fields: [],
     });
     setCreateImageMode("url");
   };
 
   const startEditing = (event: Event) => {
+    const registrationState = parseRegistrationSchemaState(event.registration_schema);
     setEditingId(event.id);
     setEditForm({
       title: event.title ?? "",
@@ -501,7 +600,8 @@ export default function AdminPage() {
       waiver_url: event.waiver_url ?? "",
       allow_multiple_registrations: Boolean(event.allow_multiple_registrations),
       registration_limit: event.registration_limit?.toString() ?? "",
-      registration_schema: event.registration_schema ? JSON.stringify(event.registration_schema, null, 2) : "",
+      require_waiver: registrationState.require_waiver,
+      registration_fields: registrationState.registration_fields,
     });
     setEditImageMode("url");
     setFormStatus({ type: "idle" });
@@ -514,6 +614,261 @@ export default function AdminPage() {
   const updateEdit = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setEditForm((prev) => ({ ...prev, [key]: value }));
   };
+
+  const updateRegistrationField = (
+    target: "create" | "edit",
+    fieldId: string,
+    key: keyof RegistrationFieldEditor,
+    value: RegistrationFieldEditor[keyof RegistrationFieldEditor]
+  ) => {
+    const apply = (prev: EventFormState) => ({
+      ...prev,
+      registration_fields: prev.registration_fields.map((field) => {
+        if (field.id !== fieldId) return field;
+        const nextField = { ...field, [key]: value } as RegistrationFieldEditor;
+        if (key === "label") {
+          const previousSlug = slugifyFieldName(field.label);
+          if (!field.name || field.name === previousSlug) {
+            nextField.name = slugifyFieldName(String(value));
+          }
+        }
+        return nextField;
+      }),
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+    setEditForm(apply);
+  };
+
+  const addRegistrationField = (target: "create" | "edit") => {
+    const apply = (prev: EventFormState) => ({
+      ...prev,
+      registration_fields: [...prev.registration_fields, createEmptyRegistrationField()],
+    });
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+    setEditForm(apply);
+  };
+
+  const toggleRegistrationFieldExpanded = (target: "create" | "edit", fieldId: string) => {
+    const apply = (prev: EventFormState) => ({
+      ...prev,
+      registration_fields: prev.registration_fields.map((field) =>
+        field.id === fieldId ? { ...field, expanded: !field.expanded } : field
+      ),
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+    setEditForm(apply);
+  };
+
+  const removeRegistrationField = (target: "create" | "edit", fieldId: string) => {
+    const apply = (prev: EventFormState) => ({
+      ...prev,
+      registration_fields: prev.registration_fields.filter((field) => field.id !== fieldId),
+    });
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+    setEditForm(apply);
+  };
+
+  const moveRegistrationField = (target: "create" | "edit", fieldId: string, direction: -1 | 1) => {
+    const apply = (prev: EventFormState) => {
+      const index = prev.registration_fields.findIndex((field) => field.id === fieldId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= prev.registration_fields.length) {
+        return prev;
+      }
+      const nextFields = [...prev.registration_fields];
+      const [field] = nextFields.splice(index, 1);
+      nextFields.splice(nextIndex, 0, field);
+      return { ...prev, registration_fields: nextFields };
+    };
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+    setEditForm(apply);
+  };
+
+  const renderRegistrationBuilder = (target: "create" | "edit", state: EventFormState) => (
+    <div style={{ display: "grid", gap: 16 }}>
+      <div className="form-control checkbox-control">
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={state.require_waiver}
+            onChange={(e) =>
+              target === "create"
+                ? update("require_waiver", e.target.checked)
+                : updateEdit("require_waiver", e.target.checked)
+            }
+          />
+          <span>Require waiver acceptance in the form</span>
+        </label>
+      </div>
+
+      <div style={{ display: "grid", gap: 12 }}>
+        <div className="account-card__header">
+          <div>
+            <h3 style={{ margin: 0 }}>Extra Form Fields</h3>
+            <p className="muted" style={{ margin: 0 }}>
+              Name, email, and phone are always included automatically.
+            </p>
+          </div>
+          <button className="button ghost" type="button" onClick={() => addRegistrationField(target)}>
+            Add field
+          </button>
+        </div>
+
+        {state.registration_fields.length === 0 ? (
+          <p className="muted">No extra fields yet.</p>
+        ) : (
+          state.registration_fields.map((field, index) => (
+            <div key={field.id} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <p className="list__title" style={{ margin: 0 }}>
+                    {field.label.trim() || `Field ${index + 1}`}
+                  </p>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>
+                    {field.name || "no_key"} • {field.type}{field.required ? " • required" : ""}
+                  </p>
+                </div>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => toggleRegistrationFieldExpanded(target, field.id)}
+                >
+                  {field.expanded ? "Collapse" : "Expand"}
+                </button>
+              </div>
+
+              {field.expanded ? (
+                <>
+                  <div className="register-form-grid">
+                    <div className="form-control">
+                      <label htmlFor={`${target}-field-label-${field.id}`}>Field label</label>
+                      <input
+                        id={`${target}-field-label-${field.id}`}
+                        value={field.label}
+                        onChange={(e) => updateRegistrationField(target, field.id, "label", e.target.value)}
+                        placeholder="Team name"
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor={`${target}-field-name-${field.id}`}>Field key</label>
+                      <input
+                        id={`${target}-field-name-${field.id}`}
+                        value={field.name}
+                        onChange={(e) => updateRegistrationField(target, field.id, "name", slugifyFieldName(e.target.value))}
+                        placeholder="team_name"
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor={`${target}-field-type-${field.id}`}>Field type</label>
+                      <select
+                        id={`${target}-field-type-${field.id}`}
+                        value={field.type}
+                        onChange={(e) => updateRegistrationField(target, field.id, "type", e.target.value as RegistrationFieldType)}
+                      >
+                        {FIELD_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-control checkbox-control">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={field.required}
+                          onChange={(e) => updateRegistrationField(target, field.id, "required", e.target.checked)}
+                        />
+                        <span>Required</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="register-form-grid">
+                    <div className="form-control">
+                      <label htmlFor={`${target}-field-placeholder-${field.id}`}>Placeholder</label>
+                      <input
+                        id={`${target}-field-placeholder-${field.id}`}
+                        value={field.placeholder}
+                        onChange={(e) => updateRegistrationField(target, field.id, "placeholder", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor={`${target}-field-help-${field.id}`}>Help text</label>
+                      <input
+                        id={`${target}-field-help-${field.id}`}
+                        value={field.help}
+                        onChange={(e) => updateRegistrationField(target, field.id, "help", e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  {field.type === "select" ? (
+                    <div className="form-control">
+                      <label htmlFor={`${target}-field-options-${field.id}`}>Options</label>
+                      <textarea
+                        id={`${target}-field-options-${field.id}`}
+                        value={field.optionsText}
+                        onChange={(e) => updateRegistrationField(target, field.id, "optionsText", e.target.value)}
+                        rows={4}
+                        placeholder={"Rec\nCompetitive"}
+                      />
+                      <p className="form-help muted">One option per line.</p>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              <div className="cta-row">
+                <button className="button ghost" type="button" onClick={() => moveRegistrationField(target, field.id, -1)} disabled={index === 0}>
+                  Move up
+                </button>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => moveRegistrationField(target, field.id, 1)}
+                  disabled={index === state.registration_fields.length - 1}
+                >
+                  Move down
+                </button>
+                <button className="button ghost" type="button" onClick={() => removeRegistrationField(target, field.id)}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="form-control">
+        <label htmlFor={`${target}-registration-schema-preview`}>Generated schema preview</label>
+        <textarea
+          id={`${target}-registration-schema-preview`}
+          value={registrationSchemaPreview(state)}
+          rows={10}
+          readOnly
+        />
+      </div>
+    </div>
+  );
 
   const handleCreateEvent = async (event: FormEvent) => {
     event.preventDefault();
@@ -528,13 +883,7 @@ export default function AdminPage() {
     }
 
     setFormStatus({ type: "loading" });
-    let registrationSchema = null;
-    try {
-      registrationSchema = parseRegistrationSchema(form.registration_schema);
-    } catch (error) {
-      setFormStatus({ type: "error", message: error instanceof Error ? error.message : "Invalid registration schema." });
-      return;
-    }
+    const registrationSchema = buildRegistrationSchema(form);
     const payload = {
       title: form.title.trim(),
       start_date: form.start_date || null,
@@ -632,14 +981,7 @@ export default function AdminPage() {
     }
 
     setSavingEditId(eventId);
-    let registrationSchema = null;
-    try {
-      registrationSchema = parseRegistrationSchema(editForm.registration_schema);
-    } catch (error) {
-      setFormStatus({ type: "error", message: error instanceof Error ? error.message : "Invalid registration schema." });
-      setSavingEditId(null);
-      return;
-    }
+    const registrationSchema = buildRegistrationSchema(editForm);
     const payload = {
       title: editForm.title.trim(),
       start_date: editForm.start_date || null,
@@ -1250,7 +1592,6 @@ export default function AdminPage() {
                       value={form.registration_program_slug}
                       onChange={(e) => update("registration_program_slug", e.target.value)}
                     />
-                    <p className="form-help muted">Optional: keep this only for sport-page grouping logic.</p>
                   </div>
                   <div className="form-control">
                     <label htmlFor="event-waiver-url">Waiver URL</label>
@@ -1300,17 +1641,7 @@ export default function AdminPage() {
                     rows={4}
                   />
                 </div>
-                <div className="form-control">
-                  <label htmlFor="event-registration-schema">Registration schema JSON</label>
-                  <textarea
-                    id="event-registration-schema"
-                    value={form.registration_schema}
-                    onChange={(e) => update("registration_schema", e.target.value)}
-                    rows={12}
-                    placeholder={`{\n  "require_waiver": true,\n  "fields": [\n    {\n      "name": "team_name",\n      "label": "Team name",\n      "type": "text",\n      "required": true\n    }\n  ]\n}`}
-                  />
-                  <p className="form-help muted">Optional JSON schema for event-specific fields. Shared fields like name, email, and phone are always included.</p>
-                </div>
+                {renderRegistrationBuilder("create", form)}
                 <div className="cta-row">
                   <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
                     {formStatus.type === "loading" ? "Saving..." : "Create Event"}
@@ -1523,15 +1854,7 @@ export default function AdminPage() {
                               rows={3}
                             />
                           </div>
-                          <div className="form-control">
-                            <label htmlFor={`edit-registration-schema-${event.id}`}>Registration schema JSON</label>
-                            <textarea
-                              id={`edit-registration-schema-${event.id}`}
-                              value={editForm.registration_schema}
-                              onChange={(e) => updateEdit("registration_schema", e.target.value)}
-                              rows={12}
-                            />
-                          </div>
+                          {renderRegistrationBuilder("edit", editForm)}
                           <div className="cta-row">
                             <button
                               className="button primary"
