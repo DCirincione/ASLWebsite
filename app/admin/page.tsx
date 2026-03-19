@@ -20,8 +20,7 @@ type AdminModule =
   | "flyers"
   | "settings";
 type HostType = NonNullable<Event["host_type"]>;
-type ImageInputMode = "url" | "upload";
-const EVENT_IMAGE_BUCKET = "event-images";
+const EVENT_IMAGE_BUCKET = "event-creation-uploads";
 type RegistrationFieldType = "text" | "email" | "tel" | "number" | "select" | "textarea" | "checkbox" | "file";
 type RegistrationFieldEditor = {
   id: string;
@@ -186,8 +185,6 @@ export default function AdminPage() {
   const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCreateEventForm, setShowCreateEventForm] = useState(false);
-  const [createImageMode, setCreateImageMode] = useState<ImageInputMode>("url");
-  const [editImageMode, setEditImageMode] = useState<ImageInputMode>("url");
   const [formStatus, setFormStatus] = useState<FormStatus>({ type: "idle" });
   const [communityStatus, setCommunityStatus] = useState<FormStatus>({ type: "idle" });
   const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
@@ -565,7 +562,6 @@ export default function AdminPage() {
       require_waiver: false,
       registration_fields: [],
     });
-    setCreateImageMode("url");
   };
 
   const openCreateEventForm = () => {
@@ -599,7 +595,6 @@ export default function AdminPage() {
       require_waiver: registrationState.require_waiver,
       registration_fields: registrationState.registration_fields,
     });
-    setEditImageMode("url");
     setFormStatus({ type: "idle" });
   };
 
@@ -904,7 +899,8 @@ export default function AdminPage() {
       throw new Error("Supabase is not configured.");
     }
     const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-    const path = `events/${crypto.randomUUID()}-${safeFileName(file.name.replace(new RegExp(`\\.${ext}$`, "i"), ""))}.${ext}`;
+    const baseName = file.name.replace(new RegExp(`\\.${ext}$`, "i"), "");
+    const path = `events/${crypto.randomUUID()}-${safeFileName(baseName)}.${ext}`;
     const { data, error } = await supabase.storage.from(EVENT_IMAGE_BUCKET).upload(path, file, {
       cacheControl: "3600",
       upsert: false,
@@ -927,13 +923,10 @@ export default function AdminPage() {
       setUploadingCreateImage(true);
       const publicUrl = await uploadEventImage(file);
       update("image_url", publicUrl);
-      setFormStatus({ type: "success", message: "Image uploaded and URL added." });
+      setFormStatus({ type: "success", message: "Image uploaded. The generated URL was added to the field. Click Create Event to save it." });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not upload image.";
-      setFormStatus({
-        type: "error",
-        message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})`,
-      });
+      setFormStatus({ type: "error", message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})` });
     } finally {
       setUploadingCreateImage(false);
       e.target.value = "";
@@ -998,6 +991,10 @@ export default function AdminPage() {
   };
 
   const handleEditImageUpload = async (eventId: string, e: ChangeEvent<HTMLInputElement>) => {
+    if (!supabase) {
+      setFormStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     if (!file.type.startsWith("image/")) {
@@ -1007,14 +1004,21 @@ export default function AdminPage() {
     try {
       setUploadingEditImageId(eventId);
       const publicUrl = await uploadEventImage(file);
+      const { error } = await supabase
+        .from("events")
+        .update({ image_url: publicUrl })
+        .eq("id", eventId);
+
+      if (error) {
+        throw error;
+      }
+
       updateEdit("image_url", publicUrl);
-      setFormStatus({ type: "success", message: "Image uploaded for this event." });
+      setEvents((prev) => prev.map((item) => (item.id === eventId ? { ...item, image_url: publicUrl } : item)));
+      setFormStatus({ type: "success", message: "Image uploaded and saved to this event." });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Could not upload image.";
-      setFormStatus({
-        type: "error",
-        message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})`,
-      });
+      setFormStatus({ type: "error", message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})` });
     } finally {
       setUploadingEditImageId(null);
       e.target.value = "";
@@ -1547,40 +1551,26 @@ export default function AdminPage() {
                       </select>
                     </div>
                     <div className="form-control">
-                      <label htmlFor="event-image-mode">Image Source</label>
-                      <select
-                        id="event-image-mode"
-                        value={createImageMode}
-                        onChange={(e) => setCreateImageMode(e.target.value as ImageInputMode)}
-                      >
-                        <option value="url">Use image URL</option>
-                        <option value="upload">Upload image file</option>
-                      </select>
-                    </div>
-                    {createImageMode === "url" ? (
-                      <div className="form-control">
-                        <label htmlFor="event-image">Image URL</label>
-                        <input
-                          id="event-image"
-                          value={form.image_url}
-                          onChange={(e) => update("image_url", e.target.value)}
-                        />
-                      </div>
-                    ) : (
-                      <div className="form-control">
-                        <label htmlFor="event-image-upload">Upload image</label>
+                      <label htmlFor="event-image">Image URL</label>
+                      <input
+                        id="event-image"
+                        value={form.image_url ?? ""}
+                        onChange={(e) => update("image_url", e.target.value)}
+                      />
+                      <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                        <label className="button ghost" htmlFor="event-image-upload" style={{ padding: "0.45rem 0.75rem" }}>
+                          {uploadingCreateImage ? "Uploading..." : "Upload an image manually"}
+                        </label>
                         <input
                           id="event-image-upload"
                           type="file"
                           accept="image/*"
                           onChange={handleCreateImageUpload}
                           disabled={uploadingCreateImage}
+                          style={{ display: "none" }}
                         />
-                        <p className="form-help muted">
-                          Uploads to the {EVENT_IMAGE_BUCKET} storage bucket.
-                        </p>
                       </div>
-                    )}
+                    </div>
                     <div className="form-control">
                       <label htmlFor="event-program-slug">Registration program slug</label>
                       <input
@@ -1742,40 +1732,30 @@ export default function AdminPage() {
                               </select>
                             </div>
                             <div className="form-control">
-                              <label htmlFor={`edit-image-mode-${event.id}`}>Image Source</label>
-                              <select
-                                id={`edit-image-mode-${event.id}`}
-                                value={editImageMode}
-                                onChange={(e) => setEditImageMode(e.target.value as ImageInputMode)}
-                              >
-                                <option value="url">Use image URL</option>
-                                <option value="upload">Upload image file</option>
-                              </select>
-                            </div>
-                            {editImageMode === "url" ? (
-                              <div className="form-control">
-                                <label htmlFor={`edit-image-${event.id}`}>Image URL</label>
-                                <input
-                                  id={`edit-image-${event.id}`}
-                                  value={editForm.image_url}
-                                  onChange={(e) => updateEdit("image_url", e.target.value)}
-                                />
-                              </div>
-                            ) : (
-                              <div className="form-control">
-                                <label htmlFor={`edit-image-upload-${event.id}`}>Upload image</label>
+                              <label htmlFor={`edit-image-${event.id}`}>Image URL</label>
+                              <input
+                                id={`edit-image-${event.id}`}
+                                value={editForm.image_url ?? ""}
+                                onChange={(e) => updateEdit("image_url", e.target.value)}
+                              />
+                              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                <label
+                                  className="button ghost"
+                                  htmlFor={`edit-image-upload-${event.id}`}
+                                  style={{ padding: "0.45rem 0.75rem" }}
+                                >
+                                  {uploadingEditImageId === event.id ? "Uploading..." : "Upload an image manually"}
+                                </label>
                                 <input
                                   id={`edit-image-upload-${event.id}`}
                                   type="file"
                                   accept="image/*"
                                   onChange={(e) => void handleEditImageUpload(event.id, e)}
                                   disabled={uploadingEditImageId === event.id}
+                                  style={{ display: "none" }}
                                 />
-                                <p className="form-help muted">
-                                  Uploads to the {EVENT_IMAGE_BUCKET} storage bucket.
-                                </p>
                               </div>
-                            )}
+                            </div>
                             <div className="form-control">
                               <label htmlFor={`edit-slug-${event.id}`}>Registration program slug</label>
                               <input
