@@ -14,7 +14,6 @@ const links = [
   { href: "/sports", label: "Sports" },
   { href: "/community", label: "Community" },
   { href: "/contact", label: "Contact" },
-  { href: "/register", label: "Register" },
 ];
 
 export function SiteHeader() {

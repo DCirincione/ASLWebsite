@@ -271,17 +271,6 @@ export default function BaseballPage() {
                     </button>
                   </div>
                 </div>
-                {ev.image ? (
-                  <div className="sport-event-card__media">
-                    <Image
-                      src={ev.image}
-                      alt=""
-                      width={480}
-                      height={300}
-                      sizes="(max-width: 960px) 100vw, 320px"
-                    />
-                  </div>
-                ) : null}
               </article>
             ))}
           </div>

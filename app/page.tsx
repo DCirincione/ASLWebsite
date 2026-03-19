@@ -269,8 +269,8 @@ export default async function Home() {
         description="Join thousands of athletes and sports enthusiasts in ALDRICH SPORTS. Whether you want to compete, stay active, or support our community, there's a place for you."
       >
         <div className="cta-actions">
-          <Link className="button primary" href="/register">
-            Register a Team
+          <Link className="button primary" href="/events">
+            Browse Events
           </Link>
           <Link className="button ghost" href="/contact">
             Become a Sponsor
