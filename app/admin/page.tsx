@@ -77,7 +77,7 @@ type UserDirectoryRecord = {
   id: string;
   name: string;
   role?: "player" | "admin" | "owner" | null;
-  age?: number | null;
+  age?: string | null;
   sports?: string[] | null;
   suspended?: boolean | null;
   suspended_at?: string | null;

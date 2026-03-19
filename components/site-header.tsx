@@ -174,7 +174,7 @@ export function SiteHeader() {
                       <Link href="/account#profile" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
                         My Profile
                       </Link>
-                      <Link href="/account#settings" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
+                      <Link href="/account/settings" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
                         Settings
                       </Link>
                       {canAccessAdmin ? (
@@ -225,7 +225,7 @@ export function SiteHeader() {
                         Admin Dashboard
                       </Link>
                     ) : null}
-                    <Link href="/account#settings" role="menuitem" onClick={() => setIsMenuOpen(false)}>
+                    <Link href="/account/settings" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                       Settings
                     </Link>
                   </div>

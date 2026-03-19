@@ -1,7 +1,7 @@
 export type Profile = {
   id: string;
   name: string;
-  age: number | null;
+  age: string | null;
   role?: "player" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
@@ -18,7 +18,7 @@ export type Profile = {
 export type ProfileInsert = {
   id?: string;
   name: string;
-  age?: number | null;
+  age?: string | null;
   role?: "player" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
@@ -35,7 +35,7 @@ export type ProfileInsert = {
 export type ProfileUpdate = {
   id?: string;
   name?: string;
-  age?: number | null;
+  age?: string | null;
   role?: "player" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;

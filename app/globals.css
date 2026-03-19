@@ -1447,6 +1447,29 @@ html[data-contrast="high"] .font-controls__value {
   padding-top: 12px;
 }
 
+.settings-layout {
+  display: grid;
+  gap: 12px;
+}
+
+.settings-notifications {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+}
+
+.settings-notifications__row {
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.settings-notifications__row .checkbox-label {
+  justify-content: flex-start;
+  width: 100%;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1465,7 +1488,9 @@ html[data-contrast="high"] .font-controls__value {
 }
 
 .account-form input,
+.account-form select,
 .account-form textarea {
+  width: 100%;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
@@ -1479,6 +1504,7 @@ html[data-contrast="high"] .font-controls__value {
 }
 
 .account-form input:focus,
+.account-form select:focus,
 .account-form textarea:focus {
   outline: none;
   border-color: rgba(233, 93, 42, 0.6);
@@ -3175,6 +3201,7 @@ html[data-theme="dark"] .account-form .form-control label {
 }
 
 html[data-theme="dark"] .account-form input,
+html[data-theme="dark"] .account-form select,
 html[data-theme="dark"] .account-form textarea {
   background: rgba(255, 255, 255, 0.06);
   border-color: #1f2a40;
@@ -3187,6 +3214,7 @@ html[data-theme="dark"] .account-form textarea::placeholder {
 }
 
 html[data-theme="dark"] .account-form input:focus,
+html[data-theme="dark"] .account-form select:focus,
 html[data-theme="dark"] .account-form textarea:focus {
   border-color: rgba(233, 93, 42, 0.6);
   box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.2);
@@ -3205,6 +3233,7 @@ html[data-contrast="high"] .account-form .form-control label {
 }
 
 html[data-contrast="high"] .account-form input,
+html[data-contrast="high"] .account-form select,
 html[data-contrast="high"] .account-form textarea {
   background: #000000;
   border-color: #f8fafc;
@@ -3217,6 +3246,7 @@ html[data-contrast="high"] .account-form textarea::placeholder {
 }
 
 html[data-contrast="high"] .account-form input:focus,
+html[data-contrast="high"] .account-form select:focus,
 html[data-contrast="high"] .account-form textarea:focus {
   border-color: #f8fafc;
   box-shadow: 0 0 0 3px rgba(248, 250, 252, 0.35);

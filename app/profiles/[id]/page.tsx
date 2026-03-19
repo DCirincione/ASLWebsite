@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
 import type { Profile, TeamMembership } from "@/lib/supabase/types";
 
@@ -165,7 +166,7 @@ export default function PublicProfilePage() {
             <div className="profile-grid">
               <div className="stat">
                 <p className="stat__label">Age</p>
-                <p className="stat__value">{data.age ?? "—"}</p>
+                <p className="stat__value">{calculateAgeFromDateString(data.age) ?? "—"}</p>
               </div>
               <div className="stat">
                 <p className="stat__label">Skill (1-10)</p>

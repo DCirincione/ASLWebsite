@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { createId } from "@/lib/create-id";
+import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Friend, Profile, TeamMembership } from "@/lib/supabase/types";
 
@@ -34,7 +35,7 @@ type FriendWithAvatar = Friend & { avatar_url?: string | null };
 const fallbackProfile: ProfileData = {
   id: "demo",
   name: "Alex Johnson",
-  age: 24,
+  age: "2000-01-01",
   avatar_url: null,
   positions: ["Forward", "Wing"],
   skill_level: 8,
@@ -94,7 +95,7 @@ const emptyProfileForm: ProfileFormState = {
 
 const toProfileFormState = (profile: Profile | null): ProfileFormState => ({
   name: profile?.name ?? "",
-  age: profile?.age?.toString() ?? "",
+  age: profile?.age ?? "",
   skill_level: profile?.skill_level?.toString() ?? "",
   positions: profile?.positions?.join(", ") ?? "",
   sports: profile?.sports?.join(", ") ?? "",
@@ -237,7 +238,7 @@ export default function AccountPage() {
 
     const payload = {
       name: profileForm.name.trim() || "Player",
-      age: parseOptionalNumber(profileForm.age),
+      age: profileForm.age.trim() || null,
       skill_level: parseOptionalNumber(profileForm.skill_level),
       positions: parseArray(profileForm.positions),
       sports: parseArray(profileForm.sports),
@@ -652,12 +653,12 @@ export default function AccountPage() {
                   />
                 </div>
                 <div className="form-control">
-                  <label htmlFor="profile-age">Age</label>
+                  <label htmlFor="profile-age">Birthday</label>
                   <input
                     id="profile-age"
+                    type="date"
                     value={profileForm.age}
                     onChange={(event) => updateProfileForm("age", event.target.value)}
-                    inputMode="numeric"
                   />
                 </div>
                 <div className="form-control">
@@ -739,7 +740,7 @@ export default function AccountPage() {
             <>
               <p className="muted">{data.about || "Add a bio so other players know how you play."}</p>
               <div className="profile-grid">
-                <Stat label="Age" value={data.age} />
+                <Stat label="Age" value={calculateAgeFromDateString(data.age)} />
                 <Stat label="Skill (1-10)" value={data.skill_level} />
                 <Stat label="Positions" value={data.positions?.join(", ") ?? "—"} />
                 <Stat label="Sports" value={data.sports?.join(", ") ?? "—"} />

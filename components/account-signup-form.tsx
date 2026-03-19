@@ -29,11 +29,6 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const parseNumber = (value: string) => {
-    const num = Number(value);
-    return Number.isNaN(num) ? null : num;
-  };
-
   const parseArray = (value: string) =>
     value
       .split(",")
@@ -53,8 +48,8 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
     setStatus({ type: "loading" });
 
     const { email, password, name, about } = form;
-    const age = parseNumber(form.age);
-    const skill_level = parseNumber(form.skill_level);
+    const age = form.age.trim() || null;
+    const skill_level = Number.isNaN(Number(form.skill_level)) ? null : Number(form.skill_level);
     const positions = parseArray(form.positions);
     const sports = parseArray(form.sports);
 
@@ -135,13 +130,13 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
           />
         </div>
         <div className="form-control">
-          <label htmlFor="age">Age</label>
+          <label htmlFor="age">Birthday</label>
           <input
             id="age"
             name="age"
+            type="date"
             value={form.age}
             onChange={(e) => update("age", e.target.value)}
-            inputMode="numeric"
           />
         </div>
         <div className="form-control">
