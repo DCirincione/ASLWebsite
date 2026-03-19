@@ -26,11 +26,9 @@ type RegistrationFieldType = "text" | "email" | "tel" | "number" | "select" | "t
 type RegistrationFieldEditor = {
   id: string;
   label: string;
-  name: string;
   type: RegistrationFieldType;
   required: boolean;
   placeholder: string;
-  help: string;
   optionsText: string;
   expanded: boolean;
 };
@@ -46,7 +44,6 @@ type EventFormState = {
   registration_program_slug: string;
   registration_enabled: boolean;
   waiver_url: string;
-  allow_multiple_registrations: boolean;
   registration_limit: string;
   require_waiver: boolean;
   registration_fields: RegistrationFieldEditor[];
@@ -115,11 +112,9 @@ const slugifyFieldName = (value: string) =>
 const createEmptyRegistrationField = (): RegistrationFieldEditor => ({
   id: crypto.randomUUID(),
   label: "",
-  name: "",
   type: "text",
   required: false,
   placeholder: "",
-  help: "",
   optionsText: "",
   expanded: true,
 });
@@ -134,11 +129,9 @@ const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick
     return [{
       id: typeof field.id === "string" && field.id ? field.id : crypto.randomUUID(),
       label: typeof field.label === "string" ? field.label : "",
-      name: typeof field.name === "string" ? field.name : "",
       type,
       required: Boolean(field.required),
       placeholder: typeof field.placeholder === "string" ? field.placeholder : "",
-      help: typeof field.help === "string" ? field.help : "",
       optionsText: Array.isArray(field.options) ? field.options.filter((option): option is string => typeof option === "string").join("\n") : "",
       expanded: false,
     }];
@@ -154,7 +147,7 @@ const buildRegistrationSchema = (formState: EventFormState) => {
   const fields = formState.registration_fields
     .map((field) => {
       const label = field.label.trim();
-      const name = field.name.trim() || slugifyFieldName(label);
+      const name = slugifyFieldName(label);
       if (!label || !name) return null;
       return {
         id: field.id,
@@ -163,7 +156,6 @@ const buildRegistrationSchema = (formState: EventFormState) => {
         type: field.type,
         required: field.required,
         placeholder: field.placeholder.trim() || undefined,
-        help: field.help.trim() || undefined,
         options: field.type === "select"
           ? field.optionsText.split("\n").map((option) => option.trim()).filter(Boolean)
           : undefined,
@@ -181,11 +173,6 @@ const buildRegistrationSchema = (formState: EventFormState) => {
   };
 };
 
-const registrationSchemaPreview = (formState: EventFormState) => {
-  const schema = buildRegistrationSchema(formState);
-  return schema ? JSON.stringify(schema, null, 2) : "";
-};
-
 export default function AdminPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
   const [activeModule, setActiveModule] = useState<AdminModule>("none");
@@ -198,6 +185,7 @@ export default function AdminPage() {
   const [uploadingCreateImage, setUploadingCreateImage] = useState(false);
   const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showCreateEventForm, setShowCreateEventForm] = useState(false);
   const [createImageMode, setCreateImageMode] = useState<ImageInputMode>("url");
   const [editImageMode, setEditImageMode] = useState<ImageInputMode>("url");
   const [formStatus, setFormStatus] = useState<FormStatus>({ type: "idle" });
@@ -257,7 +245,6 @@ export default function AdminPage() {
     registration_program_slug: "",
     registration_enabled: false,
     waiver_url: "",
-    allow_multiple_registrations: false,
     registration_limit: "",
     require_waiver: false,
     registration_fields: [],
@@ -274,7 +261,6 @@ export default function AdminPage() {
     registration_program_slug: "",
     registration_enabled: false,
     waiver_url: "",
-    allow_multiple_registrations: false,
     registration_limit: "",
     require_waiver: false,
     registration_fields: [],
@@ -575,12 +561,23 @@ export default function AdminPage() {
       registration_program_slug: "",
       registration_enabled: false,
       waiver_url: "",
-      allow_multiple_registrations: false,
       registration_limit: "",
       require_waiver: false,
       registration_fields: [],
     });
     setCreateImageMode("url");
+  };
+
+  const openCreateEventForm = () => {
+    resetForm();
+    setFormStatus({ type: "idle" });
+    setShowCreateEventForm(true);
+  };
+
+  const closeCreateEventForm = () => {
+    resetForm();
+    setFormStatus({ type: "idle" });
+    setShowCreateEventForm(false);
   };
 
   const startEditing = (event: Event) => {
@@ -598,7 +595,6 @@ export default function AdminPage() {
       registration_program_slug: event.registration_program_slug ?? "",
       registration_enabled: Boolean(event.registration_enabled),
       waiver_url: event.waiver_url ?? "",
-      allow_multiple_registrations: Boolean(event.allow_multiple_registrations),
       registration_limit: event.registration_limit?.toString() ?? "",
       require_waiver: registrationState.require_waiver,
       registration_fields: registrationState.registration_fields,
@@ -625,14 +621,7 @@ export default function AdminPage() {
       ...prev,
       registration_fields: prev.registration_fields.map((field) => {
         if (field.id !== fieldId) return field;
-        const nextField = { ...field, [key]: value } as RegistrationFieldEditor;
-        if (key === "label") {
-          const previousSlug = slugifyFieldName(field.label);
-          if (!field.name || field.name === previousSlug) {
-            nextField.name = slugifyFieldName(String(value));
-          }
-        }
-        return nextField;
+        return { ...field, [key]: value } as RegistrationFieldEditor;
       }),
     });
 
@@ -660,6 +649,21 @@ export default function AdminPage() {
       ...prev,
       registration_fields: prev.registration_fields.map((field) =>
         field.id === fieldId ? { ...field, expanded: !field.expanded } : field
+      ),
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+    setEditForm(apply);
+  };
+
+  const collapseRegistrationField = (target: "create" | "edit", fieldId: string) => {
+    const apply = (prev: EventFormState) => ({
+      ...prev,
+      registration_fields: prev.registration_fields.map((field) =>
+        field.id === fieldId ? { ...field, expanded: false } : field
       ),
     });
 
@@ -704,21 +708,6 @@ export default function AdminPage() {
 
   const renderRegistrationBuilder = (target: "create" | "edit", state: EventFormState) => (
     <div style={{ display: "grid", gap: 16 }}>
-      <div className="form-control checkbox-control">
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={state.require_waiver}
-            onChange={(e) =>
-              target === "create"
-                ? update("require_waiver", e.target.checked)
-                : updateEdit("require_waiver", e.target.checked)
-            }
-          />
-          <span>Require waiver acceptance in the form</span>
-        </label>
-      </div>
-
       <div style={{ display: "grid", gap: 12 }}>
         <div className="account-card__header">
           <div>
@@ -727,6 +716,8 @@ export default function AdminPage() {
               Name, email, and phone are always included automatically.
             </p>
           </div>
+        </div>
+        <div>
           <button className="button ghost" type="button" onClick={() => addRegistrationField(target)}>
             Add field
           </button>
@@ -743,16 +734,18 @@ export default function AdminPage() {
                     {field.label.trim() || `Field ${index + 1}`}
                   </p>
                   <p className="muted" style={{ margin: "4px 0 0" }}>
-                    {field.name || "no_key"} • {field.type}{field.required ? " • required" : ""}
+                    {slugifyFieldName(field.label) || "no_key"} • {field.type}{field.required ? " • required" : ""}
                   </p>
                 </div>
-                <button
-                  className="button ghost"
-                  type="button"
-                  onClick={() => toggleRegistrationFieldExpanded(target, field.id)}
-                >
-                  {field.expanded ? "Collapse" : "Expand"}
-                </button>
+                {!field.expanded ? (
+                  <button
+                    className="button ghost"
+                    type="button"
+                    onClick={() => toggleRegistrationFieldExpanded(target, field.id)}
+                  >
+                    Expand
+                  </button>
+                ) : null}
               </div>
 
               {field.expanded ? (
@@ -768,12 +761,11 @@ export default function AdminPage() {
                       />
                     </div>
                     <div className="form-control">
-                      <label htmlFor={`${target}-field-name-${field.id}`}>Field key</label>
+                      <label htmlFor={`${target}-field-placeholder-${field.id}`}>Placeholder</label>
                       <input
-                        id={`${target}-field-name-${field.id}`}
-                        value={field.name}
-                        onChange={(e) => updateRegistrationField(target, field.id, "name", slugifyFieldName(e.target.value))}
-                        placeholder="team_name"
+                        id={`${target}-field-placeholder-${field.id}`}
+                        value={field.placeholder}
+                        onChange={(e) => updateRegistrationField(target, field.id, "placeholder", e.target.value)}
                       />
                     </div>
                     <div className="form-control">
@@ -790,35 +782,17 @@ export default function AdminPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="form-control checkbox-control">
-                      <label className="checkbox-label">
-                        <input
-                          type="checkbox"
-                          checked={field.required}
-                          onChange={(e) => updateRegistrationField(target, field.id, "required", e.target.checked)}
-                        />
-                        <span>Required</span>
-                      </label>
-                    </div>
                   </div>
 
-                  <div className="register-form-grid">
-                    <div className="form-control">
-                      <label htmlFor={`${target}-field-placeholder-${field.id}`}>Placeholder</label>
+                  <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+                    <label className="checkbox-label">
                       <input
-                        id={`${target}-field-placeholder-${field.id}`}
-                        value={field.placeholder}
-                        onChange={(e) => updateRegistrationField(target, field.id, "placeholder", e.target.value)}
+                        type="checkbox"
+                        checked={field.required}
+                        onChange={(e) => updateRegistrationField(target, field.id, "required", e.target.checked)}
                       />
-                    </div>
-                    <div className="form-control">
-                      <label htmlFor={`${target}-field-help-${field.id}`}>Help text</label>
-                      <input
-                        id={`${target}-field-help-${field.id}`}
-                        value={field.help}
-                        onChange={(e) => updateRegistrationField(target, field.id, "help", e.target.value)}
-                      />
-                    </div>
+                      <span>Required foield</span>
+                    </label>
                   </div>
 
                   {field.type === "select" ? (
@@ -838,6 +812,11 @@ export default function AdminPage() {
               ) : null}
 
               <div className="cta-row">
+                {field.expanded ? (
+                  <button className="button primary" type="button" onClick={() => collapseRegistrationField(target, field.id)}>
+                    Save field
+                  </button>
+                ) : null}
                 <button className="button ghost" type="button" onClick={() => moveRegistrationField(target, field.id, -1)} disabled={index === 0}>
                   Move up
                 </button>
@@ -858,14 +837,19 @@ export default function AdminPage() {
         )}
       </div>
 
-      <div className="form-control">
-        <label htmlFor={`${target}-registration-schema-preview`}>Generated schema preview</label>
-        <textarea
-          id={`${target}-registration-schema-preview`}
-          value={registrationSchemaPreview(state)}
-          rows={10}
-          readOnly
-        />
+      <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={state.require_waiver}
+            onChange={(e) =>
+              target === "create"
+                ? update("require_waiver", e.target.checked)
+                : updateEdit("require_waiver", e.target.checked)
+            }
+          />
+          <span>Require waiver acceptance in the form</span>
+        </label>
       </div>
     </div>
   );
@@ -896,7 +880,7 @@ export default function AdminPage() {
       registration_program_slug: form.registration_program_slug.trim() || null,
       registration_enabled: form.registration_enabled,
       waiver_url: form.waiver_url.trim() || null,
-      allow_multiple_registrations: form.allow_multiple_registrations,
+      allow_multiple_registrations: false,
       registration_limit: form.registration_limit.trim() ? Number(form.registration_limit) : null,
       registration_schema: registrationSchema,
     };
@@ -909,6 +893,7 @@ export default function AdminPage() {
 
     setFormStatus({ type: "success", message: "Event created." });
     resetForm();
+    setShowCreateEventForm(false);
     await loadEvents();
   };
 
@@ -994,7 +979,7 @@ export default function AdminPage() {
       registration_program_slug: editForm.registration_program_slug.trim() || null,
       registration_enabled: editForm.registration_enabled,
       waiver_url: editForm.waiver_url.trim() || null,
-      allow_multiple_registrations: editForm.allow_multiple_registrations,
+      allow_multiple_registrations: false,
       registration_limit: editForm.registration_limit.trim() ? Number(editForm.registration_limit) : null,
       registration_schema: registrationSchema,
     };
@@ -1490,128 +1475,140 @@ export default function AdminPage() {
               <p className="muted">Add new events or update/remove existing ones.</p>
             </section>
             <section className="account-card">
-              <h2>Create Event</h2>
-              <form className="register-form" onSubmit={handleCreateEvent}>
-                <div className="register-form-grid">
-                  <div className="form-control">
-                    <label htmlFor="event-title">Title *</label>
-                    <input
-                      id="event-title"
-                      value={form.title}
-                      onChange={(e) => update("title", e.target.value)}
-                      required
-                    />
-                  </div>
-                  <div className="form-control">
-                    <label htmlFor="event-start">Start date</label>
-                    <input
-                      id="event-start"
-                      type="date"
-                      value={form.start_date}
-                      onChange={(e) => update("start_date", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-control">
-                    <label htmlFor="event-end">End date</label>
-                    <input
-                      id="event-end"
-                      type="date"
-                      value={form.end_date}
-                      onChange={(e) => update("end_date", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-control">
-                    <label htmlFor="event-time">Time info</label>
-                    <input
-                      id="event-time"
-                      value={form.time_info}
-                      onChange={(e) => update("time_info", e.target.value)}
-                      placeholder="8:00 AM tip-off"
-                    />
-                  </div>
-                  <div className="form-control">
-                    <label htmlFor="event-location">Location</label>
-                    <input
-                      id="event-location"
-                      value={form.location}
-                      onChange={(e) => update("location", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-control">
-                    <label htmlFor="event-host-type">Host type</label>
-                    <select
-                      id="event-host-type"
-                      value={form.host_type}
-                      onChange={(e) => update("host_type", e.target.value as HostType)}
-                    >
-                      <option value="aldrich">Aldrich</option>
-                      <option value="featured">Featured</option>
-                      <option value="partner">Partner</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div className="form-control">
-                    <label htmlFor="event-image-mode">Image Source</label>
-                    <select
-                      id="event-image-mode"
-                      value={createImageMode}
-                      onChange={(e) => setCreateImageMode(e.target.value as ImageInputMode)}
-                    >
-                      <option value="url">Use image URL</option>
-                      <option value="upload">Upload image file</option>
-                    </select>
-                  </div>
-                  {createImageMode === "url" ? (
+              <div className="account-card__header">
+                <div>
+                  <h2>Create Event</h2>
+                  <p className="muted">Open the event builder when you want to add a new event.</p>
+                </div>
+                {!showCreateEventForm ? (
+                  <button className="button primary" type="button" onClick={openCreateEventForm}>
+                    Create Event
+                  </button>
+                ) : null}
+              </div>
+              {showCreateEventForm ? (
+                <form className="register-form" onSubmit={handleCreateEvent}>
+                  <div className="register-form-grid">
                     <div className="form-control">
-                      <label htmlFor="event-image">Image URL</label>
+                      <label htmlFor="event-title">Title *</label>
                       <input
-                        id="event-image"
-                        value={form.image_url}
-                        onChange={(e) => update("image_url", e.target.value)}
+                        id="event-title"
+                        value={form.title}
+                        onChange={(e) => update("title", e.target.value)}
+                        required
                       />
                     </div>
-                  ) : (
                     <div className="form-control">
-                      <label htmlFor="event-image-upload">Upload image</label>
+                      <label htmlFor="event-start">Start date</label>
                       <input
-                        id="event-image-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleCreateImageUpload}
-                        disabled={uploadingCreateImage}
+                        id="event-start"
+                        type="date"
+                        value={form.start_date}
+                        onChange={(e) => update("start_date", e.target.value)}
                       />
-                      <p className="form-help muted">
-                        Uploads to the {EVENT_IMAGE_BUCKET} storage bucket.
-                      </p>
                     </div>
-                  )}
-                  <div className="form-control">
-                    <label htmlFor="event-program-slug">Registration program slug</label>
-                    <input
-                      id="event-program-slug"
-                      value={form.registration_program_slug}
-                      onChange={(e) => update("registration_program_slug", e.target.value)}
-                    />
+                    <div className="form-control">
+                      <label htmlFor="event-end">End date</label>
+                      <input
+                        id="event-end"
+                        type="date"
+                        value={form.end_date}
+                        onChange={(e) => update("end_date", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="event-time">Time info</label>
+                      <input
+                        id="event-time"
+                        value={form.time_info}
+                        onChange={(e) => update("time_info", e.target.value)}
+                        placeholder="8:00 AM tip-off"
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="event-location">Location</label>
+                      <input
+                        id="event-location"
+                        value={form.location}
+                        onChange={(e) => update("location", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="event-host-type">Host type</label>
+                      <select
+                        id="event-host-type"
+                        value={form.host_type}
+                        onChange={(e) => update("host_type", e.target.value as HostType)}
+                      >
+                        <option value="aldrich">Aldrich</option>
+                        <option value="featured">Featured</option>
+                        <option value="partner">Partner</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="event-image-mode">Image Source</label>
+                      <select
+                        id="event-image-mode"
+                        value={createImageMode}
+                        onChange={(e) => setCreateImageMode(e.target.value as ImageInputMode)}
+                      >
+                        <option value="url">Use image URL</option>
+                        <option value="upload">Upload image file</option>
+                      </select>
+                    </div>
+                    {createImageMode === "url" ? (
+                      <div className="form-control">
+                        <label htmlFor="event-image">Image URL</label>
+                        <input
+                          id="event-image"
+                          value={form.image_url}
+                          onChange={(e) => update("image_url", e.target.value)}
+                        />
+                      </div>
+                    ) : (
+                      <div className="form-control">
+                        <label htmlFor="event-image-upload">Upload image</label>
+                        <input
+                          id="event-image-upload"
+                          type="file"
+                          accept="image/*"
+                          onChange={handleCreateImageUpload}
+                          disabled={uploadingCreateImage}
+                        />
+                        <p className="form-help muted">
+                          Uploads to the {EVENT_IMAGE_BUCKET} storage bucket.
+                        </p>
+                      </div>
+                    )}
+                    <div className="form-control">
+                      <label htmlFor="event-program-slug">Registration program slug</label>
+                      <input
+                        id="event-program-slug"
+                        value={form.registration_program_slug}
+                        onChange={(e) => update("registration_program_slug", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="event-waiver-url">Waiver URL</label>
+                      <input
+                        id="event-waiver-url"
+                        value={form.waiver_url}
+                        onChange={(e) => update("waiver_url", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="event-registration-limit">Registration limit</label>
+                      <input
+                        id="event-registration-limit"
+                        type="number"
+                        min="1"
+                        value={form.registration_limit}
+                        onChange={(e) => update("registration_limit", e.target.value)}
+                      />
+                    </div>
                   </div>
-                  <div className="form-control">
-                    <label htmlFor="event-waiver-url">Waiver URL</label>
-                    <input
-                      id="event-waiver-url"
-                      value={form.waiver_url}
-                      onChange={(e) => update("waiver_url", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-control">
-                    <label htmlFor="event-registration-limit">Registration limit</label>
-                    <input
-                      id="event-registration-limit"
-                      type="number"
-                      min="1"
-                      value={form.registration_limit}
-                      onChange={(e) => update("registration_limit", e.target.value)}
-                    />
-                  </div>
-                  <div className="form-control checkbox-control">
+                  <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
                     <label className="checkbox-label">
                       <input
                         type="checkbox"
@@ -1621,36 +1618,17 @@ export default function AdminPage() {
                       <span>Enable event registration</span>
                     </label>
                   </div>
-                  <div className="form-control checkbox-control">
-                    <label className="checkbox-label">
-                      <input
-                        type="checkbox"
-                        checked={form.allow_multiple_registrations}
-                        onChange={(e) => update("allow_multiple_registrations", e.target.checked)}
-                      />
-                      <span>Allow multiple submissions per user</span>
-                    </label>
+                  {renderRegistrationBuilder("create", form)}
+                  <div className="cta-row">
+                    <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
+                      {formStatus.type === "loading" ? "Saving..." : "Create Event"}
+                    </button>
+                    <button className="button ghost" type="button" onClick={closeCreateEventForm}>
+                      Cancel
+                    </button>
                   </div>
-                </div>
-                <div className="form-control">
-                  <label htmlFor="event-description">Description</label>
-                  <textarea
-                    id="event-description"
-                    value={form.description}
-                    onChange={(e) => update("description", e.target.value)}
-                    rows={4}
-                  />
-                </div>
-                {renderRegistrationBuilder("create", form)}
-                <div className="cta-row">
-                  <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
-                    {formStatus.type === "loading" ? "Saving..." : "Create Event"}
-                  </button>
-                  <button className="button ghost" type="button" onClick={resetForm}>
-                    Reset
-                  </button>
-                </div>
-              </form>
+                </form>
+              ) : null}
               {formStatus.message ? (
                 <p className={`form-help ${formStatus.type === "error" ? "error" : "muted"}`}>{formStatus.message}</p>
               ) : null}
@@ -1824,35 +1802,16 @@ export default function AdminPage() {
                                 onChange={(e) => updateEdit("registration_limit", e.target.value)}
                               />
                             </div>
-                            <div className="form-control checkbox-control">
-                              <label className="checkbox-label">
-                                <input
-                                  type="checkbox"
-                                  checked={editForm.registration_enabled}
-                                  onChange={(e) => updateEdit("registration_enabled", e.target.checked)}
-                                />
-                                <span>Enable event registration</span>
-                              </label>
-                            </div>
-                            <div className="form-control checkbox-control">
-                              <label className="checkbox-label">
-                                <input
-                                  type="checkbox"
-                                  checked={editForm.allow_multiple_registrations}
-                                  onChange={(e) => updateEdit("allow_multiple_registrations", e.target.checked)}
-                                />
-                                <span>Allow multiple submissions per user</span>
-                              </label>
-                            </div>
                           </div>
-                          <div className="form-control">
-                            <label htmlFor={`edit-description-${event.id}`}>Description</label>
-                            <textarea
-                              id={`edit-description-${event.id}`}
-                              value={editForm.description}
-                              onChange={(e) => updateEdit("description", e.target.value)}
-                              rows={3}
-                            />
+                          <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+                            <label className="checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={editForm.registration_enabled}
+                                onChange={(e) => updateEdit("registration_enabled", e.target.checked)}
+                              />
+                              <span>Enable event registration</span>
+                            </label>
                           </div>
                           {renderRegistrationBuilder("edit", editForm)}
                           <div className="cta-row">
