@@ -115,6 +115,14 @@ export type FriendRequestUpdate = {
   created_at?: string | null;
 };
 
+export type JsonValue =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: JsonValue | undefined }
+  | JsonValue[];
+
 export type Event = {
   id: string;
   title: string;
@@ -129,6 +137,11 @@ export type Event = {
   registration_program_slug?: string | null;
   sport_slug?: string | null;
   rules_url?: string | null;
+  registration_enabled?: boolean | null;
+  registration_schema?: JsonValue | null;
+  waiver_url?: string | null;
+  allow_multiple_registrations?: boolean | null;
+  registration_limit?: number | null;
 };
 
 export type EventInsert = {
@@ -143,6 +156,11 @@ export type EventInsert = {
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
   registration_program_slug?: string | null;
+  registration_enabled?: boolean | null;
+  registration_schema?: JsonValue | null;
+  waiver_url?: string | null;
+  allow_multiple_registrations?: boolean | null;
+  registration_limit?: number | null;
 };
 
 export type EventUpdate = {
@@ -157,6 +175,11 @@ export type EventUpdate = {
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
   registration_program_slug?: string | null;
+  registration_enabled?: boolean | null;
+  registration_schema?: JsonValue | null;
+  waiver_url?: string | null;
+  allow_multiple_registrations?: boolean | null;
+  registration_limit?: number | null;
 };
 
 export type EventSignup = {
@@ -178,6 +201,51 @@ export type EventSignupUpdate = {
   user_id?: string;
   event_id?: string;
   created_at?: string | null;
+};
+
+export type EventSubmission = {
+  id: string;
+  event_id: string;
+  user_id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  answers?: Record<string, JsonValue> | null;
+  attachments?: string[] | null;
+  waiver_accepted?: boolean | null;
+  waiver_accepted_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type EventSubmissionInsert = {
+  id?: string;
+  event_id: string;
+  user_id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  answers?: Record<string, JsonValue> | null;
+  attachments?: string[] | null;
+  waiver_accepted?: boolean | null;
+  waiver_accepted_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type EventSubmissionUpdate = {
+  id?: string;
+  event_id?: string;
+  user_id?: string;
+  name?: string;
+  email?: string;
+  phone?: string | null;
+  answers?: Record<string, JsonValue> | null;
+  attachments?: string[] | null;
+  waiver_accepted?: boolean | null;
+  waiver_accepted_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 export type Sport = {
@@ -460,6 +528,12 @@ export type Database = {
         Row: EventSignup;
         Insert: EventSignupInsert;
         Update: EventSignupUpdate;
+        Relationships: [];
+      };
+      event_submissions: {
+        Row: EventSubmission;
+        Insert: EventSubmissionInsert;
+        Update: EventSubmissionUpdate;
         Relationships: [];
       };
       sports: {

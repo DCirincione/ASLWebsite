@@ -68,12 +68,7 @@ const fallbackEvents: Event[] = [
 ];
 
 type SubmissionRow = {
-  program_id: string;
-};
-
-type ProgramRow = {
-  id: string;
-  slug: string | null;
+  event_id: string;
 };
 
 type ProfileFormState = {
@@ -346,8 +341,8 @@ export default function AccountPage() {
 
       setEventsStatus("loading");
       const { data: submissions, error: submissionsError } = await supabase
-        .from("registration_submissions")
-        .select("program_id")
+        .from("event_submissions")
+        .select("event_id")
         .eq("user_id", userId);
 
       if (submissionsError) {
@@ -357,33 +352,11 @@ export default function AccountPage() {
         return;
       }
 
-      const programIds = Array.from(
-        new Set((submissions as SubmissionRow[]).map((row) => row.program_id).filter(Boolean))
+      const eventIds = Array.from(
+        new Set((submissions as SubmissionRow[]).map((row) => row.event_id).filter(Boolean))
       );
 
-      if (programIds.length === 0) {
-        setRegisteredEvents([]);
-        setEventsStatus("ready");
-        return;
-      }
-
-      const { data: programs, error: programsError } = await supabase
-        .from("registration_programs")
-        .select("id,slug")
-        .in("id", programIds);
-
-      if (programsError) {
-        setRegisteredEvents(fallbackEvents);
-        setEventsStatus("ready");
-        setEventsError("Could not load your saved events yet.");
-        return;
-      }
-
-      const registrationSlugs = Array.from(
-        new Set((programs as ProgramRow[]).map((row) => row.slug?.trim()).filter(Boolean))
-      ) as string[];
-
-      if (registrationSlugs.length === 0) {
+      if (eventIds.length === 0) {
         setRegisteredEvents([]);
         setEventsStatus("ready");
         return;
@@ -392,7 +365,7 @@ export default function AccountPage() {
       const { data: eventData, error: eventError } = await supabase
         .from("events")
         .select("id,title,start_date,end_date,time_info,location,description,host_type,registration_program_slug")
-        .in("registration_program_slug", registrationSlugs);
+        .in("id", eventIds);
 
       if (eventError) {
         setRegisteredEvents(fallbackEvents);

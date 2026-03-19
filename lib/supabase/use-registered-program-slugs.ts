@@ -5,62 +5,35 @@ import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 
 type SubmissionRow = {
-  program_id: string;
+  event_id: string;
 };
 
-type ProgramRow = {
-  id: string;
-  slug: string | null;
-};
-
-const normalizeSlug = (value?: string | null) => (value ?? "").trim().toLowerCase();
-
-export function useRegisteredProgramSlugs() {
+export function useRegisteredEventIds() {
   const [userId, setUserId] = useState<string | null>(null);
-  const [registeredSlugs, setRegisteredSlugs] = useState<Set<string>>(new Set());
+  const [registeredEventIds, setRegisteredEventIds] = useState<Set<string>>(new Set());
 
-  const loadRegisteredSlugs = useCallback(async (uid: string | null) => {
+  const loadRegisteredEvents = useCallback(async (uid: string | null) => {
     const client = supabase;
     if (!client || !uid) {
-      setRegisteredSlugs(new Set());
+      setRegisteredEventIds(new Set());
       return;
     }
 
     const { data: submissions, error: submissionsError } = await client
-      .from("registration_submissions")
-      .select("program_id")
+      .from("event_submissions")
+      .select("event_id")
       .eq("user_id", uid);
 
     if (submissionsError) {
-      setRegisteredSlugs(new Set());
+      setRegisteredEventIds(new Set());
       return;
     }
 
-    const programIds = Array.from(
-      new Set((submissions as SubmissionRow[]).map((row) => row.program_id).filter(Boolean))
+    const eventIds = Array.from(
+      new Set((submissions as SubmissionRow[]).map((row) => row.event_id).filter(Boolean))
     );
 
-    if (programIds.length === 0) {
-      setRegisteredSlugs(new Set());
-      return;
-    }
-
-    const { data: programs, error: programsError } = await client
-      .from("registration_programs")
-      .select("id,slug")
-      .in("id", programIds);
-
-    if (programsError) {
-      setRegisteredSlugs(new Set());
-      return;
-    }
-
-    const slugSet = new Set(
-      (programs as ProgramRow[])
-        .map((row) => normalizeSlug(row.slug))
-        .filter(Boolean)
-    );
-    setRegisteredSlugs(slugSet);
+    setRegisteredEventIds(new Set(eventIds));
   }, []);
 
   useEffect(() => {
@@ -70,35 +43,35 @@ export function useRegisteredProgramSlugs() {
     client.auth.getSession().then(({ data }) => {
       const uid = data.session?.user.id ?? null;
       setUserId(uid);
-      loadRegisteredSlugs(uid);
+      loadRegisteredEvents(uid);
     });
 
     const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
       const uid = session?.user.id ?? null;
       setUserId(uid);
-      loadRegisteredSlugs(uid);
+      loadRegisteredEvents(uid);
     });
 
     return () => {
       subscription?.subscription.unsubscribe();
     };
-  }, [loadRegisteredSlugs]);
+  }, [loadRegisteredEvents]);
 
-  const isRegisteredSlug = useCallback(
-    (slug?: string | null) => {
-      const normalized = normalizeSlug(slug);
-      return normalized.length > 0 && registeredSlugs.has(normalized);
+  const isRegisteredEvent = useCallback(
+    (eventId?: string | null) => {
+      const normalized = (eventId ?? "").trim();
+      return normalized.length > 0 && registeredEventIds.has(normalized);
     },
-    [registeredSlugs]
+    [registeredEventIds]
   );
 
-  const refreshRegisteredSlugs = useCallback(() => {
-    return loadRegisteredSlugs(userId);
-  }, [loadRegisteredSlugs, userId]);
+  const refreshRegisteredEvents = useCallback(() => {
+    return loadRegisteredEvents(userId);
+  }, [loadRegisteredEvents, userId]);
 
   return {
-    registeredSlugs,
-    isRegisteredSlug,
-    refreshRegisteredSlugs,
+    registeredEventIds,
+    isRegisteredEvent,
+    refreshRegisteredEvents,
   };
 }

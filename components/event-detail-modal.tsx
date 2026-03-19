@@ -15,6 +15,7 @@ type EventDetail = {
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
   registration_program_slug?: string | null;
+  registration_enabled?: boolean | null;
   image?: string | null;
 };
 

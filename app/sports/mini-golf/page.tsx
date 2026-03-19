@@ -9,7 +9,7 @@ import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
-import { useRegisteredProgramSlugs } from "@/lib/supabase/use-registered-program-slugs";
+import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 import type { Event } from "@/lib/supabase/types";
 
 type SportEvent = Event & { image?: string };
@@ -28,10 +28,10 @@ export default function MiniGolfPage() {
   const [events, setEvents] = useState<SportEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
-  const [modalSlug, setModalSlug] = useState<string | null>(null);
+  const [modalEventId, setModalEventId] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string | null>(null);
   const [detailEvent, setDetailEvent] = useState<SportEvent | null>(null);
-  const { isRegisteredSlug, refreshRegisteredSlugs } = useRegisteredProgramSlugs();
+  const { isRegisteredEvent, refreshRegisteredEvents } = useRegisteredEventIds();
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -39,7 +39,7 @@ export default function MiniGolfPage() {
       setLoadingEvents(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,registration_program_slug,image_url")
+        .select("id,title,start_date,end_date,time_info,location,description,registration_program_slug,image_url,registration_enabled")
         .order("start_date", { ascending: true, nullsFirst: false });
 
       if (!error && data) {
@@ -88,10 +88,10 @@ export default function MiniGolfPage() {
     return `${startLabel} - ${formatDate(end)}`;
   };
 
-  const openModal = (slug?: string | null, title?: string) => {
-    const normalizedSlug = slug?.trim();
-    if (!normalizedSlug || isRegisteredSlug(normalizedSlug)) return;
-    setModalSlug(normalizedSlug);
+  const openModal = (eventId?: string | null, title?: string) => {
+    const normalizedEventId = eventId?.trim();
+    if (!normalizedEventId || isRegisteredEvent(normalizedEventId)) return;
+    setModalEventId(normalizedEventId);
     setModalTitle(title ?? null);
     setModalOpen(true);
   };
@@ -127,10 +127,10 @@ export default function MiniGolfPage() {
                 <button
                   className="button primary"
                   type="button"
-                  disabled={!item.registration_program_slug || isRegisteredSlug(item.registration_program_slug)}
-                  onClick={() => openModal(item.registration_program_slug, item.title)}
+                  disabled={!item.registration_enabled || isRegisteredEvent(item.id)}
+                  onClick={() => openModal(item.id, item.title)}
                 >
-                  {!item.registration_program_slug ? "Registration coming soon" : isRegisteredSlug(item.registration_program_slug) ? "Registered" : "Sign up"}
+                  {!item.registration_enabled ? "Registration coming soon" : isRegisteredEvent(item.id) ? "Registered" : "Sign up"}
                 </button>
               </div>
             </div>
@@ -191,18 +191,18 @@ export default function MiniGolfPage() {
 
       <RegistrationModal
         open={modalOpen}
-        programSlug={modalSlug}
+        eventId={modalEventId}
         contextTitle={modalTitle ?? undefined}
         onClose={() => setModalOpen(false)}
-        onSubmitted={refreshRegisteredSlugs}
+        onSubmitted={refreshRegisteredEvents}
       />
       <EventDetailModal
         open={Boolean(detailEvent)}
         event={detailEvent}
         dateLabel={detailEvent ? primaryTimeLabel(detailEvent) : undefined}
-        isRegistered={isRegisteredSlug(detailEvent?.registration_program_slug)}
+        isRegistered={isRegisteredEvent(detailEvent?.id)}
         onClose={() => setDetailEvent(null)}
-        onRegister={(event) => openModal(event.registration_program_slug, event.title)}
+        onRegister={(event) => openModal(event.id, event.title)}
       />
     </PageShell>
   );

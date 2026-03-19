@@ -32,6 +32,11 @@ type EventFormState = {
   host_type: HostType;
   image_url: string;
   registration_program_slug: string;
+  registration_enabled: boolean;
+  waiver_url: string;
+  allow_multiple_registrations: boolean;
+  registration_limit: string;
+  registration_schema: string;
 };
 type CommunityArticle = {
   id: string;
@@ -46,9 +51,9 @@ type RegistrationRecord = {
   submitted_at?: string | null;
   user_id: string;
   user_name: string;
-  program_id: string;
-  program_name: string;
-  program_slug: string;
+  user_email: string;
+  user_phone?: string | null;
+  event_id: string;
   event_title: string;
 };
 type ContactMessage = {
@@ -145,6 +150,11 @@ export default function AdminPage() {
     host_type: "aldrich",
     image_url: "",
     registration_program_slug: "",
+    registration_enabled: false,
+    waiver_url: "",
+    allow_multiple_registrations: false,
+    registration_limit: "",
+    registration_schema: "",
   });
   const [editForm, setEditForm] = useState<EventFormState>({
     title: "",
@@ -156,6 +166,11 @@ export default function AdminPage() {
     host_type: "aldrich",
     image_url: "",
     registration_program_slug: "",
+    registration_enabled: false,
+    waiver_url: "",
+    allow_multiple_registrations: false,
+    registration_limit: "",
+    registration_schema: "",
   });
   const adminModules: Array<{
     id: Exclude<AdminModule, "none">;
@@ -219,7 +234,7 @@ export default function AdminPage() {
     setEventsError(null);
     const { data, error } = await supabase
       .from("events")
-      .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,registration_program_slug")
+      .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,registration_program_slug,registration_enabled,waiver_url,allow_multiple_registrations,registration_limit,registration_schema")
       .order("start_date", { ascending: true, nullsFirst: false });
 
     if (!error && data) {
@@ -297,8 +312,8 @@ export default function AdminPage() {
     setRegistrationsError(null);
 
     const { data: submissionData, error: submissionError } = await supabase
-      .from("registration_submissions")
-      .select("id,program_id,user_id,created_at")
+      .from("event_submissions")
+      .select("id,event_id,user_id,name,email,phone,created_at")
       .order("created_at", { ascending: false });
 
     if (submissionError) {
@@ -310,8 +325,11 @@ export default function AdminPage() {
 
     const submissions = (submissionData ?? []) as Array<{
       id: string;
-      program_id: string;
+      event_id: string;
       user_id: string;
+      name: string;
+      email: string;
+      phone?: string | null;
       created_at?: string | null;
     }>;
 
@@ -321,65 +339,42 @@ export default function AdminPage() {
       return;
     }
 
-    const programIds = Array.from(new Set(submissions.map((row) => row.program_id).filter(Boolean)));
     const userIds = Array.from(new Set(submissions.map((row) => row.user_id).filter(Boolean)));
 
-    const [{ data: programsData, error: programsError }, { data: profilesData, error: profilesError }] =
+    const [{ data: eventsData, error: eventsError }, { data: profilesData, error: profilesError }] =
       await Promise.all([
         supabase
-          .from("registration_programs")
-          .select("id,name,slug")
-          .in("id", programIds),
+          .from("events")
+          .select("id,title")
+          .in("id", Array.from(new Set(submissions.map((row) => row.event_id).filter(Boolean)))),
         supabase
           .from("profiles")
           .select("id,name")
           .in("id", userIds),
       ]);
 
-    if (programsError || profilesError) {
+    if (eventsError || profilesError) {
       setRegistrations([]);
-      setRegistrationsError(programsError?.message || profilesError?.message || "Could not load registrations.");
+      setRegistrationsError(eventsError?.message || profilesError?.message || "Could not load registrations.");
       setLoadingRegistrations(false);
       return;
     }
 
-    const programs = (programsData ?? []) as Array<{ id: string; name: string; slug: string }>;
     const profiles = (profilesData ?? []) as Array<{ id: string; name: string | null }>;
-    const programById = new Map(programs.map((row) => [row.id, row]));
     const profileById = new Map(profiles.map((row) => [row.id, row]));
-    const slugs = Array.from(new Set(programs.map((row) => row.slug).filter(Boolean)));
-
-    const { data: eventsData, error: eventsError } = await supabase
-      .from("events")
-      .select("id,title,registration_program_slug")
-      .in("registration_program_slug", slugs);
-
-    if (eventsError) {
-      setRegistrations([]);
-      setRegistrationsError(eventsError.message ?? "Could not load registrations.");
-      setLoadingRegistrations(false);
-      return;
-    }
-
-    const eventBySlug = new Map(
-      ((eventsData ?? []) as Array<{ id: string; title: string; registration_program_slug?: string | null }>)
-        .filter((row) => row.registration_program_slug)
-        .map((row) => [row.registration_program_slug as string, row.title])
-    );
+    const eventById = new Map(((eventsData ?? []) as Array<{ id: string; title: string }>).map((row) => [row.id, row.title]));
 
     const resolved: RegistrationRecord[] = submissions.map((row) => {
-      const program = programById.get(row.program_id);
       const profile = profileById.get(row.user_id);
-      const slug = program?.slug ?? "";
       return {
         id: row.id,
         submitted_at: row.created_at ?? null,
         user_id: row.user_id,
-        user_name: profile?.name?.trim() || "Unknown user",
-        program_id: row.program_id,
-        program_name: program?.name ?? "Unknown program",
-        program_slug: slug,
-        event_title: eventBySlug.get(slug) ?? program?.name ?? "Unknown event",
+        user_name: profile?.name?.trim() || row.name || "Unknown user",
+        user_email: row.email,
+        user_phone: row.phone ?? null,
+        event_id: row.event_id,
+        event_title: eventById.get(row.event_id) ?? "Unknown event",
       };
     });
 
@@ -460,6 +455,16 @@ export default function AdminPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const parseRegistrationSchema = (raw: string) => {
+    const value = raw.trim();
+    if (!value) return null;
+    try {
+      return JSON.parse(value);
+    } catch {
+      throw new Error("Registration schema must be valid JSON.");
+    }
+  };
+
   const resetForm = () => {
     setForm({
       title: "",
@@ -471,6 +476,11 @@ export default function AdminPage() {
       host_type: "aldrich",
       image_url: "",
       registration_program_slug: "",
+      registration_enabled: false,
+      waiver_url: "",
+      allow_multiple_registrations: false,
+      registration_limit: "",
+      registration_schema: "",
     });
     setCreateImageMode("url");
   };
@@ -487,6 +497,11 @@ export default function AdminPage() {
       host_type: event.host_type ?? "aldrich",
       image_url: event.image_url ?? "",
       registration_program_slug: event.registration_program_slug ?? "",
+      registration_enabled: Boolean(event.registration_enabled),
+      waiver_url: event.waiver_url ?? "",
+      allow_multiple_registrations: Boolean(event.allow_multiple_registrations),
+      registration_limit: event.registration_limit?.toString() ?? "",
+      registration_schema: event.registration_schema ? JSON.stringify(event.registration_schema, null, 2) : "",
     });
     setEditImageMode("url");
     setFormStatus({ type: "idle" });
@@ -513,6 +528,13 @@ export default function AdminPage() {
     }
 
     setFormStatus({ type: "loading" });
+    let registrationSchema = null;
+    try {
+      registrationSchema = parseRegistrationSchema(form.registration_schema);
+    } catch (error) {
+      setFormStatus({ type: "error", message: error instanceof Error ? error.message : "Invalid registration schema." });
+      return;
+    }
     const payload = {
       title: form.title.trim(),
       start_date: form.start_date || null,
@@ -523,6 +545,11 @@ export default function AdminPage() {
       host_type: form.host_type || null,
       image_url: form.image_url.trim() || null,
       registration_program_slug: form.registration_program_slug.trim() || null,
+      registration_enabled: form.registration_enabled,
+      waiver_url: form.waiver_url.trim() || null,
+      allow_multiple_registrations: form.allow_multiple_registrations,
+      registration_limit: form.registration_limit.trim() ? Number(form.registration_limit) : null,
+      registration_schema: registrationSchema,
     };
 
     const { error } = await supabase.from("events").insert(payload);
@@ -605,6 +632,14 @@ export default function AdminPage() {
     }
 
     setSavingEditId(eventId);
+    let registrationSchema = null;
+    try {
+      registrationSchema = parseRegistrationSchema(editForm.registration_schema);
+    } catch (error) {
+      setFormStatus({ type: "error", message: error instanceof Error ? error.message : "Invalid registration schema." });
+      setSavingEditId(null);
+      return;
+    }
     const payload = {
       title: editForm.title.trim(),
       start_date: editForm.start_date || null,
@@ -615,6 +650,11 @@ export default function AdminPage() {
       host_type: editForm.host_type || null,
       image_url: editForm.image_url.trim() || null,
       registration_program_slug: editForm.registration_program_slug.trim() || null,
+      registration_enabled: editForm.registration_enabled,
+      waiver_url: editForm.waiver_url.trim() || null,
+      allow_multiple_registrations: editForm.allow_multiple_registrations,
+      registration_limit: editForm.registration_limit.trim() ? Number(editForm.registration_limit) : null,
+      registration_schema: registrationSchema,
     };
 
     const { error } = await supabase.from("events").update(payload).eq("id", eventId);
@@ -1210,6 +1250,45 @@ export default function AdminPage() {
                       value={form.registration_program_slug}
                       onChange={(e) => update("registration_program_slug", e.target.value)}
                     />
+                    <p className="form-help muted">Optional: keep this only for sport-page grouping logic.</p>
+                  </div>
+                  <div className="form-control">
+                    <label htmlFor="event-waiver-url">Waiver URL</label>
+                    <input
+                      id="event-waiver-url"
+                      value={form.waiver_url}
+                      onChange={(e) => update("waiver_url", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-control">
+                    <label htmlFor="event-registration-limit">Registration limit</label>
+                    <input
+                      id="event-registration-limit"
+                      type="number"
+                      min="1"
+                      value={form.registration_limit}
+                      onChange={(e) => update("registration_limit", e.target.value)}
+                    />
+                  </div>
+                  <div className="form-control checkbox-control">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={form.registration_enabled}
+                        onChange={(e) => update("registration_enabled", e.target.checked)}
+                      />
+                      <span>Enable event registration</span>
+                    </label>
+                  </div>
+                  <div className="form-control checkbox-control">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={form.allow_multiple_registrations}
+                        onChange={(e) => update("allow_multiple_registrations", e.target.checked)}
+                      />
+                      <span>Allow multiple submissions per user</span>
+                    </label>
                   </div>
                 </div>
                 <div className="form-control">
@@ -1220,6 +1299,17 @@ export default function AdminPage() {
                     onChange={(e) => update("description", e.target.value)}
                     rows={4}
                   />
+                </div>
+                <div className="form-control">
+                  <label htmlFor="event-registration-schema">Registration schema JSON</label>
+                  <textarea
+                    id="event-registration-schema"
+                    value={form.registration_schema}
+                    onChange={(e) => update("registration_schema", e.target.value)}
+                    rows={12}
+                    placeholder={`{\n  "require_waiver": true,\n  "fields": [\n    {\n      "name": "team_name",\n      "label": "Team name",\n      "type": "text",\n      "required": true\n    }\n  ]\n}`}
+                  />
+                  <p className="form-help muted">Optional JSON schema for event-specific fields. Shared fields like name, email, and phone are always included.</p>
                 </div>
                 <div className="cta-row">
                   <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
@@ -1261,6 +1351,9 @@ export default function AdminPage() {
                         {event.registration_program_slug ? (
                           <p className="muted">Program: {event.registration_program_slug}</p>
                         ) : null}
+                        <p className="muted">
+                          Registration: {event.registration_enabled ? "Enabled" : "Disabled"}
+                        </p>
                       </div>
                       <div className="cta-row">
                         <button
@@ -1382,6 +1475,44 @@ export default function AdminPage() {
                                 onChange={(e) => updateEdit("registration_program_slug", e.target.value)}
                               />
                             </div>
+                            <div className="form-control">
+                              <label htmlFor={`edit-waiver-url-${event.id}`}>Waiver URL</label>
+                              <input
+                                id={`edit-waiver-url-${event.id}`}
+                                value={editForm.waiver_url}
+                                onChange={(e) => updateEdit("waiver_url", e.target.value)}
+                              />
+                            </div>
+                            <div className="form-control">
+                              <label htmlFor={`edit-registration-limit-${event.id}`}>Registration limit</label>
+                              <input
+                                id={`edit-registration-limit-${event.id}`}
+                                type="number"
+                                min="1"
+                                value={editForm.registration_limit}
+                                onChange={(e) => updateEdit("registration_limit", e.target.value)}
+                              />
+                            </div>
+                            <div className="form-control checkbox-control">
+                              <label className="checkbox-label">
+                                <input
+                                  type="checkbox"
+                                  checked={editForm.registration_enabled}
+                                  onChange={(e) => updateEdit("registration_enabled", e.target.checked)}
+                                />
+                                <span>Enable event registration</span>
+                              </label>
+                            </div>
+                            <div className="form-control checkbox-control">
+                              <label className="checkbox-label">
+                                <input
+                                  type="checkbox"
+                                  checked={editForm.allow_multiple_registrations}
+                                  onChange={(e) => updateEdit("allow_multiple_registrations", e.target.checked)}
+                                />
+                                <span>Allow multiple submissions per user</span>
+                              </label>
+                            </div>
                           </div>
                           <div className="form-control">
                             <label htmlFor={`edit-description-${event.id}`}>Description</label>
@@ -1390,6 +1521,15 @@ export default function AdminPage() {
                               value={editForm.description}
                               onChange={(e) => updateEdit("description", e.target.value)}
                               rows={3}
+                            />
+                          </div>
+                          <div className="form-control">
+                            <label htmlFor={`edit-registration-schema-${event.id}`}>Registration schema JSON</label>
+                            <textarea
+                              id={`edit-registration-schema-${event.id}`}
+                              value={editForm.registration_schema}
+                              onChange={(e) => updateEdit("registration_schema", e.target.value)}
+                              rows={12}
                             />
                           </div>
                           <div className="cta-row">
@@ -1706,7 +1846,8 @@ export default function AdminPage() {
                           </div>
                           <div className="event-card__meta">
                             <p className="muted">User: {row.user_name}</p>
-                            <p className="muted">Program: {row.program_name}</p>
+                            <p className="muted">Email: {row.user_email}</p>
+                            {row.user_phone ? <p className="muted">Phone: {row.user_phone}</p> : null}
                             {row.submitted_at ? (
                               <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
                             ) : null}

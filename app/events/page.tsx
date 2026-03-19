@@ -8,7 +8,7 @@ import { EventDetailModal } from "@/components/event-detail-modal";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
-import { useRegisteredProgramSlugs } from "@/lib/supabase/use-registered-program-slugs";
+import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 
 type EventItem = {
   id: string;
@@ -21,6 +21,7 @@ type EventItem = {
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
   registration_program_slug?: string | null;
+  registration_enabled?: boolean | null;
   image?: string;
 };
 
@@ -30,11 +31,11 @@ export default function EventsPage() {
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [modalSlug, setModalSlug] = useState<string | null>(null);
+  const [modalEventId, setModalEventId] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailEvent, setDetailEvent] = useState<EventItem | null>(null);
-  const { isRegisteredSlug, refreshRegisteredSlugs } = useRegisteredProgramSlugs();
+  const { isRegisteredEvent, refreshRegisteredEvents } = useRegisteredEventIds();
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -42,7 +43,7 @@ export default function EventsPage() {
       setLoading(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,registration_program_slug")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,registration_program_slug,registration_enabled")
         .order("start_date", { ascending: true, nullsFirst: false });
       if (!error && data) {
         setEvents(data as EventItem[]);
@@ -172,7 +173,8 @@ export default function EventsPage() {
 
   const renderEventCard = (event: EventItem) => {
     const primaryDate = primaryDateLabel(event);
-    const isRegistered = isRegisteredSlug(event.registration_program_slug);
+    const isRegistered = isRegisteredEvent(event.id);
+    const canRegister = Boolean(event.registration_enabled);
 
     return (
       <article key={event.id} className="event-card event-card--full">
@@ -226,7 +228,7 @@ export default function EventsPage() {
               className="button primary"
               type="button"
               onClick={() => {
-                if (!event.registration_program_slug) {
+                if (!canRegister) {
                   setMessage("Registration for this event is not available yet.");
                   return;
                 }
@@ -237,13 +239,13 @@ export default function EventsPage() {
                   router.push("/account");
                   return;
                 }
-                setModalSlug(event.registration_program_slug);
+                setModalEventId(event.id);
                 setModalTitle(event.title);
                 setModalOpen(true);
               }}
-              disabled={!event.registration_program_slug || isRegistered}
+              disabled={!canRegister || isRegistered}
             >
-              {!event.registration_program_slug
+              {!canRegister
                 ? "Registration coming soon"
                 : isRegistered
                   ? "Registered"
@@ -345,23 +347,23 @@ export default function EventsPage() {
       </Section>
       <RegistrationModal
         open={modalOpen}
-        programSlug={modalSlug}
+        eventId={modalEventId}
         contextTitle={modalTitle ?? undefined}
         onClose={() => setModalOpen(false)}
-        onSubmitted={refreshRegisteredSlugs}
+        onSubmitted={refreshRegisteredEvents}
       />
       <EventDetailModal
         open={Boolean(detailEvent)}
         event={detailEvent}
         dateLabel={detailEvent ? primaryDateLabel(detailEvent) : undefined}
-        isRegistered={isRegisteredSlug(detailEvent?.registration_program_slug)}
+        isRegistered={isRegisteredEvent(detailEvent?.id)}
         onClose={() => setDetailEvent(null)}
         onRegister={(event) => {
-          if (!event.registration_program_slug) {
+          if (!event.registration_enabled) {
             setMessage("Registration for this event is not available yet.");
             return;
           }
-          if (isRegisteredSlug(event.registration_program_slug)) {
+          if (isRegisteredEvent(event.id)) {
             return;
           }
           if (!userId) {
@@ -369,7 +371,7 @@ export default function EventsPage() {
             return;
           }
           setDetailEvent(null);
-          setModalSlug(event.registration_program_slug);
+          setModalEventId(event.id);
           setModalTitle(event.title);
           setModalOpen(true);
         }}
