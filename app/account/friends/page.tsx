@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { AccountNav } from "@/components/account-nav";
+import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
 import type { Friend } from "@/lib/supabase/types";
 
@@ -206,7 +207,7 @@ export default function AccountFriendsPage() {
     }
     const inserted = (data as FriendRequest[] | null)?.[0];
     setRequests((prev) => [
-      inserted ?? { id: crypto.randomUUID(), sender_id: userId, receiver_id: receiverId, status: "pending" },
+      inserted ?? { id: createId(), sender_id: userId, receiver_id: receiverId, status: "pending" },
       ...prev,
     ]);
 

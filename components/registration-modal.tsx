@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
 import type { JsonValue } from "@/lib/supabase/types";
 
@@ -287,7 +288,7 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
       if (!fileList?.length) continue;
       const storedPaths: string[] = [];
       for (const file of fileList) {
-        const path = `${eventConfig.id}/${crypto.randomUUID()}-${file.name}`;
+        const path = `${eventConfig.id}/${createId()}-${file.name}`;
         const { data, error } = await client.storage.from("signups").upload(path, file, {
           cacheControl: "3600",
           upsert: false,

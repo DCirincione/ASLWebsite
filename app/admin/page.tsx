@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
 import type { Event } from "@/lib/supabase/types";
 
@@ -109,7 +110,7 @@ const slugifyFieldName = (value: string) =>
     .replace(/^_+|_+$/g, "");
 
 const createEmptyRegistrationField = (): RegistrationFieldEditor => ({
-  id: crypto.randomUUID(),
+  id: createId(),
   label: "",
   type: "text",
   required: false,
@@ -126,7 +127,7 @@ const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick
     const field = entry as Record<string, unknown>;
     const type = FIELD_TYPE_OPTIONS.includes(field.type as RegistrationFieldType) ? (field.type as RegistrationFieldType) : "text";
     return [{
-      id: typeof field.id === "string" && field.id ? field.id : crypto.randomUUID(),
+      id: typeof field.id === "string" && field.id ? field.id : createId(),
       label: typeof field.label === "string" ? field.label : "",
       type,
       required: Boolean(field.required),
@@ -185,6 +186,8 @@ export default function AdminPage() {
   const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showCreateEventForm, setShowCreateEventForm] = useState(false);
+  const [showCreateArticleForm, setShowCreateArticleForm] = useState(false);
+  const [showCommunityContentForm, setShowCommunityContentForm] = useState(false);
   const [formStatus, setFormStatus] = useState<FormStatus>({ type: "idle" });
   const [communityStatus, setCommunityStatus] = useState<FormStatus>({ type: "idle" });
   const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
@@ -900,7 +903,7 @@ export default function AdminPage() {
     }
     const ext = file.name.split(".").pop()?.toLowerCase() || "png";
     const baseName = file.name.replace(new RegExp(`\\.${ext}$`, "i"), "");
-    const path = `events/${crypto.randomUUID()}-${safeFileName(baseName)}.${ext}`;
+    const path = `events/${createId()}-${safeFileName(baseName)}.${ext}`;
     const { data, error } = await supabase.storage.from(EVENT_IMAGE_BUCKET).upload(path, file, {
       cacheControl: "3600",
       upsert: false,
@@ -1121,12 +1124,35 @@ export default function AdminPage() {
     });
   };
 
+  const openCreateArticleForm = () => {
+    resetCommunityForm();
+    setCommunityStatus({ type: "idle" });
+    setShowCreateArticleForm(true);
+  };
+
+  const closeCreateArticleForm = () => {
+    resetCommunityForm();
+    setCommunityStatus({ type: "idle" });
+    setShowCreateArticleForm(false);
+  };
+
   const updateCommunityEdit = (key: keyof typeof communityEditForm, value: string) => {
     setCommunityEditForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const updateCommunityContent = (key: keyof typeof communityContentForm, value: string) => {
     setCommunityContentForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const openCommunityContentForm = () => {
+    setCommunityContentStatus({ type: "idle" });
+    setShowCommunityContentForm(true);
+  };
+
+  const closeCommunityContentForm = () => {
+    setCommunityContentStatus({ type: "idle" });
+    void loadCommunityContent();
+    setShowCommunityContentForm(false);
   };
 
   const getAccessToken = async () => {
@@ -1177,6 +1203,7 @@ export default function AdminPage() {
       }
       setCommunityStatus({ type: "success", message: "Community article added." });
       resetCommunityForm();
+      setShowCreateArticleForm(false);
       setCommunityArticles((json?.articles ?? []) as CommunityArticle[]);
     } catch {
       setCommunityStatus({ type: "error", message: "Could not save article." });
@@ -1386,6 +1413,7 @@ export default function AdminPage() {
         return;
       }
       setCommunityContentStatus({ type: "success", message: "Community intro block updated." });
+      setShowCommunityContentForm(false);
     } catch {
       setCommunityContentStatus({ type: "error", message: "Could not update intro block." });
     }
@@ -1823,42 +1851,53 @@ export default function AdminPage() {
                   <p className="muted">Add featured articles shown on the Community page.</p>
                 </section>
                 <section className="account-card">
-                  <h2>Top Community Block</h2>
-                  <p className="muted">Edit the title and intro paragraphs shown at the top of the Community page.</p>
-                  <form className="register-form" onSubmit={handleSaveCommunityContent}>
-                    <div className="form-control">
-                      <label htmlFor="community-board-title">Block Title *</label>
-                      <input
-                        id="community-board-title"
-                        value={communityContentForm.boardTitle}
-                        onChange={(e) => updateCommunityContent("boardTitle", e.target.value)}
-                        required
-                      />
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Top Community Block</h2>
+                      <p className="muted">Edit the title and intro paragraphs shown at the top of the Community page.</p>
                     </div>
-                    <div className="register-form-grid">
+                    {!showCommunityContentForm ? (
+                      <button className="button primary" type="button" onClick={openCommunityContentForm}>
+                        Edit
+                      </button>
+                    ) : null}
+                  </div>
+                  {showCommunityContentForm ? (
+                    <form className="register-form" onSubmit={handleSaveCommunityContent}>
                       <div className="form-control">
-                        <label htmlFor="community-paragraph-body">Paragraph Body *</label>
-                        <textarea
-                          id="community-paragraph-body"
-                          value={communityContentForm.body}
-                          onChange={(e) => updateCommunityContent("body", e.target.value)}
-                          rows={12}
+                        <label htmlFor="community-board-title">Block Title *</label>
+                        <input
+                          id="community-board-title"
+                          value={communityContentForm.boardTitle}
+                          onChange={(e) => updateCommunityContent("boardTitle", e.target.value)}
                           required
                         />
                       </div>
-                    </div>
-                    <p className="form-help muted">
-                      Add spacing manually with blank lines (press Enter twice).
-                    </p>
-                    <div className="cta-row">
-                      <button className="button primary" type="submit" disabled={communityContentStatus.type === "loading"}>
-                        {communityContentStatus.type === "loading" ? "Saving..." : "Save Top Block"}
-                      </button>
-                      <button className="button ghost" type="button" onClick={() => void loadCommunityContent()}>
-                        Reload
-                      </button>
-                    </div>
-                  </form>
+                      <div className="register-form-grid">
+                        <div className="form-control">
+                          <label htmlFor="community-paragraph-body">Paragraph Body *</label>
+                          <textarea
+                            id="community-paragraph-body"
+                            value={communityContentForm.body}
+                            onChange={(e) => updateCommunityContent("body", e.target.value)}
+                            rows={12}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <p className="form-help muted">
+                        Add spacing manually with blank lines (press Enter twice).
+                      </p>
+                      <div className="cta-row">
+                        <button className="button primary" type="submit" disabled={communityContentStatus.type === "loading"}>
+                          {communityContentStatus.type === "loading" ? "Saving..." : "Save Top Block"}
+                        </button>
+                        <button className="button ghost" type="button" onClick={closeCommunityContentForm}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
                   {communityContentStatus.message ? (
                     <p className={`form-help ${communityContentStatus.type === "error" ? "error" : "muted"}`}>
                       {communityContentStatus.message}
@@ -1866,73 +1905,85 @@ export default function AdminPage() {
                   ) : null}
                 </section>
                 <section className="account-card">
-                  <h2>Add Article</h2>
-                  <form className="register-form" onSubmit={handleCreateCommunityArticle}>
-                    <div className="register-form-grid">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Add Article</h2>
+                      <p className="muted">Open the article builder when you want to add a new article.</p>
+                    </div>
+                    {!showCreateArticleForm ? (
+                      <button className="button primary" type="button" onClick={openCreateArticleForm}>
+                        Add Article
+                      </button>
+                    ) : null}
+                  </div>
+                  {showCreateArticleForm ? (
+                    <form className="register-form" onSubmit={handleCreateCommunityArticle}>
+                      <div className="register-form-grid">
+                        <div className="form-control">
+                          <label htmlFor="community-title">Title *</label>
+                          <input
+                            id="community-title"
+                            value={communityForm.title}
+                            onChange={(e) => updateCommunity("title", e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-control">
+                          <label htmlFor="community-link">Article Link *</label>
+                          <input
+                            id="community-link"
+                            value={communityForm.href}
+                            onChange={(e) => updateCommunity("href", e.target.value)}
+                            required
+                          />
+                          <button
+                            className="button ghost"
+                            type="button"
+                            onClick={() => void handleAutoFillCreateArticle()}
+                            disabled={autoFillingCreateArticle}
+                            style={{ marginTop: 8, alignSelf: "flex-start" }}
+                          >
+                            {autoFillingCreateArticle ? "Auto-filling..." : "Auto-fill from URL"}
+                          </button>
+                        </div>
+                        <div className="form-control">
+                          <label htmlFor="community-date">Date label</label>
+                          <input
+                            id="community-date"
+                            value={communityForm.date}
+                            onChange={(e) => updateCommunity("date", e.target.value)}
+                            placeholder="Aug 5, 2024"
+                          />
+                        </div>
+                        <div className="form-control">
+                          <label htmlFor="community-image">Image URL</label>
+                          <input
+                            id="community-image"
+                            value={communityForm.image}
+                            onChange={(e) => updateCommunity("image", e.target.value)}
+                          />
+                        </div>
+                      </div>
                       <div className="form-control">
-                        <label htmlFor="community-title">Title *</label>
-                        <input
-                          id="community-title"
-                          value={communityForm.title}
-                          onChange={(e) => updateCommunity("title", e.target.value)}
+                        <label htmlFor="community-blurb">Blurb *</label>
+                        <textarea
+                          id="community-blurb"
+                          value={communityForm.blurb}
+                          onChange={(e) => updateCommunity("blurb", e.target.value)}
+                          rows={4}
                           required
                         />
                       </div>
-                      <div className="form-control">
-                        <label htmlFor="community-link">Article Link *</label>
-                        <input
-                          id="community-link"
-                          value={communityForm.href}
-                          onChange={(e) => updateCommunity("href", e.target.value)}
-                          required
-                        />
-                        <button
-                          className="button ghost"
-                          type="button"
-                          onClick={() => void handleAutoFillCreateArticle()}
-                          disabled={autoFillingCreateArticle}
-                          style={{ marginTop: 8, alignSelf: "flex-start" }}
-                        >
-                          {autoFillingCreateArticle ? "Auto-filling..." : "Auto-fill from URL"}
+                      <div className="cta-row">
+                        <button className="button primary" type="submit" disabled={communityStatus.type === "loading"}>
+                          {communityStatus.type === "loading" ? "Saving..." : "Add Article"}
+                        </button>
+                        <button className="button ghost" type="button" onClick={closeCreateArticleForm}>
+                          Cancel
                         </button>
                       </div>
-                      <div className="form-control">
-                        <label htmlFor="community-date">Date label</label>
-                        <input
-                          id="community-date"
-                          value={communityForm.date}
-                          onChange={(e) => updateCommunity("date", e.target.value)}
-                          placeholder="Aug 5, 2024"
-                        />
-                      </div>
-                      <div className="form-control">
-                        <label htmlFor="community-image">Image URL</label>
-                        <input
-                          id="community-image"
-                          value={communityForm.image}
-                          onChange={(e) => updateCommunity("image", e.target.value)}
-                        />
-                      </div>
-                    </div>
-                    <div className="form-control">
-                      <label htmlFor="community-blurb">Blurb *</label>
-                      <textarea
-                        id="community-blurb"
-                        value={communityForm.blurb}
-                        onChange={(e) => updateCommunity("blurb", e.target.value)}
-                        rows={4}
-                        required
-                      />
-                    </div>
-                    <div className="cta-row">
-                      <button className="button primary" type="submit" disabled={communityStatus.type === "loading"}>
-                        {communityStatus.type === "loading" ? "Saving..." : "Add Article"}
-                      </button>
-                      <button className="button ghost" type="button" onClick={resetCommunityForm}>
-                        Reset
-                      </button>
-                    </div>
-                  </form>
+                    </form>
+                  ) : null}
                   {communityStatus.message ? (
                     <p className={`form-help ${communityStatus.type === "error" ? "error" : "muted"}`}>
                       {communityStatus.message}
@@ -2153,45 +2204,33 @@ export default function AdminPage() {
                   {loadingUsers ? <p className="muted">Loading users...</p> : null}
                   {!loadingUsers && filteredUsers.length === 0 ? <p className="muted">No users found.</p> : null}
                   {!loadingUsers && filteredUsers.length > 0 ? (
-                    <div style={{ marginTop: 12, border: "1px solid var(--border)", borderRadius: 12, overflow: "hidden" }}>
-                      <div
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "minmax(160px, 2fr) minmax(90px, 1fr) minmax(110px, 1fr) auto",
-                          gap: 12,
-                          padding: "10px 14px",
-                          borderBottom: "1px solid var(--border)",
-                          fontWeight: 700,
-                        }}
-                      >
+                    <div className="user-directory">
+                      <div className="user-directory__header">
                         <span>USER</span>
                         <span>ROLE</span>
                         <span>STATUS</span>
-                        <span style={{ textAlign: "right" }}>ACTIONS</span>
+                        <span className="user-directory__actions-header">ACTIONS</span>
                       </div>
                       {filteredUsers.map((user) => {
                         const isSuspended = user.suspended === true;
                         return (
-                          <div
-                            key={user.id}
-                            style={{
-                              display: "grid",
-                              gridTemplateColumns: "minmax(160px, 2fr) minmax(90px, 1fr) minmax(110px, 1fr) auto",
-                              gap: 12,
-                              padding: "12px 14px",
-                              borderBottom: "1px solid var(--border)",
-                              alignItems: "center",
-                            }}
-                          >
-                            <div>
+                          <div key={user.id} className="user-directory__row">
+                            <div className="user-directory__primary">
                               <p className="list__title">{user.name || "Unnamed user"}</p>
                               <p className="muted">{user.id}</p>
                             </div>
-                            <p style={{ margin: 0, textTransform: "capitalize" }}>{user.role ?? "player"}</p>
-                            <span className={`pill ${isSuspended ? "pill--amber" : "pill--green"}`}>
-                              {isSuspended ? "Suspended" : "Active"}
-                            </span>
-                            <div style={{ textAlign: "right" }}>
+                            <p className="user-directory__cell user-directory__role">
+                              <span className="user-directory__label">Role:</span>
+                              <span style={{ textTransform: "capitalize" }}>{user.role ?? "player"}</span>
+                            </p>
+                            <div className="user-directory__cell">
+                              <span className="user-directory__label">Status:</span>
+                              <span className={`pill ${isSuspended ? "pill--amber" : "pill--green"}`}>
+                                {isSuspended ? "Suspended" : "Active"}
+                              </span>
+                            </div>
+                            <div className="user-directory__actions">
+                              <span className="user-directory__label">Actions:</span>
                               <button className="button ghost" type="button" onClick={() => openManageUser(user)}>
                                 Manage
                               </button>
@@ -2273,25 +2312,25 @@ export default function AdminPage() {
                             <label htmlFor="suspension-reason">Suspension reason (optional)</label>
                             <textarea
                               id="suspension-reason"
-                              rows={3}
                               value={manageForm.reason}
                               onChange={(e) => setManageForm((prev) => ({ ...prev, reason: e.target.value }))}
+                              rows={4}
                             />
                           </div>
                         ) : null}
-                      </div>
-                      <div className="cta-row" style={{ marginTop: 18 }}>
-                        <button
-                          className="button primary"
-                          type="button"
-                          onClick={() => void saveManagedUser()}
-                          disabled={savingUserId === manageUser.id}
-                        >
-                          {savingUserId === manageUser.id ? "Saving..." : "Save Changes"}
-                        </button>
-                        <button className="button ghost" type="button" onClick={closeManageUser}>
-                          Cancel
-                        </button>
+                        <div className="cta-row">
+                          <button
+                            className="button primary"
+                            type="button"
+                            onClick={() => void saveManagedUser()}
+                            disabled={savingUserId === manageUser.id}
+                          >
+                            {savingUserId === manageUser.id ? "Saving..." : "Save Changes"}
+                          </button>
+                          <button className="button ghost" type="button" onClick={closeManageUser}>
+                            Cancel
+                          </button>
+                        </div>
                       </div>
                     </article>
                   </div>

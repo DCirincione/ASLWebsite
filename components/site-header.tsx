@@ -163,12 +163,27 @@ export function SiteHeader() {
             <div className="nav__mobile-actions">
               {isAuthenticated ? (
                 <>
-                  <Link href="/account" className="nav__link" onClick={() => setIsMobileNavOpen(false)}>
-                    Account
-                  </Link>
-                  <Link href="/account#events" className="nav__link" onClick={() => setIsMobileNavOpen(false)}>
-                    My Events
-                  </Link>
+                  <details className="nav__mobile-group">
+                    <summary className="nav__link">
+                      <span className="nav__mobile-caret" aria-hidden>
+                        ›
+                      </span>
+                      <span>Profile</span>
+                    </summary>
+                    <div className="nav__mobile-submenu">
+                      <Link href="/account#profile" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
+                        My Profile
+                      </Link>
+                      <Link href="/account#settings" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
+                        Settings
+                      </Link>
+                      {canAccessAdmin ? (
+                        <Link href="/admin" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
+                          Admin Dashboard
+                        </Link>
+                      ) : null}
+                    </div>
+                  </details>
                 </>
               ) : (
                 <button className="button ghost" type="button" onClick={() => { setIsMobileNavOpen(false); openAccountModal(); }}>

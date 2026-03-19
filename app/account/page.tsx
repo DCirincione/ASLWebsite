@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Friend, Profile, TeamMembership } from "@/lib/supabase/types";
 
@@ -484,7 +485,7 @@ export default function AccountPage() {
     }
     const inserted = (data as FriendRequest[] | null)?.[0];
     setRequests((prev) => [
-      inserted ?? { id: crypto.randomUUID(), sender_id: userId, receiver_id: receiverId, status: "pending" },
+      inserted ?? { id: createId(), sender_id: userId, receiver_id: receiverId, status: "pending" },
       ...prev,
     ]);
 
