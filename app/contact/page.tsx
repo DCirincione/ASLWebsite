@@ -5,7 +5,6 @@ import { useState, type FormEvent } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
-import { supabase } from "@/lib/supabase/client";
 
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
 
@@ -23,11 +22,6 @@ export default function ContactPage() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    if (!supabase) {
-      setStatus({ type: "error", message: "Supabase is not configured." });
-      return;
-    }
-
     const name = form.name.trim();
     const email = form.email.trim();
     const message = form.message.trim();
@@ -37,18 +31,34 @@ export default function ContactPage() {
     }
 
     setStatus({ type: "loading" });
-    const { error } = await supabase.from("contact_messages").insert({
-      name,
-      email,
-      message,
+    const response = await fetch("/api/contact", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name,
+        email,
+        message,
+      }),
     });
 
-    if (error) {
-      setStatus({ type: "error", message: error.message ?? "Could not send message." });
+    const json = (await response.json()) as { error?: string; message?: string; email_error?: string };
+
+    if (!response.ok) {
+      setStatus({ type: "error", message: json.error ?? "Could not send message." });
       return;
     }
 
-    setStatus({ type: "success", message: "Message sent. We will get back to you soon." });
+    if (json.email_error) {
+      setStatus({
+        type: "error",
+        message: json.message ?? "Message saved, but the email notification failed.",
+      });
+      return;
+    }
+
+    setStatus({ type: "success", message: json.message ?? "Message sent. We will get back to you soon." });
     setForm({ name: "", email: "", message: "" });
   };
 
