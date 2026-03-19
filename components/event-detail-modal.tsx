@@ -66,7 +66,6 @@ const formatSingleDate = (value?: string | null) => {
 
 export function EventDetailModal({ open, event, dateLabel, isRegistered = false, onClose, onRegister }: EventDetailModalProps) {
   const [flyerImageUrl, setFlyerImageUrl] = useState<string | null>(null);
-  const [flyerEventPhotoUrl, setFlyerEventPhotoUrl] = useState<string | null>(null);
   const [flyerDetails, setFlyerDetails] = useState<string | null>(null);
   const [hasFlyerMatch, setHasFlyerMatch] = useState(false);
 
@@ -115,16 +114,15 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
       if (cancelled) return;
       if (error || !data) {
         setFlyerImageUrl(null);
-        setFlyerEventPhotoUrl(null);
         setFlyerDetails(null);
         setHasFlyerMatch(false);
         return;
       }
 
       const rows = data as Array<{
+        event_id?: string | null;
         flyer_name?: string | null;
         flyer_image_url?: string | null;
-        event_photo_url?: string | null;
         image_url?: string | null;
         details?: string | null;
       }>;
@@ -134,16 +132,15 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
       const slugCandidates = toFlyerCandidates(event.registration_program_slug);
 
       const match =
+        rows.find((row) => row.event_id === event.id) ||
         rows.find((row) => slugCandidates.includes(normalize(row.flyer_name))) ||
         rows.find((row) => normalize(row.flyer_name) === slugKey) ||
         rows.find((row) => normalize(row.flyer_name) === titleKey) ||
         null;
 
       const matchedFlyerImage = match?.flyer_image_url?.trim() || match?.image_url?.trim() || null;
-      const matchedEventPhoto = match?.event_photo_url?.trim() || null;
 
       setFlyerImageUrl(matchedFlyerImage);
-      setFlyerEventPhotoUrl(matchedEventPhoto);
       setFlyerDetails(match?.details ?? null);
       setHasFlyerMatch(Boolean(match));
     };
@@ -161,9 +158,7 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
   const startDateLabel = formatSingleDate(event.start_date);
   const endDateLabel = formatSingleDate(event.end_date);
   const flyerImage = hasFlyerMatch ? (flyerImageUrl || undefined) : (event.image || event.image_url || undefined);
-  const eventPhoto = hasFlyerMatch
-    ? (flyerEventPhotoUrl || flyerImage || undefined)
-    : (event.image || event.image_url || undefined);
+  const eventPhoto = event.image || event.image_url || flyerImage || undefined;
   const moreInfo = flyerDetails || event.description || null;
 
   return (

@@ -442,8 +442,9 @@ export type RegistrationSubmissionUpdate = {
 
 export type Flyer = {
   id: string;
+  event_id?: string | null;
   flyer_name: string;
-  event_photo_url?: string | null;
+  flyer_image_url?: string | null;
   details?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -451,8 +452,9 @@ export type Flyer = {
 
 export type FlyerInsert = {
   id?: string;
+  event_id?: string | null;
   flyer_name: string;
-  event_photo_url?: string | null;
+  flyer_image_url?: string | null;
   details?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
@@ -460,8 +462,9 @@ export type FlyerInsert = {
 
 export type FlyerUpdate = {
   id?: string;
+  event_id?: string | null;
   flyer_name?: string;
-  event_photo_url?: string | null;
+  flyer_image_url?: string | null;
   details?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
