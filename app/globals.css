@@ -1015,7 +1015,7 @@ html[data-theme="dark"] .font-controls__value {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 18px;
-  align-items: center;
+  align-items: start;
   margin-top: 20px;
 }
 
@@ -1054,6 +1054,14 @@ html[data-theme="dark"] .font-controls__value {
   justify-items: center;
   text-align: center;
   color: #0f172a;
+}
+
+.why-card--image {
+  position: relative;
+  min-height: 250px;
+  padding: 0;
+  overflow: hidden;
+  margin-top: -24px;
 }
 
 .why-card__icon {

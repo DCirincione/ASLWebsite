@@ -1,94 +1,11 @@
+import Image from "next/image";
 import Link from "next/link";
 import { CSSProperties } from "react";
 
-import { EventCard } from "@/components/event-card";
+import { HomeUpcomingEvents } from "@/components/home-upcoming-events";
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
-import { supabase } from "@/lib/supabase/client";
-
-type HomeEvent = {
-  title: string;
-  date: string;
-  location: string;
-  href?: string;
-  image?: string;
-  image_url?: string | null;
-};
-
-const fallbackEvents: HomeEvent[] = [
-  {
-    title: "3v3 Basketball Tournament",
-    date: "March 15, 2024",
-    location: "Central Sports Complex",
-    image:
-      "https://images.unsplash.com/photo-1505666287802-931dc83948e0?auto=format&fit=crop&w=800&q=80",
-    href: "/events",
-  },
-  {
-    title: "Pickleball League",
-    date: "March 20, 2024",
-    location: "Riverside Courts",
-    image: "public/Pickleball/boxPB.jpeg",
-    href: "/events",
-  },
-  {
-    title: "Flag Football Tournament",
-    date: "April 5, 2024",
-    location: "Green Field Park",
-    image:
-      "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?auto=format&fit=crop&w=800&q=80",
-    href: "/events",
-  },
-  {
-    title: "Community vs Kids Charity Game",
-    date: "April 12, 2024",
-    location: "Central Sports Complex",
-    image:
-      "https://images.unsplash.com/photo-1508609349937-5ec4ae374ebf?auto=format&fit=crop&w=800&q=80",
-    href: "/events",
-  },
-];
-
-const formatDate = (value?: string | null) => {
-  if (!value) return "Date TBD";
-  const parts = value.split("-").map(Number);
-  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return "Date TBD";
-  const [year, month, day] = parts;
-  const date = new Date(Date.UTC(year, month - 1, day));
-  return date.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    timeZone: "UTC",
-  });
-};
-
-async function getUpcomingEvents(): Promise<HomeEvent[]> {
-  if (!supabase) return fallbackEvents;
-
-  const { data, error } = await supabase
-    .from("events")
-    .select("title,start_date,location,image_url")
-    .order("start_date", { ascending: true, nullsFirst: false })
-    .limit(4);
-
-  if (error || !data || data.length === 0) return fallbackEvents;
-
-  return data.map((event, idx) => {
-    return {
-      title: event.title,
-      date: formatDate(event.start_date),
-      location: event.location ?? "Location TBD",
-      href: "/events",
-      image: event.image_url ?? undefined,
-      image_url: event.image_url ?? null,
-    };
-  });
-}
-
-export default async function Home() {
-  const upcomingEvents = await getUpcomingEvents();
-
+export default function Home() {
   return (
     <PageShell>
       <Section
@@ -134,18 +51,7 @@ export default async function Home() {
         title="Upcoming Events"
         description="Check out the latest tournaments and leagues happening near you."
       >
-        <div className="event-grid">
-          {upcomingEvents.map((event, idx) => (
-            <EventCard
-              key={`${event.title}-${idx}`}
-              title={event.title}
-              date={event.date}
-              location={event.location}
-              image={event.image}
-              href={event.href}
-            />
-          ))}
-        </div>
+        <HomeUpcomingEvents />
         <div className="event-actions">
           <Link className="button primary" href="/events">
             View All Events
@@ -218,11 +124,14 @@ export default async function Home() {
               <p>Supporting local causes and athletes</p>
             </li>
           </ul>
-          <div className="why-card">
-            <div className="why-card__icon" aria-hidden>
-              🏆
-            </div>
-            <p>Join our community of athletes and sports enthusiasts.</p>
+          <div className="why-card why-card--image">
+            <Image
+              src="/home/joefrancis.jpg"
+              alt=""
+              fill
+              sizes="(max-width: 900px) 100vw, 33vw"
+              style={{ objectFit: "cover" }}
+            />
           </div>
         </div>
       </Section>
