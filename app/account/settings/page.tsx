@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { supabase } from "@/lib/supabase/client";
@@ -38,7 +37,6 @@ const emptySettingsForm: SettingsFormState = {
 };
 
 export default function AccountSettingsPage() {
-  const router = useRouter();
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [settingsForm, setSettingsForm] = useState<SettingsFormState>(emptySettingsForm);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ type: "idle" });
@@ -228,7 +226,7 @@ export default function AccountSettingsPage() {
       return;
     }
     setSigningOut(false);
-    router.replace("/account");
+    window.location.assign("/account");
   };
 
   return (
