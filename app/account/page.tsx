@@ -140,8 +140,8 @@ export default function AccountPage() {
   const handleSignOut = async () => {
     if (!supabase) return;
     setSigningOut(true);
-    const { error: signOutError } = await supabase.auth.signOut();
-    if (signOutError) {
+    const { error: signOutError } = await supabase.auth.signOut({ scope: "local" });
+    if (signOutError && !signOutError.message.toLowerCase().includes("session missing")) {
       setError(signOutError.message);
       setSigningOut(false);
       return;

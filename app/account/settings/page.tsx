@@ -221,8 +221,8 @@ export default function AccountSettingsPage() {
   const handleSignOut = async () => {
     if (!supabase) return;
     setSigningOut(true);
-    const { error } = await supabase.auth.signOut();
-    if (error) {
+    const { error } = await supabase.auth.signOut({ scope: "local" });
+    if (error && !error.message.toLowerCase().includes("session missing")) {
       setSaveStatus({ type: "error", message: error.message });
       setSigningOut(false);
       return;
