@@ -226,7 +226,7 @@ export default function AccountSettingsPage() {
       return;
     }
     setSigningOut(false);
-    window.location.assign("/account");
+    window.location.assign("/");
   };
 
   return (

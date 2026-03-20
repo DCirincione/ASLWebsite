@@ -155,7 +155,7 @@ export default function AccountPage() {
     setSearchResults([]);
     setSuggestedProfiles([]);
     setSigningOut(false);
-    window.location.assign("/account");
+    window.location.assign("/");
   };
 
   const handleAvatarSelect = async (event: ChangeEvent<HTMLInputElement>) => {
