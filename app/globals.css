@@ -732,9 +732,16 @@ html[data-theme="dark"] .font-controls__value {
   border-color: transparent;
 }
 
-.hero__actions .button.ghost:hover {
+.hero__actions .button.ghost:hover:not(:disabled) {
   background: #f8fafc;
+  color: #0f172a;
   border-color: #f1f5f9;
+}
+
+html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.05);
+  color: #ffffff;
+  border-color: var(--border);
 }
 
 .hero__controls,
@@ -1369,6 +1376,7 @@ html[data-theme="dark"] .font-controls__value {
 .settings-layout {
   display: grid;
   gap: 12px;
+  padding-bottom: 50px;
 }
 
 .settings-notifications {

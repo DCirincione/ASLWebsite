@@ -34,8 +34,8 @@ export default function Home() {
               <Link className="button primary" href="#events">
                 View Upcoming Events
               </Link>
-              <Link className="button ghost" href="#projects">
-                Register a Team
+              <Link className="button ghost" href="/sports">
+                Browse Sports
               </Link>
             </div>
           </div>

@@ -232,32 +232,33 @@ export default function AccountSettingsPage() {
   return (
     <>
       <AccessibilityControls />
-      <div className="account-body shell">
-        <Link className="button ghost" href="/account">
-          ← Back
-        </Link>
+      <div className="account-page">
+        <div className="account-body shell">
+          <Link className="button ghost" href="/">
+            ← Back
+          </Link>
 
-        {status === "loading" ? (
-          <section className="account-card">
-            <p className="muted">Loading your settings...</p>
-          </section>
-        ) : status === "no-session" ? (
-          <section className="account-card">
-            <p className="muted">Sign in to manage your settings.</p>
-          </section>
-        ) : status === "error" ? (
-          <section className="account-card">
-            <p className="form-help error">Could not load settings.</p>
-          </section>
-        ) : (
-          <form
-            className="settings-layout"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void saveSettings();
-            }}
-          >
+          {status === "loading" ? (
             <section className="account-card">
+              <p className="muted">Loading your settings...</p>
+            </section>
+          ) : status === "no-session" ? (
+            <section className="account-card">
+              <p className="muted">Sign in to manage your settings.</p>
+            </section>
+          ) : status === "error" ? (
+            <section className="account-card">
+              <p className="form-help error">Could not load settings.</p>
+            </section>
+          ) : (
+            <form
+              className="settings-layout"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void saveSettings();
+              }}
+            >
+              <section className="account-card">
               <div className="account-card__header">
                 <div>
                   <h2>Profile Information</h2>
@@ -432,16 +433,17 @@ export default function AccountSettingsPage() {
               </p>
             ) : null}
 
-            <div className="account-create__actions">
-              <button className="button primary" type="submit" disabled={saveStatus.type === "loading"}>
-                {saveStatus.type === "loading" ? "Saving..." : "Save Settings"}
-              </button>
-              <button className="button ghost" type="button" onClick={() => void handleSignOut()} disabled={signingOut}>
-                {signingOut ? "Signing out..." : "Sign out"}
-              </button>
-            </div>
-          </form>
-        )}
+              <div className="account-create__actions">
+                <button className="button primary" type="submit" disabled={saveStatus.type === "loading"}>
+                  {saveStatus.type === "loading" ? "Saving..." : "Save Settings"}
+                </button>
+                <button className="button ghost" type="button" onClick={() => void handleSignOut()} disabled={signingOut}>
+                  {signingOut ? "Signing out..." : "Sign out"}
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
       </div>
     </>
   );
