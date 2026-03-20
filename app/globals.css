@@ -77,108 +77,23 @@ html[data-theme="dark"] .site-footer__social a:hover {
   color: #ffffff;
 }
 
-html[data-contrast="high"] .site-header,
-html[data-contrast="high"] .site-footer,
-html[data-contrast="high"] .cta-section {
-  background: #000000;
-  color: #f8fafc;
-  border-color: #f8fafc;
-}
 
-html[data-contrast="high"] body {
-  background: #000000;
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] a,
-html[data-contrast="high"] .nav__link,
-html[data-contrast="high"] .site-footer__column a,
-html[data-contrast="high"] .site-footer__social a {
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .site-footer__column h4,
-html[data-contrast="high"] .site-footer__social h4 {
-  color: #f8fafc;
-}
 
 html {
   scroll-behavior: smooth;
 }
 
-html[data-contrast="high"] .hero__title,
-html[data-contrast="high"] .hero__lede,
-html[data-contrast="high"] .hero__eyebrow,
-html[data-contrast="high"] .section__header h1,
-html[data-contrast="high"] .section__header h2,
-html[data-contrast="high"] .section__header p,
-html[data-contrast="high"] .eyebrow {
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .button.primary {
-  background: transparent;
-  color: #e95d2a;
-  border: 2px solid #e95d2a;
-  box-shadow: none;
-}
 
-html[data-contrast="high"] .button.ghost {
-  background: transparent;
-  color: #f8fafc;
-  border: 2px solid #f8fafc;
-}
 
-html[data-contrast="high"] .program-card,
-html[data-contrast="high"] .event-card,
-html[data-contrast="high"] .why-card {
-  background: #000000;
-  border-color: #f8fafc;
-  color: #f8fafc;
-  box-shadow: none;
-}
 
-html[data-contrast="high"] .event-card__title,
-html[data-contrast="high"] .event-card__meta,
-html[data-contrast="high"] .program-card h3,
-html[data-contrast="high"] .program-card .muted,
-html[data-contrast="high"] .why-list li,
-html[data-contrast="high"] .why-list li p,
-html[data-contrast="high"] .community-copy h3,
-html[data-contrast="high"] .community-copy p {
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .event-card__cta,
-html[data-contrast="high"] .program-card__icon,
-html[data-contrast="high"] .why-card__icon,
-html[data-contrast="high"] .hero__actions .button.ghost {
-  color: #e95d2a;
-  border-color: #e95d2a;
-}
 
-html[data-contrast="high"] .community-image {
-  box-shadow: none;
-}
 
-html[data-contrast="high"] .accessibility-panel,
-html[data-contrast="high"] .ada-toggle {
-  background: #000000;
-  color: #f8fafc;
-  border-color: #f8fafc;
-}
 
-html[data-contrast="high"] .chip {
-  background: #000000;
-  color: #f8fafc;
-  border-color: #f8fafc;
-}
 
-html[data-contrast="high"] .chip[aria-pressed="true"] {
-  background: #e95d2a;
-  color: #000000;
-  border-color: #e95d2a;
-}
 
 html[data-theme="dark"] .why-list li,
 html[data-theme="dark"] .why-list li p {
@@ -214,13 +129,6 @@ html[data-theme="dark"] .event-card__meta {
   color: #cbd5e1;
 }
 
-html[data-contrast="high"] {
-  --background: #000000;
-  --text: #f8fafc;
-  --muted: #e5e7eb;
-  --border: #f8fafc;
-  --accent: #e95d2a;
-}
 
 .highlight-links a {
   outline: 2px dashed currentColor;
@@ -378,9 +286,6 @@ html[data-theme="dark"] .font-controls__value {
   color: #e8edf7;
 }
 
-html[data-contrast="high"] .font-controls__value {
-  color: #e95d2a;
-}
 
 .shell {
   width: min(1100px, calc(100% - 32px));
@@ -1470,6 +1375,10 @@ html[data-contrast="high"] .font-controls__value {
   width: 100%;
 }
 
+html[data-theme="dark"] .settings-notifications__row .checkbox-label {
+  color: #f3ede7;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1738,28 +1647,9 @@ html[data-theme="dark"] .team-card__logo {
   border-color: #1f2a40;
 }
 
-html[data-contrast="high"] .account-header,
-html[data-contrast="high"] .account-card {
-  background: #000000;
-  border-color: #f8fafc;
-}
 
-html[data-contrast="high"] .account-nav__links a,
-html[data-contrast="high"] .list__title,
-html[data-contrast="high"] .stat__value {
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .account-card .muted,
-html[data-contrast="high"] .account-header__text .muted,
-html[data-contrast="high"] .stat__label {
-  color: #e5e7eb;
-}
 
-html[data-contrast="high"] .team-card {
-  background: #000000;
-  border-color: #f8fafc;
-}
 
 .search-panel {
   display: grid;
@@ -1960,36 +1850,10 @@ html[data-theme="dark"] .contact-form textarea:focus {
   background: rgba(255, 255, 255, 0.08);
 }
 
-html[data-contrast="high"] .contact-card {
-  background: #000000;
-  border-color: #f8fafc;
-  box-shadow: none;
-}
 
-html[data-contrast="high"] .contact-card--info {
-  background: #000000;
-}
 
-html[data-contrast="high"] .contact-form input,
-html[data-contrast="high"] .contact-form textarea {
-  background: #000000;
-  border-color: #f8fafc;
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .contact-form input:focus,
-html[data-contrast="high"] .contact-form textarea:focus {
-  border-color: #e95d2a;
-  box-shadow: 0 0 0 3px #e95d2a;
-  background: #000000;
-}
 
-html[data-contrast="high"] .contact-item .muted,
-html[data-contrast="high"] .contact-card .muted,
-html[data-contrast="high"] .contact-card h3,
-html[data-contrast="high"] .contact-card .list__title {
-  color: #f8fafc;
-}
 
 /* Events */
 .event-list {
@@ -2157,21 +2021,8 @@ html[data-contrast="high"] .contact-card .list__title {
   scroll-margin-top: 90px;
 }
 
-html[data-contrast="high"] .events-section {
-  background: transparent;
-}
 
-html[data-contrast="high"] .events-group {
-  background: #000000;
-  border-color: #f8fafc;
-  box-shadow: none;
-}
 
-html[data-contrast="high"] .events-jump select {
-  background: #000000;
-  color: #f8fafc;
-  border-color: #f8fafc;
-}
 
 .events-group__header h2 {
   margin: 6px 0 6px;
@@ -2578,42 +2429,11 @@ html[data-theme="dark"] .register-form textarea:focus {
   box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.2);
 }
 
-html[data-contrast="high"] .register-modal {
-  background: #000000;
-  border-color: #f8fafc;
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .register-modal__header,
-html[data-contrast="high"] .register-modal__footer {
-  border-color: #f8fafc;
-}
 
-html[data-contrast="high"] .register-form .form-control label,
-html[data-contrast="high"] .register-form .register-field-label {
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .register-form input,
-html[data-contrast="high"] .register-form select,
-html[data-contrast="high"] .register-form textarea {
-  background: #000000;
-  border-color: #f8fafc;
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .register-form input::placeholder,
-html[data-contrast="high"] .register-form textarea::placeholder {
-  color: #cbd5e1;
-}
 
-html[data-contrast="high"] .register-form input:focus,
-html[data-contrast="high"] .register-form select:focus,
-html[data-contrast="high"] .register-form textarea:focus {
-  border-color: #f8fafc;
-  box-shadow: 0 0 0 3px rgba(248, 250, 252, 0.35);
-  background: #000000;
-}
 
 @media (max-width: 720px) {
   .event-card-grid {
@@ -2747,11 +2567,6 @@ html[data-theme="dark"] .pill--muted {
   border-color: #1f2a40;
 }
 
-html[data-contrast="high"] .event-card-simple {
-  background: #000000;
-  border-color: #f8fafc;
-  box-shadow: none;
-}
 
 /* Soccer page */
 .soccer-hero {
@@ -3016,27 +2831,9 @@ html[data-theme="dark"] .soccer-card__media {
   background: #0c1526;
 }
 
-html[data-contrast="high"] .soccer-card {
-  background: #000000;
-  border-color: #f8fafc;
-  box-shadow: none;
-}
 
-html[data-contrast="high"] .soccer-card__media {
-  background: #0f172a;
-}
 
-html[data-contrast="high"] .sport-event-card {
-  background: #000000;
-  border-color: #f8fafc;
-  box-shadow: none;
-}
 
-html[data-contrast="high"] .sport-event-card__body h3,
-html[data-contrast="high"] .sport-event-card .muted,
-html[data-contrast="high"] .sport-event-card .sport-event__meta {
-  color: #f8fafc;
-}
 
 .soccer-section .league-card,
 .pickup-card {
@@ -3111,16 +2908,7 @@ html[data-theme="dark"] .run-club-overview__flyer img {
   border-color: #1f2a40;
 }
 
-html[data-contrast="high"] .run-club-overview {
-  background: #000000;
-  border-color: #f8fafc;
-  box-shadow: none;
-}
 
-html[data-contrast="high"] .run-club-overview__flyer img {
-  background: #000000;
-  border-color: #f8fafc;
-}
 
 @media (max-width: 900px) {
   .soccer-hero__grid {
@@ -3140,16 +2928,7 @@ html[data-contrast="high"] .run-club-overview__flyer img {
   }
 }
 
-html[data-contrast="high"] .pill {
-  border-color: #f8fafc;
-}
 
-html[data-contrast="high"] .pill--green,
-html[data-contrast="high"] .pill--amber,
-html[data-contrast="high"] .pill--muted {
-  background: #000000;
-  color: #f8fafc;
-}
 
 @media (max-width: 900px) {
   .search-panel {
@@ -3221,37 +3000,10 @@ html[data-theme="dark"] .account-form textarea:focus {
   background: rgba(255, 255, 255, 0.08);
 }
 
-html[data-contrast="high"] .account-create-modal,
-html[data-contrast="high"] .account-card {
-  background: #000000;
-  border-color: #f8fafc;
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .account-form .form-control label {
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .account-form input,
-html[data-contrast="high"] .account-form select,
-html[data-contrast="high"] .account-form textarea {
-  background: #000000;
-  border-color: #f8fafc;
-  color: #f8fafc;
-}
 
-html[data-contrast="high"] .account-form input::placeholder,
-html[data-contrast="high"] .account-form textarea::placeholder {
-  color: #cbd5e1;
-}
 
-html[data-contrast="high"] .account-form input:focus,
-html[data-contrast="high"] .account-form select:focus,
-html[data-contrast="high"] .account-form textarea:focus {
-  border-color: #f8fafc;
-  box-shadow: 0 0 0 3px rgba(248, 250, 252, 0.35);
-  background: #000000;
-}
 
 .community-stack {
   max-width: 1200px;

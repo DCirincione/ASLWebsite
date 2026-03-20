@@ -14,7 +14,6 @@ export function AccessibilityControls() {
       return {
         fontScale: 1,
         theme: "light" as const,
-        contrast: "off" as Toggle,
         highlightLinks: "off" as Toggle,
       };
     }
@@ -23,7 +22,6 @@ export function AccessibilityControls() {
       return {
         fontScale: 1,
         theme: "light" as const,
-        contrast: "off" as Toggle,
         highlightLinks: "off" as Toggle,
       };
     }
@@ -31,36 +29,31 @@ export function AccessibilityControls() {
       const parsed = JSON.parse(saved) as {
         fontScale?: number;
         theme?: "light" | "dark";
-        contrast?: Toggle;
         highlightLinks?: Toggle;
       };
       return {
         fontScale: parsed.fontScale ?? 1,
         theme: parsed.theme ?? ("light" as const),
-        contrast: parsed.contrast ?? ("off" as Toggle),
         highlightLinks: parsed.highlightLinks ?? ("off" as Toggle),
       };
     } catch {
       return {
         fontScale: 1,
         theme: "light" as const,
-        contrast: "off" as Toggle,
         highlightLinks: "off" as Toggle,
       };
     }
   };
 
-  const [fontScale, setFontScale] = useState(1);
-  const [theme, setTheme] = useState<"light" | "dark">("light");
-  const [contrast, setContrast] = useState<Toggle>("off");
-  const [highlightLinks, setHighlightLinks] = useState<Toggle>("off");
+  const [initialSettings] = useState(() => getSavedSettings());
+  const [fontScale, setFontScale] = useState(initialSettings.fontScale);
+  const [theme, setTheme] = useState<"light" | "dark">(initialSettings.theme);
+  const [highlightLinks, setHighlightLinks] = useState<Toggle>(initialSettings.highlightLinks);
   const [open, setOpen] = useState(false);
-  const [hydrated, setHydrated] = useState(false);
 
   const resetAll = () => {
     setFontScale(1);
     setTheme("light");
-    setContrast("off");
     setHighlightLinks("off");
     setOpen(false);
   };
@@ -71,21 +64,9 @@ export function AccessibilityControls() {
     setFontScale((prev) => Math.max(FONT_MIN, parseFloat((prev - FONT_STEP).toFixed(2))));
 
   useEffect(() => {
-    const saved = getSavedSettings();
-    setFontScale(saved.fontScale);
-    setTheme(saved.theme);
-    setContrast(saved.contrast);
-    setHighlightLinks(saved.highlightLinks);
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-
     const root = document.documentElement;
     root.dataset.fontScale = fontScale.toString();
     root.dataset.theme = theme;
-    root.dataset.contrast = contrast === "on" ? "high" : "normal";
     root.style.setProperty("--font-scale", fontScale.toString());
     if (highlightLinks === "on") {
       root.classList.add("highlight-links");
@@ -95,17 +76,12 @@ export function AccessibilityControls() {
     const toStore = {
       fontScale,
       theme,
-      contrast,
       highlightLinks,
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(toStore));
-  }, [fontScale, theme, contrast, highlightLinks, hydrated]);
+  }, [fontScale, theme, highlightLinks]);
 
   const toggleOpen = () => setOpen((prev) => !prev);
-
-  if (!hydrated) {
-    return null;
-  }
 
   return (
     <>
@@ -167,14 +143,6 @@ export function AccessibilityControls() {
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
           >
             {theme === "dark" ? "Light mode" : "Dark mode"}
-          </button>
-          <button
-            type="button"
-            className="chip"
-            aria-pressed={contrast === "on"}
-            onClick={() => setContrast(contrast === "on" ? "off" : "on")}
-          >
-            High contrast
           </button>
           <button
             type="button"
