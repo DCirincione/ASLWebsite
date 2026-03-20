@@ -1519,6 +1519,10 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   flex-shrink: 0;
 }
 
+.account-avatar img {
+  object-fit: cover;
+}
+
 .account-header__text h1 {
   margin: 4px 0 6px;
 }
