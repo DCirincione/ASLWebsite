@@ -6,14 +6,14 @@ import Link from "next/link";
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { supabase } from "@/lib/supabase/client";
 
+const PASSWORD_RESET_REDIRECT = "https://aldrichsports.com/reset-password";
+
 type SettingsFormState = {
   display_name: string;
   sports: string;
   about: string;
   email: string;
   birthday: string;
-  new_password: string;
-  confirm_password: string;
   profile_visibility: "public" | "members" | "private";
   friend_request_access: "everyone" | "players" | "none";
   email_event_updates: boolean;
@@ -29,8 +29,6 @@ const emptySettingsForm: SettingsFormState = {
   about: "",
   email: "",
   birthday: "",
-  new_password: "",
-  confirm_password: "",
   profile_visibility: "members",
   friend_request_access: "everyone",
   email_event_updates: true,
@@ -42,6 +40,7 @@ export default function AccountSettingsPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [settingsForm, setSettingsForm] = useState<SettingsFormState>(emptySettingsForm);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ type: "idle" });
+  const [passwordResetStatus, setPasswordResetStatus] = useState<SaveStatus>({ type: "idle" });
   const [currentEmail, setCurrentEmail] = useState("");
 
   useEffect(() => {
@@ -123,16 +122,6 @@ export default function AccountSettingsPage() {
       return;
     }
 
-    if (settingsForm.new_password && settingsForm.new_password.length < 8) {
-      setSaveStatus({ type: "error", message: "New password must be at least 8 characters." });
-      return;
-    }
-
-    if (settingsForm.new_password !== settingsForm.confirm_password) {
-      setSaveStatus({ type: "error", message: "Password confirmation does not match." });
-      return;
-    }
-
     setSaveStatus({ type: "loading" });
 
     const profilePayload = {
@@ -165,7 +154,6 @@ export default function AccountSettingsPage() {
 
     const payload: {
       email?: string;
-      password?: string;
       data: { settings: typeof settingsMetadata };
     } = {
       data: { settings: settingsMetadata },
@@ -173,10 +161,6 @@ export default function AccountSettingsPage() {
 
     if (email !== currentEmail) {
       payload.email = email;
-    }
-
-    if (settingsForm.new_password) {
-      payload.password = settingsForm.new_password;
     }
 
     const { data, error } = await supabase.auth.updateUser(payload);
@@ -194,8 +178,6 @@ export default function AccountSettingsPage() {
       sports: profilePayload.sports.join(", "),
       about: profilePayload.about ?? "",
       email: updatedEmail,
-      new_password: "",
-      confirm_password: "",
     }));
     setSaveStatus({
       type: "success",
@@ -203,6 +185,33 @@ export default function AccountSettingsPage() {
         payload.email && payload.email !== currentEmail
           ? "Settings saved. Check your email to confirm the new address."
           : "Settings saved.",
+    });
+  };
+
+  const sendPasswordResetEmail = async () => {
+    if (!supabase) {
+      setPasswordResetStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+    const email = currentEmail || settingsForm.email.trim();
+    if (!email) {
+      setPasswordResetStatus({ type: "error", message: "Add an email address first." });
+      return;
+    }
+
+    setPasswordResetStatus({ type: "loading" });
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: PASSWORD_RESET_REDIRECT,
+    });
+
+    if (error) {
+      setPasswordResetStatus({ type: "error", message: error.message });
+      return;
+    }
+
+    setPasswordResetStatus({
+      type: "success",
+      message: "Password reset email sent. Check your inbox for the reset link.",
     });
   };
 
@@ -327,25 +336,27 @@ export default function AccountSettingsPage() {
                     />
                   </div>
                   <div className="form-control">
-                    <label htmlFor="settings-password">New password</label>
-                    <input
-                      id="settings-password"
-                      type="password"
-                      value={settingsForm.new_password}
-                      onChange={(event) => updateSettingsForm("new_password", event.target.value)}
-                      placeholder="At least 8 characters"
-                    />
+                    <label htmlFor="settings-current-password">Password</label>
+                    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <input
+                        id="settings-current-password"
+                        type="password"
+                        value="********"
+                        readOnly
+                        aria-readonly="true"
+                      />
+                    </div>
                   </div>
-                  <div className="form-control">
-                    <label htmlFor="settings-password-confirm">Confirm new password</label>
-                    <input
-                      id="settings-password-confirm"
-                      type="password"
-                      value={settingsForm.confirm_password}
-                      onChange={(event) => updateSettingsForm("confirm_password", event.target.value)}
-                      placeholder="Repeat new password"
-                    />
-                  </div>
+                </div>
+                <div className="form-control" style={{ alignItems: "flex-start" }}>
+                  <button className="button ghost" type="button" onClick={() => void sendPasswordResetEmail()} disabled={passwordResetStatus.type === "loading"}>
+                    {passwordResetStatus.type === "loading" ? "Sending..." : "Send reset email"}
+                  </button>
+                  {passwordResetStatus.message ? (
+                    <p className={`form-help ${passwordResetStatus.type === "error" ? "error" : passwordResetStatus.type === "success" ? "success" : ""}`}>
+                      {passwordResetStatus.message}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </section>
