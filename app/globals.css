@@ -842,6 +842,7 @@ html[data-theme="dark"] .font-controls__value {
     box-shadow 0.15s ease,
     background 0.15s ease,
     border-color 0.15s ease;
+  cursor: pointer;
 }
 
 .button.primary {
@@ -851,8 +852,8 @@ html[data-theme="dark"] .font-controls__value {
   border-color: transparent;
 }
 
-.button.primary:hover {
-  transform: translateY(-1px);
+.button.primary:hover:not(:disabled) {
+  transform: translateY(-1px) scale(1.05);
   box-shadow: 0 14px 35px rgba(74, 214, 193, 0.25);
 }
 
@@ -861,9 +862,14 @@ html[data-theme="dark"] .font-controls__value {
   color: #111827;
 }
 
-.button.ghost:hover {
+.button.ghost:hover:not(:disabled) {
+  transform: scale(1.05);
   border-color: var(--border);
   background: rgba(0, 0, 0, 0.05);
+}
+
+.button:focus-visible:not(:disabled) {
+  transform: scale(1.05);
 }
 
 .feature-grid {
