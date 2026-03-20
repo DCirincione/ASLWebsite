@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { supabase } from "@/lib/supabase/client";
@@ -37,11 +38,13 @@ const emptySettingsForm: SettingsFormState = {
 };
 
 export default function AccountSettingsPage() {
+  const router = useRouter();
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [settingsForm, setSettingsForm] = useState<SettingsFormState>(emptySettingsForm);
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ type: "idle" });
   const [passwordResetStatus, setPasswordResetStatus] = useState<SaveStatus>({ type: "idle" });
   const [currentEmail, setCurrentEmail] = useState("");
+  const [signingOut, setSigningOut] = useState(false);
 
   useEffect(() => {
     const loadSettings = async () => {
@@ -213,6 +216,19 @@ export default function AccountSettingsPage() {
       type: "success",
       message: "Password reset email sent. Check your inbox for the reset link.",
     });
+  };
+
+  const handleSignOut = async () => {
+    if (!supabase) return;
+    setSigningOut(true);
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      setSaveStatus({ type: "error", message: error.message });
+      setSigningOut(false);
+      return;
+    }
+    setSigningOut(false);
+    router.replace("/account");
   };
 
   return (
@@ -421,6 +437,9 @@ export default function AccountSettingsPage() {
             <div className="account-create__actions">
               <button className="button primary" type="submit" disabled={saveStatus.type === "loading"}>
                 {saveStatus.type === "loading" ? "Saving..." : "Save Settings"}
+              </button>
+              <button className="button ghost" type="button" onClick={() => void handleSignOut()} disabled={signingOut}>
+                {signingOut ? "Signing out..." : "Sign out"}
               </button>
             </div>
           </form>

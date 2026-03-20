@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
@@ -103,6 +104,7 @@ const toProfileFormState = (profile: Profile | null): ProfileFormState => ({
 });
 
 export default function AccountPage() {
+  const router = useRouter();
   const [profile, setProfile] = useState<ProfileData | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [signingOut, setSigningOut] = useState(false);
@@ -138,7 +140,12 @@ export default function AccountPage() {
   const handleSignOut = async () => {
     if (!supabase) return;
     setSigningOut(true);
-    await supabase.auth.signOut();
+    const { error: signOutError } = await supabase.auth.signOut();
+    if (signOutError) {
+      setError(signOutError.message);
+      setSigningOut(false);
+      return;
+    }
     setProfile(null);
     setUserId(null);
     setStatus("no-session");
@@ -150,6 +157,7 @@ export default function AccountPage() {
     setSearchResults([]);
     setSuggestedProfiles([]);
     setSigningOut(false);
+    router.replace("/account");
   };
 
   const handleAvatarSelect = async (event: ChangeEvent<HTMLInputElement>) => {
