@@ -156,6 +156,7 @@ export type EventInsert = {
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
   registration_program_slug?: string | null;
+  sport_slug?: string | null;
   registration_enabled?: boolean | null;
   registration_schema?: JsonValue | null;
   waiver_url?: string | null;
@@ -175,6 +176,7 @@ export type EventUpdate = {
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
   registration_program_slug?: string | null;
+  sport_slug?: string | null;
   registration_enabled?: boolean | null;
   registration_schema?: JsonValue | null;
   waiver_url?: string | null;
@@ -257,6 +259,7 @@ export type Sport = {
   players_per_team?: number | null;
   gender?: "men" | "women" | "coed" | "open" | null;
   short_description?: string | null;
+  section_headers?: string[] | null;
   image_url?: string | null;
   created_at?: string | null;
 };
@@ -270,6 +273,7 @@ export type SportInsert = {
   players_per_team?: number | null;
   gender?: "men" | "women" | "coed" | "open" | null;
   short_description?: string | null;
+  section_headers?: string[] | null;
   image_url?: string | null;
   created_at?: string | null;
 };
@@ -283,6 +287,7 @@ export type SportUpdate = {
   players_per_team?: number | null;
   gender?: "men" | "women" | "coed" | "open" | null;
   short_description?: string | null;
+  section_headers?: string[] | null;
   image_url?: string | null;
   created_at?: string | null;
 };
@@ -582,9 +587,9 @@ export type Database = {
         Relationships: [];
       };
     };
-    Views: {};
-    Functions: {};
-    Enums: {};
-    CompositeTypes: {};
+    Views: Record<string, never>;
+    Functions: Record<string, never>;
+    Enums: Record<string, never>;
+    CompositeTypes: Record<string, never>;
   };
 };

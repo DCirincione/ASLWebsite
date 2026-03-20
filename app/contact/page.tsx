@@ -131,7 +131,7 @@ export default function ContactPage() {
                 <span className="contact-icon">📞</span>
                 <div>
                   <p className="list__title">Phone</p>
-                  <p className="muted">(631) 644-0871</p>
+                  <p className="muted">(631) 644-0871 / (631) 905-9595</p>
                 </div>
               </div>
               <div className="contact-item">

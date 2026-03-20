@@ -5,8 +5,9 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { createId } from "@/lib/create-id";
+import { parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
-import type { Event, Flyer } from "@/lib/supabase/types";
+import type { Event, Flyer, Sport } from "@/lib/supabase/types";
 
 type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type FormStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -47,6 +48,15 @@ type EventFormState = {
   registration_limit: string;
   require_waiver: boolean;
   registration_fields: RegistrationFieldEditor[];
+};
+type SportGender = NonNullable<Sport["gender"]>;
+type SportFormState = {
+  title: string;
+  players_per_team: string;
+  gender: SportGender;
+  short_description: string;
+  section_headers: string;
+  image_url: string;
 };
 type CommunityArticle = {
   id: string;
@@ -92,6 +102,7 @@ type UserManageForm = {
 };
 
 const FLYER_BUCKET = "flyers";
+const SPORT_GENDER_OPTIONS: SportGender[] = ["open", "coed", "men", "women"];
 const FIELD_TYPE_OPTIONS: RegistrationFieldType[] = [
   "text",
   "email",
@@ -174,25 +185,53 @@ const buildRegistrationSchema = (formState: EventFormState) => {
   };
 };
 
+const createEmptySportForm = (): SportFormState => ({
+  title: "",
+  players_per_team: "",
+  gender: "open",
+  short_description: "",
+  section_headers: "",
+  image_url: "",
+});
+
+const mapSportToForm = (sport: Sport): SportFormState => ({
+  title: sport.title ?? "",
+  players_per_team: sport.players_per_team?.toString() ?? "",
+  gender: sport.gender ?? "open",
+  short_description: sport.short_description ?? "",
+  section_headers: parseSportSectionHeaders(sport.section_headers).join("\n"),
+  image_url: sport.image_url ?? "",
+});
+
 export default function AdminPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
   const [activeModule, setActiveModule] = useState<AdminModule>("none");
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
+  const [sports, setSports] = useState<Sport[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [loadingSports, setLoadingSports] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deletingSportId, setDeletingSportId] = useState<string | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const [savingSportEditId, setSavingSportEditId] = useState<string | null>(null);
   const [uploadingCreateImage, setUploadingCreateImage] = useState(false);
   const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
+  const [uploadingCreateSportImage, setUploadingCreateSportImage] = useState(false);
+  const [uploadingEditSportImageId, setUploadingEditSportImageId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingSportId, setEditingSportId] = useState<string | null>(null);
   const [showCreateEventForm, setShowCreateEventForm] = useState(false);
+  const [showCreateSportForm, setShowCreateSportForm] = useState(false);
   const [showCreateArticleForm, setShowCreateArticleForm] = useState(false);
   const [showCommunityContentForm, setShowCommunityContentForm] = useState(false);
   const [formStatus, setFormStatus] = useState<FormStatus>({ type: "idle" });
+  const [sportsStatus, setSportsStatus] = useState<FormStatus>({ type: "idle" });
   const [communityStatus, setCommunityStatus] = useState<FormStatus>({ type: "idle" });
   const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [sportsError, setSportsError] = useState<string | null>(null);
   const [flyers, setFlyers] = useState<Flyer[]>([]);
   const [loadingFlyers, setLoadingFlyers] = useState(false);
   const [flyersError, setFlyersError] = useState<string | null>(null);
@@ -275,6 +314,8 @@ export default function AdminPage() {
     require_waiver: false,
     registration_fields: [],
   });
+  const [sportForm, setSportForm] = useState<SportFormState>(createEmptySportForm());
+  const [editSportForm, setEditSportForm] = useState<SportFormState>(createEmptySportForm());
   const adminModules: Array<{
     id: Exclude<AdminModule, "none">;
     title: string;
@@ -303,7 +344,7 @@ export default function AdminPage() {
       id: "sports",
       title: "Sports",
       description: "Manage sports pages and configurations.",
-      enabled: false,
+      enabled: true,
     },
     {
       id: "registrations",
@@ -347,6 +388,26 @@ export default function AdminPage() {
       setEventsError(error?.message ?? "Could not load events.");
     }
     setLoadingEvents(false);
+  };
+
+  const loadSports = async () => {
+    if (!supabase) return;
+    setLoadingSports(true);
+    setSportsError(null);
+
+    const { data, error } = await supabase
+      .from("sports")
+      .select("*")
+      .order("title", { ascending: true });
+
+    if (error) {
+      setSports([]);
+      setSportsError(error.message ?? "Could not load sports.");
+    } else {
+      setSports((data ?? []) as Sport[]);
+    }
+
+    setLoadingSports(false);
   };
 
   const loadFlyers = async () => {
@@ -588,6 +649,10 @@ export default function AdminPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateSport = <K extends keyof SportFormState>(key: K, value: SportFormState[K]) => {
+    setSportForm((prev) => ({ ...prev, [key]: value }));
+  };
+
   const resetForm = () => {
     setForm({
       title: "",
@@ -607,16 +672,32 @@ export default function AdminPage() {
     });
   };
 
+  const resetSportForm = () => {
+    setSportForm(createEmptySportForm());
+  };
+
   const openCreateEventForm = () => {
     resetForm();
     setFormStatus({ type: "idle" });
     setShowCreateEventForm(true);
   };
 
+  const openCreateSportForm = () => {
+    resetSportForm();
+    setSportsStatus({ type: "idle" });
+    setShowCreateSportForm(true);
+  };
+
   const closeCreateEventForm = () => {
     resetForm();
     setFormStatus({ type: "idle" });
     setShowCreateEventForm(false);
+  };
+
+  const closeCreateSportForm = () => {
+    resetSportForm();
+    setSportsStatus({ type: "idle" });
+    setShowCreateSportForm(false);
   };
 
   const startEditing = (event: Event) => {
@@ -641,12 +722,26 @@ export default function AdminPage() {
     setFormStatus({ type: "idle" });
   };
 
+  const startEditingSport = (sport: Sport) => {
+    setEditingSportId(sport.id);
+    setEditSportForm(mapSportToForm(sport));
+    setSportsStatus({ type: "idle" });
+  };
+
   const cancelEditing = () => {
     setEditingId(null);
   };
 
+  const cancelEditingSport = () => {
+    setEditingSportId(null);
+  };
+
   const updateEdit = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setEditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateEditSport = <K extends keyof SportFormState>(key: K, value: SportFormState[K]) => {
+    setEditSportForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const updateRegistrationField = (
@@ -937,13 +1032,13 @@ export default function AdminPage() {
 
   const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
-  const uploadEventImage = async (file: File) => {
+  const uploadManagedImage = async (folder: "events" | "sports", file: File) => {
     if (!supabase) {
       throw new Error("Supabase is not configured.");
     }
     const ext = file.name.split(".").pop()?.toLowerCase() || "png";
     const baseName = file.name.replace(new RegExp(`\\.${ext}$`, "i"), "");
-    const path = `events/${createId()}-${safeFileName(baseName)}.${ext}`;
+    const path = `${folder}/${createId()}-${safeFileName(baseName)}.${ext}`;
     const { data, error } = await supabase.storage.from(EVENT_IMAGE_BUCKET).upload(path, file, {
       cacheControl: "3600",
       upsert: false,
@@ -964,7 +1059,7 @@ export default function AdminPage() {
     }
     try {
       setUploadingCreateImage(true);
-      const publicUrl = await uploadEventImage(file);
+      const publicUrl = await uploadManagedImage("events", file);
       update("image_url", publicUrl);
       setFormStatus({ type: "success", message: "Image uploaded. The generated URL was added to the field. Click Create Event to save it." });
     } catch (error) {
@@ -1046,7 +1141,7 @@ export default function AdminPage() {
     }
     try {
       setUploadingEditImageId(eventId);
-      const publicUrl = await uploadEventImage(file);
+      const publicUrl = await uploadManagedImage("events", file);
       const { error } = await supabase
         .from("events")
         .update({ image_url: publicUrl })
@@ -1064,6 +1159,155 @@ export default function AdminPage() {
       setFormStatus({ type: "error", message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})` });
     } finally {
       setUploadingEditImageId(null);
+      e.target.value = "";
+    }
+  };
+
+  const buildSportPayload = (state: SportFormState) => {
+    const sectionHeaders = state.section_headers
+      .split("\n")
+      .map((value) => value.trim())
+      .filter(Boolean);
+
+    return {
+      title: state.title.trim(),
+      players_per_team: state.players_per_team.trim() ? Number(state.players_per_team) : null,
+      gender: state.gender || null,
+      short_description: state.short_description.trim() || null,
+      ...(sectionHeaders.length > 0 ? { section_headers: sectionHeaders } : {}),
+      image_url: state.image_url.trim() || null,
+    };
+  };
+
+  const handleCreateSport = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) {
+      setSportsStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+
+    if (!sportForm.title.trim()) {
+      setSportsStatus({ type: "error", message: "Sport title is required." });
+      return;
+    }
+
+    const slug = slugifySportValue(sportForm.title);
+    if (!slug) {
+      setSportsStatus({ type: "error", message: "Sport slug is required." });
+      return;
+    }
+
+    setSportsStatus({ type: "loading" });
+    const { error } = await supabase.from("sports").insert(buildSportPayload(sportForm));
+
+    if (error) {
+      setSportsStatus({ type: "error", message: error.message });
+      return;
+    }
+
+    setSportsStatus({ type: "success", message: "Sport created." });
+    resetSportForm();
+    setShowCreateSportForm(false);
+    await loadSports();
+  };
+
+  const handleSaveSportEdit = async (sportId: string) => {
+    if (!supabase) return;
+    if (!editSportForm.title.trim()) {
+      setSportsStatus({ type: "error", message: "Sport title is required." });
+      return;
+    }
+
+    const slug = slugifySportValue(editSportForm.title);
+    if (!slug) {
+      setSportsStatus({ type: "error", message: "Sport slug is required." });
+      return;
+    }
+
+    setSavingSportEditId(sportId);
+    const { error } = await supabase.from("sports").update(buildSportPayload(editSportForm)).eq("id", sportId);
+    setSavingSportEditId(null);
+
+    if (error) {
+      setSportsStatus({ type: "error", message: `Could not update sport: ${error.message}` });
+      return;
+    }
+
+    setSportsStatus({ type: "success", message: "Sport updated." });
+    setEditingSportId(null);
+    await loadSports();
+  };
+
+  const handleDeleteSport = async (sportId: string, title: string) => {
+    if (!supabase) return;
+    const confirmed = window.confirm(`Delete "${title}"? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingSportId(sportId);
+    const { error } = await supabase.from("sports").delete().eq("id", sportId);
+    setDeletingSportId(null);
+
+    if (error) {
+      setSportsStatus({ type: "error", message: `Could not delete sport: ${error.message}` });
+      return;
+    }
+
+    setSportsStatus({ type: "success", message: "Sport deleted." });
+    await loadSports();
+  };
+
+  const handleCreateSportImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setSportsStatus({ type: "error", message: "Please select a valid image file." });
+      return;
+    }
+    try {
+      setUploadingCreateSportImage(true);
+      const publicUrl = await uploadManagedImage("sports", file);
+      updateSport("image_url", publicUrl);
+      setSportsStatus({ type: "success", message: "Image uploaded. The generated URL was added to the field. Click Create Sport to save it." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload image.";
+      setSportsStatus({ type: "error", message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})` });
+    } finally {
+      setUploadingCreateSportImage(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleEditSportImageUpload = async (sportId: string, e: ChangeEvent<HTMLInputElement>) => {
+    if (!supabase) {
+      setSportsStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setSportsStatus({ type: "error", message: "Please select a valid image file." });
+      return;
+    }
+
+    try {
+      setUploadingEditSportImageId(sportId);
+      const publicUrl = await uploadManagedImage("sports", file);
+      const { error } = await supabase
+        .from("sports")
+        .update({ image_url: publicUrl })
+        .eq("id", sportId);
+
+      if (error) throw error;
+
+      updateEditSport("image_url", publicUrl);
+      setSports((prev) => prev.map((item) => (item.id === sportId ? { ...item, image_url: publicUrl } : item)));
+      setSportsStatus({ type: "success", message: "Image uploaded and saved to this sport." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload image.";
+      setSportsStatus({ type: "error", message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})` });
+    } finally {
+      setUploadingEditSportImageId(null);
       e.target.value = "";
     }
   };
@@ -1186,6 +1430,9 @@ export default function AdminPage() {
     setActiveModule(module);
     if (module === "events") {
       void loadEvents();
+    }
+    if (module === "sports") {
+      void loadSports();
     }
     if (module === "registrations") {
       void loadRegistrations();
@@ -1595,6 +1842,104 @@ export default function AdminPage() {
   const flyerByEventId = new Map(
     flyers.filter((flyer) => flyer.event_id).map((flyer) => [flyer.event_id as string, flyer])
   );
+  const renderSportFormFields = (
+    state: SportFormState,
+    target: "create" | "edit",
+    sportId?: string
+  ) => {
+    const updateField = target === "create" ? updateSport : updateEditSport;
+    const isUploading = target === "create" ? uploadingCreateSportImage : uploadingEditSportImageId === sportId;
+
+    return (
+      <>
+        <div className="register-form-grid">
+          <div className="form-control">
+            <label htmlFor={`${target}-sport-title`}>Sport Title *</label>
+            <input
+              id={`${target}-sport-title`}
+              value={state.title}
+              onChange={(e) => updateField("title", e.target.value)}
+              required
+            />
+          </div>
+          <div className="form-control">
+            <label htmlFor={`${target}-sport-players`}>Players per team</label>
+            <input
+              id={`${target}-sport-players`}
+              type="number"
+              min="1"
+              value={state.players_per_team}
+              onChange={(e) => updateField("players_per_team", e.target.value)}
+            />
+          </div>
+          <div className="form-control">
+            <label htmlFor={`${target}-sport-gender`}>Gender</label>
+            <select
+              id={`${target}-sport-gender`}
+              value={state.gender}
+              onChange={(e) => updateField("gender", e.target.value as SportGender)}
+            >
+              {SPORT_GENDER_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="form-control">
+            <label htmlFor={`${target}-sport-image`}>Image URL</label>
+            <input
+              id={`${target}-sport-image`}
+              value={state.image_url}
+              onChange={(e) => updateField("image_url", e.target.value)}
+            />
+            <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <label className="button ghost" htmlFor={`${target}-sport-image-upload`} style={{ padding: "0.45rem 0.75rem" }}>
+                {isUploading ? "Uploading..." : "Upload an image manually"}
+              </label>
+              <input
+                id={`${target}-sport-image-upload`}
+                type="file"
+                accept="image/*"
+                onChange={(e) =>
+                  target === "create"
+                    ? void handleCreateSportImageUpload(e)
+                    : sportId
+                      ? void handleEditSportImageUpload(sportId, e)
+                      : undefined
+                }
+                disabled={Boolean(isUploading)}
+                style={{ display: "none" }}
+              />
+            </div>
+          </div>
+        </div>
+        <div className="form-control">
+          <label htmlFor={`${target}-sport-description`}>Short Description</label>
+          <textarea
+            id={`${target}-sport-description`}
+            value={state.short_description}
+            onChange={(e) => updateField("short_description", e.target.value)}
+            rows={4}
+            placeholder="Leagues, clinics, and special events."
+          />
+        </div>
+        <div className="form-control">
+          <label htmlFor={`${target}-sport-sections`}>Section Headers</label>
+          <textarea
+            id={`${target}-sport-sections`}
+            value={state.section_headers}
+            onChange={(e) => updateField("section_headers", e.target.value)}
+            rows={5}
+            placeholder={"Leagues\nTournaments\nEvents"}
+          />
+          <p className="form-help muted">
+            One section per line. The page URL is auto-built from the title, and events are grouped by registration slug prefixes like `{slugifySportValue(state.title) || "sport"}-league`.
+          </p>
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className="account-page">
@@ -1996,6 +2341,114 @@ export default function AdminPage() {
                 </div>
               ) : null}
             </section>
+              </>
+            ) : null}
+            {activeModule === "sports" ? (
+              <>
+                <section className="account-card">
+                  <h2>Sports Manager</h2>
+                  <p className="muted">Create sport pages and control which section headers appear on each one.</p>
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Create Sport</h2>
+                      <p className="muted">Open the sport builder when you want to add a new sport page.</p>
+                    </div>
+                    {!showCreateSportForm ? (
+                      <button className="button primary" type="button" onClick={openCreateSportForm}>
+                        Create Sport
+                      </button>
+                    ) : null}
+                  </div>
+                  {showCreateSportForm ? (
+                    <form className="register-form" onSubmit={handleCreateSport}>
+                      {renderSportFormFields(sportForm, "create")}
+                      <div className="cta-row">
+                        <button className="button primary" type="submit" disabled={sportsStatus.type === "loading"}>
+                          {sportsStatus.type === "loading" ? "Saving..." : "Create Sport"}
+                        </button>
+                        <button className="button ghost" type="button" onClick={closeCreateSportForm}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+                  {sportsStatus.message ? (
+                    <p className={`form-help ${sportsStatus.type === "error" ? "error" : "muted"}`}>{sportsStatus.message}</p>
+                  ) : null}
+                </section>
+
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Existing Sports</h2>
+                      <p className="muted">Edit the sport page metadata and section configuration.</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => void loadSports()} disabled={loadingSports}>
+                      {loadingSports ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  {loadingSports ? <p className="muted">Loading sports...</p> : null}
+                  {sportsError ? <p className="form-help error">{sportsError}</p> : null}
+                  {!loadingSports && sports.length === 0 ? <p className="muted">No sports found.</p> : null}
+                  {!loadingSports && sports.length > 0 ? (
+                    <div className="event-list">
+                      {sports.map((sport) => (
+                        <article key={sport.id} className="event-card-simple">
+                          <div className="event-card__header">
+                            <h3>{sport.title}</h3>
+                          </div>
+                          <div className="event-card__meta">
+                            <p className="muted">Page: /sports/{slugifySportValue(sport.title)}</p>
+                            {sport.players_per_team ? <p className="muted">Players per team: {sport.players_per_team}</p> : null}
+                            {sport.gender ? <p className="muted">Gender: {sport.gender}</p> : null}
+                            {parseSportSectionHeaders(sport.section_headers).length > 0 ? (
+                              <p className="muted">Sections: {parseSportSectionHeaders(sport.section_headers).join(", ")}</p>
+                            ) : null}
+                          </div>
+                          {sport.short_description ? <p className="muted">{sport.short_description}</p> : null}
+                          <div className="cta-row">
+                            <button
+                              className="button ghost"
+                              type="button"
+                              onClick={() => startEditingSport(sport)}
+                              disabled={editingSportId === sport.id && savingSportEditId === sport.id}
+                            >
+                              {editingSportId === sport.id ? "Editing" : "Edit"}
+                            </button>
+                            <button
+                              className="button ghost"
+                              type="button"
+                              onClick={() => void handleDeleteSport(sport.id, sport.title)}
+                              disabled={deletingSportId === sport.id}
+                            >
+                              {deletingSportId === sport.id ? "Deleting..." : "Delete"}
+                            </button>
+                          </div>
+                          {editingSportId === sport.id ? (
+                            <div className="register-form" style={{ marginTop: 12 }}>
+                              {renderSportFormFields(editSportForm, "edit", sport.id)}
+                              <div className="cta-row">
+                                <button
+                                  className="button primary"
+                                  type="button"
+                                  onClick={() => void handleSaveSportEdit(sport.id)}
+                                  disabled={savingSportEditId === sport.id}
+                                >
+                                  {savingSportEditId === sport.id ? "Saving..." : "Save"}
+                                </button>
+                                <button className="button ghost" type="button" onClick={cancelEditingSport}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : null}
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
               </>
             ) : null}
             {activeModule === "community" ? (

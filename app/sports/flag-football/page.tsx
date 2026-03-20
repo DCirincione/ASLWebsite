@@ -20,8 +20,8 @@ const eventSlug = (registrationSlug?: string | null) => (registrationSlug ?? "")
 const bucketFromSlug = (registrationSlug?: string | null): EventBucket => {
   const value = eventSlug(registrationSlug);
 
-  if (value.startsWith("football-league") || value.startsWith("youth-football-league")) return "league";
-  if (value.startsWith("football-event") || value.startsWith("youth-football-event")) return "event";
+  if (value.startsWith("football-league")) return "league";
+  if (value.startsWith("football-event")) return "event";
 
   return "other";
 };
@@ -49,9 +49,7 @@ export default function FlagFootballPage() {
           const slug = eventSlug(row.registration_program_slug);
           return (
             slug.startsWith("football-event") ||
-            slug.startsWith("football-league") ||
-            slug.startsWith("youth-football-league") ||
-            slug.startsWith("youth-football-event")
+            slug.startsWith("football-league")
           );
         });
         const mapped = flagFootballOnly.map((row) => ({
@@ -72,7 +70,7 @@ export default function FlagFootballPage() {
     const leagues = events.filter((ev) => bucketFromSlug(ev.registration_program_slug) === "league");
     const featuredEvents = events.filter((ev) => {
       const slug = eventSlug(ev.registration_program_slug);
-      return bucketFromSlug(slug) === "event" || slug.startsWith("youth-football-league");
+      return bucketFromSlug(slug) === "event";
     });
     return { leagues, featuredEvents };
   }, [events]);

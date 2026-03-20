@@ -1,20 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
+import { normalizeSportSlug, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type { Sport } from "@/lib/supabase/types";
 
-type SportCard = Sport & { activities?: string; slug: string };
-
-const toSlug = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
+type SportCard = Sport & { slug: string };
 
 const sportRouteBySlug: Record<string, string> = {
   baseball: "baseball",
@@ -68,7 +63,7 @@ const activityLabels: Record<string, string> = {
 };
 
 const getSportImageUrl = (sport: Pick<SportCard, "image_url" | "slug" | "title">) =>
-  sport.image_url || fallbackSportImages[sport.slug] || fallbackSportImages[toSlug(sport.title ?? "")] || undefined;
+  sport.image_url || fallbackSportImages[sport.slug] || fallbackSportImages[slugifySportValue(sport.title ?? "")] || undefined;
 
 export default function SportsPage() {
   const [sports, setSports] = useState<SportCard[]>(fallbackSports);
@@ -79,17 +74,14 @@ export default function SportsPage() {
       if (!supabase) return;
       const { data, error } = await supabase.from("sports").select("*").order("title", { ascending: true });
       if (!error && data) {
-        const mapped = (data as Sport[]).map((sport) => {
-          const slug = toSlug(sport.title ?? "sport");
-          return {
-            ...sport,
-            slug,
-          } as SportCard;
-        });
+        const mapped = (data as Sport[]).map((sport) => ({
+          ...sport,
+          slug: normalizeSportSlug(sport) || slugifySportValue(sport.title ?? "sport"),
+        }));
         setSports(mapped);
       }
     };
-    loadSports();
+    void loadSports();
   }, []);
 
   const scrollToSport = (value: string) => {
@@ -109,9 +101,9 @@ export default function SportsPage() {
 
   const options = [
     { value: "all", label: "All Sports" },
-    ...sports.map((s) => ({
-      value: s.slug,
-      label: s.title,
+    ...sports.map((sport) => ({
+      value: sport.slug,
+      label: sport.title,
     })),
   ];
 
@@ -138,9 +130,9 @@ export default function SportsPage() {
               scrollToSport(value);
             }}
           >
-            {options.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
+            {options.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
               </option>
             ))}
           </select>
@@ -148,19 +140,14 @@ export default function SportsPage() {
 
         <div className="sports-stack">
           {sports.map((sport, idx) => {
-            const id = sport.slug ?? toSlug(sport.title);
-            const sportRoute = sportRouteBySlug[id] ?? sportRouteBySlug[toSlug(sport.title)];
-            const activities =
-              sport.short_description ||
-              activityLabels[id] ||
-              activityLabels[toSlug(sport.title)] ||
-              "Leagues • Pickup • Tournaments";
+            const activities = sport.short_description || activityLabels[sport.slug] || "Leagues • Pickup • Tournaments";
             const bgImage = getSportImageUrl(sport);
             const tone = idx % 2 === 0 ? "sport-card--primary" : "sport-card--secondary";
+            const sportRoute = sportRouteBySlug[sport.slug] ?? sport.slug;
             return (
               <article
-                key={id}
-                id={id}
+                key={sport.id}
+                id={sport.slug}
                 className={`sport-card ${tone}`}
                 style={
                   {
@@ -170,22 +157,9 @@ export default function SportsPage() {
               >
                 <div className="sport-card__overlay">
                   <div className="sport-card__content">
-                    {sportRoute ? (
-                      <Link className="sport-card__cta" href={`/sports/${sportRoute}`}>
-                        Play {sport.title}
-                      </Link>
-                    ) : (
-                      <button
-                        className="sport-card__cta"
-                        type="button"
-                        onClick={() => {
-                          setSelected(sport.slug);
-                          scrollToSport(sport.slug);
-                        }}
-                      >
-                        Play {sport.title}
-                      </button>
-                    )}
+                    <Link className="sport-card__cta" href={`/sports/${sportRoute}`}>
+                      Play {sport.title}
+                    </Link>
                     <p className="sport-card__meta">{activities}</p>
                   </div>
                 </div>
