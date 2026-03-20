@@ -128,7 +128,10 @@ export default function AccountPage() {
   const [profiles, setProfiles] = useState<Record<string, ProfileSummary>>({});
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<ProfileSummary[]>([]);
+  const [suggestedProfiles, setSuggestedProfiles] = useState<ProfileSummary[]>([]);
   const [searchLoading, setSearchLoading] = useState(false);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -145,6 +148,7 @@ export default function AccountPage() {
     setTeams([]);
     setSearch("");
     setSearchResults([]);
+    setSuggestedProfiles([]);
     setSigningOut(false);
   };
 
@@ -331,6 +335,47 @@ export default function AccountPage() {
     loadTeams();
   }, [userId]);
 
+  useEffect(() => {
+    const loadSuggestedProfiles = async () => {
+      if (!supabase || !userId) {
+        setSuggestedProfiles([]);
+        return;
+      }
+
+      setSuggestionsLoading(true);
+      const { data, error: profilesError } = await supabase
+        .from("profiles")
+        .select("id,name,sports,skill_level,avatar_url")
+        .order("name", { ascending: true })
+        .limit(24);
+
+      if (profilesError || !data) {
+        setSuggestedProfiles([]);
+        setSuggestionsLoading(false);
+        return;
+      }
+
+      const existingIds = new Set<string>([
+        ...friends.map((friend) => friend.id),
+        ...requests.map((request) => (request.sender_id === userId ? request.receiver_id : request.sender_id)),
+        userId,
+      ]);
+
+      const suggestions = (data as ProfileSummary[]).filter((profile) => !existingIds.has(profile.id));
+      setSuggestedProfiles(suggestions);
+      setProfiles((prev) => {
+        const next = { ...prev };
+        for (const profile of suggestions) {
+          next[profile.id] = profile;
+        }
+        return next;
+      });
+      setSuggestionsLoading(false);
+    };
+
+    void loadSuggestedProfiles();
+  }, [friends, requests, userId]);
+
   // Load registered events
   useEffect(() => {
     const loadEvents = async () => {
@@ -490,6 +535,8 @@ export default function AccountPage() {
       inserted ?? { id: createId(), sender_id: userId, receiver_id: receiverId, status: "pending" },
       ...prev,
     ]);
+    setSearchResults((prev) => prev.filter((profile) => profile.id !== receiverId));
+    setSuggestedProfiles((prev) => prev.filter((profile) => profile.id !== receiverId));
 
     if (!profiles[receiverId]) {
       const { data: prof } = await supabase
@@ -913,6 +960,45 @@ export default function AccountPage() {
                 ))}
               </ul>
             )}
+          </section>
+          <section className="account-card" style={{ marginTop: 12 }}>
+            <div className="account-card__header">
+              <div>
+                <h3>People you may know</h3>
+                <p className="muted">Discover other players on the site.</p>
+              </div>
+              <button className="button ghost" type="button" onClick={() => setShowSuggestions((prev) => !prev)}>
+                {showSuggestions ? "Hide" : "Show People"}
+              </button>
+            </div>
+            {showSuggestions ? (
+              suggestionsLoading ? (
+                <p className="muted">Loading people...</p>
+              ) : suggestedProfiles.length === 0 ? (
+                <p className="muted">No new people to suggest right now.</p>
+              ) : (
+                <ul className="list list--grid">
+                  {suggestedProfiles.map((person) => (
+                    <li key={person.id} className="team-card">
+                      <div className="team-card__logo">
+                        <img src={person.avatar_url ?? "/avatar-placeholder.svg"} alt="" />
+                      </div>
+                      <div className="team-card__info">
+                        <p className="list__title">{person.name}</p>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <Link className="button ghost" href={`/profiles/${person.id}`}>
+                          View
+                        </Link>
+                        <button className="button primary" type="button" onClick={() => sendRequest(person.id)}>
+                          Add
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )
+            ) : null}
           </section>
           <section className="account-card" style={{ marginTop: 12 }}>
             <h3>Friend requests</h3>

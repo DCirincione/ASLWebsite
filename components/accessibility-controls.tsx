@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 type Toggle = "on" | "off";
 const FONT_MIN = 0.9;
@@ -50,6 +50,11 @@ export function AccessibilityControls() {
   const [theme, setTheme] = useState<"light" | "dark">(initialSettings.theme);
   const [highlightLinks, setHighlightLinks] = useState<Toggle>(initialSettings.highlightLinks);
   const [open, setOpen] = useState(false);
+  const isHydrated = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
 
   const resetAll = () => {
     setFontScale(1);
@@ -82,6 +87,10 @@ export function AccessibilityControls() {
   }, [fontScale, theme, highlightLinks]);
 
   const toggleOpen = () => setOpen((prev) => !prev);
+
+  if (!isHydrated) {
+    return null;
+  }
 
   return (
     <>
