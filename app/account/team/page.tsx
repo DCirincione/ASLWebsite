@@ -48,7 +48,7 @@ export default function AccountTeamPage() {
         return;
       }
 
-      setTeams(data ?? []);
+      setTeams((data ?? []) as TeamMembership[]);
       setStatus("ready");
     };
 

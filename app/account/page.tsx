@@ -396,11 +396,12 @@ export default function AccountPage() {
         .order("created_at", { ascending: false });
 
       if (!reqError && reqs) {
-        setRequests(reqs as FriendRequest[]);
+        const requestRows = reqs as FriendRequest[];
+        setRequests(requestRows);
 
         const peerIds = Array.from(
           new Set(
-            reqs
+            requestRows
               .map((r) => (r.sender_id === userId ? r.receiver_id : r.sender_id))
               .filter(Boolean)
           )
@@ -416,7 +417,7 @@ export default function AccountPage() {
               map[p.id] = p as ProfileSummary;
             }
             setProfiles(map);
-            const accepted = reqs
+            const accepted = requestRows
               .filter((r) => r.status === "accepted")
               .map((r) => {
                 const otherId = r.sender_id === userId ? r.receiver_id : r.sender_id;

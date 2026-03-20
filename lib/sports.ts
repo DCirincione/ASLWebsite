@@ -1,5 +1,10 @@
 import type { Event, Sport } from "@/lib/supabase/types";
 
+type SportSlugSource = {
+  title?: string | null;
+  slug?: string | null;
+};
+
 export const slugifySportValue = (value: string) =>
   value
     .trim()
@@ -7,7 +12,7 @@ export const slugifySportValue = (value: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
 
-export const normalizeSportSlug = (sport?: Pick<Sport, "slug" | "title"> | null) => {
+export const normalizeSportSlug = (sport?: SportSlugSource | null) => {
   if (!sport) return "";
   return slugifySportValue(sport.title?.trim() || sport.slug?.trim() || "");
 };
