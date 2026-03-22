@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase/client";
 
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
+const PASSWORD_RESET_REDIRECT = "https://aldrichsports.com/reset-password";
 
 type AccountSigninFormProps = {
   onSuccess?: () => void;
@@ -14,6 +15,7 @@ type AccountSigninFormProps = {
 export function AccountSigninForm({ onSuccess }: AccountSigninFormProps) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>({ type: "idle" });
+  const [resetStatus, setResetStatus] = useState<Status>({ type: "idle" });
   const [form, setForm] = useState({
     email: "",
     password: "",
@@ -21,6 +23,38 @@ export function AccountSigninForm({ onSuccess }: AccountSigninFormProps) {
 
   const update = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handlePasswordReset = async () => {
+    if (!supabase) {
+      setResetStatus({
+        type: "error",
+        message: "Supabase keys are missing. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.",
+      });
+      return;
+    }
+
+    const email = form.email.trim();
+    if (!email) {
+      setResetStatus({ type: "error", message: "Enter your email first to receive a reset link." });
+      return;
+    }
+
+    setResetStatus({ type: "loading" });
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: PASSWORD_RESET_REDIRECT,
+    });
+
+    if (error) {
+      setResetStatus({ type: "error", message: error.message });
+      return;
+    }
+
+    setResetStatus({
+      type: "success",
+      message: "Password reset email sent. Check your inbox for the reset link.",
+    });
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -74,8 +108,20 @@ export function AccountSigninForm({ onSuccess }: AccountSigninFormProps) {
           />
         </div>
       </div>
+      <div className="account-form__actions">
+        <button
+          className="account-form__link-action"
+          type="button"
+          onClick={() => void handlePasswordReset()}
+          disabled={resetStatus.type === "loading"}
+        >
+          {resetStatus.type === "loading" ? "Sending reset email..." : "Forgot your password?"}
+        </button>
+      </div>
       {status.type === "error" ? <p className="form-help error">{status.message}</p> : null}
       {status.type === "success" ? <p className="form-help success">{status.message}</p> : null}
+      {resetStatus.type === "error" ? <p className="form-help error">{resetStatus.message}</p> : null}
+      {resetStatus.type === "success" ? <p className="form-help success">{resetStatus.message}</p> : null}
       <button className="button primary" type="submit" disabled={status.type === "loading"}>
         {status.type === "loading" ? "Signing in..." : "Sign In"}
       </button>
