@@ -116,6 +116,33 @@ html[data-theme="dark"] .program-card {
   border-color: #1f2a40;
 }
 
+html[data-theme="dark"] .sunday-league-promo,
+html[data-theme="dark"] .sunday-league-panel-box,
+html[data-theme="dark"] .sunday-league-team-card,
+html[data-theme="dark"] .sunday-league-table-wrap {
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .sunday-league-panel-box,
+html[data-theme="dark"] .sunday-league-team-card,
+html[data-theme="dark"] .sunday-league-table-wrap {
+  background: linear-gradient(180deg, rgba(15, 25, 45, 0.92), rgba(12, 21, 38, 0.98));
+}
+
+html[data-theme="dark"] .sunday-league-sidebar__item {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .sunday-league-sidebar__item:hover,
+html[data-theme="dark"] .sunday-league-sidebar__item.is-active {
+  color: #ffffff;
+}
+
+html[data-theme="dark"] .sunday-league-table th,
+html[data-theme="dark"] .sunday-league-table td {
+  border-bottom-color: rgba(148, 163, 184, 0.2);
+}
+
 html[data-theme="dark"] .event-card {
   background: #0f192d;
   border-color: #1f2a40;
@@ -1022,6 +1049,266 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 .program-card h3 {
   margin: 0;
   color: #0f172a;
+}
+
+.sunday-league-page {
+  padding-top: 24px;
+}
+
+.sunday-league-page h1,
+.sunday-league-page h2,
+.sunday-league-page h3 {
+  margin: 0;
+  line-height: 1.05;
+}
+
+.sunday-league-page h1 {
+  font-size: clamp(2.2rem, 4vw, 3.2rem);
+}
+
+.sunday-league-page h2 {
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+}
+
+.sunday-league-page h3 {
+  font-size: clamp(1.1rem, 2vw, 1.35rem);
+}
+
+.sunday-league-topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+.sunday-league-topbar__title {
+  display: grid;
+  gap: 14px;
+}
+
+.sunday-league-topbar__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sunday-league-topbar__actions .button {
+  min-width: 160px;
+  justify-content: center;
+}
+
+.sunday-league-layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 36px;
+  align-items: start;
+}
+
+.sunday-league-sidebar {
+  display: grid;
+  gap: 10px;
+  position: sticky;
+  top: 96px;
+}
+
+.sunday-league-sidebar__item {
+  border: 0;
+  background: transparent;
+  color: #111827;
+  text-align: left;
+  font: inherit;
+  font-weight: 700;
+  font-size: 1.05rem;
+  line-height: 1.2;
+  padding: 10px 0;
+  cursor: pointer;
+  opacity: 0.72;
+  transition: transform 0.15s ease, opacity 0.15s ease, color 0.15s ease;
+}
+
+.sunday-league-sidebar__item:hover,
+.sunday-league-sidebar__item.is-active {
+  opacity: 1;
+  transform: translateX(8px);
+  color: #0f172a;
+}
+
+.sunday-league-main {
+  min-width: 0;
+}
+
+.sunday-league-main__content {
+  min-height: 620px;
+}
+
+.sunday-league-content__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.sunday-league-copy-block {
+  display: grid;
+  gap: 18px;
+}
+
+.sunday-league-copy-block p,
+.sunday-league-rule-box p,
+.sunday-league-schedule p,
+.sunday-league-inquiries p {
+  font-size: 1rem;
+  margin: 0;
+}
+
+.sunday-league-promo {
+  position: relative;
+  min-height: 520px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.sunday-league-promo img {
+  object-fit: cover;
+}
+
+.sunday-league-rule-box,
+.sunday-league-team-section,
+.sunday-league-leaderboard,
+.sunday-league-schedule,
+.sunday-league-inquiries {
+  display: grid;
+  gap: 22px;
+}
+
+.sunday-league-panel-box {
+  display: grid;
+  gap: 16px;
+  min-height: 440px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 28px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.sunday-league-team-header {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.sunday-league-division-pill {
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: #111827;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+}
+
+.sunday-league-team-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.sunday-league-team-card {
+  min-height: 260px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  display: grid;
+  align-content: space-between;
+  gap: 18px;
+  background: rgba(255, 255, 255, 0.58);
+}
+
+.sunday-league-team-card__logo {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  justify-self: center;
+}
+
+.sunday-league-team-card__logo img {
+  object-fit: contain;
+}
+
+.sunday-league-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.sunday-league-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 760px;
+}
+
+.sunday-league-table th,
+.sunday-league-table td {
+  padding: 16px 18px;
+  text-align: left;
+  border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+  font-weight: 700;
+}
+
+.sunday-league-table th {
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.sunday-league-schedule__date {
+  font-weight: 700;
+}
+
+.sunday-league-schedule__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+}
+
+.sunday-league-schedule__column {
+  display: grid;
+  gap: 14px;
+}
+
+.sunday-league-schedule__column h3 {
+  line-height: 1.05;
+}
+
+.sunday-league-inquiries__prompt {
+  font-weight: 700;
+}
+
+.sunday-league-inquiries__form {
+  display: grid;
+  gap: 18px;
+}
+
+.sunday-league-inquiries__form textarea {
+  width: 100%;
+  min-height: 260px;
+  border: 4px solid var(--border);
+  border-radius: 48px;
+  padding: 28px;
+  font: inherit;
+  font-size: 1rem;
+  background: transparent;
+  color: inherit;
+  resize: vertical;
+}
+
+.sunday-league-inquiries__actions {
+  display: flex;
+  justify-content: flex-end;
 }
 
 .why-grid {
@@ -2964,6 +3251,22 @@ html[data-theme="dark"] .run-club-overview__flyer img {
 
 
 @media (max-width: 900px) {
+  .sunday-league-topbar,
+  .sunday-league-layout,
+  .sunday-league-content__grid,
+  .sunday-league-schedule__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sunday-league-sidebar {
+    position: static;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sunday-league-team-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .soccer-hero__grid {
     grid-template-columns: 1fr;
   }
@@ -3007,6 +3310,24 @@ html[data-theme="dark"] .run-club-overview__flyer img {
 }
 
 @media (max-width: 720px) {
+  .sunday-league-sidebar {
+    grid-template-columns: 1fr;
+  }
+
+  .sunday-league-team-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sunday-league-topbar__actions .button {
+    width: 100%;
+  }
+
+  .sunday-league-inquiries__form textarea {
+    min-height: 220px;
+    border-radius: 28px;
+    font-size: 1.25rem;
+  }
+
   .account-header__info {
     flex-direction: column;
     align-items: flex-start;

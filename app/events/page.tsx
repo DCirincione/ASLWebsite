@@ -9,6 +9,7 @@ import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
+import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 
 type EventItem = {
   id: string;
@@ -175,6 +176,7 @@ export default function EventsPage() {
     const primaryDate = primaryDateLabel(event);
     const isRegistered = isRegisteredEvent(event.id);
     const canRegister = Boolean(event.registration_enabled);
+    const isSundayLeague = isRegularAslSundayLeagueEvent(event);
 
     return (
       <article key={event.id} className="event-card event-card--full">
@@ -183,10 +185,20 @@ export default function EventsPage() {
           role="button"
           tabIndex={0}
           aria-label={`Open details for ${event.title}`}
-          onClick={() => setDetailEvent(event)}
+          onClick={() => {
+            if (isSundayLeague) {
+              router.push(SUNDAY_LEAGUE_HREF);
+              return;
+            }
+            setDetailEvent(event);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
+              if (isSundayLeague) {
+                router.push(SUNDAY_LEAGUE_HREF);
+                return;
+              }
               setDetailEvent(event);
             }
           }}
@@ -217,40 +229,61 @@ export default function EventsPage() {
           </div>
           {event.description ? <p className="muted">{event.description}</p> : null}
           <div className="event-card__actions">
-            <button
-              className="button ghost"
-              type="button"
-              onClick={() => setDetailEvent(event)}
-            >
-              View Details
-            </button>
-            <button
-              className="button primary"
-              type="button"
-              onClick={() => {
-                if (!canRegister) {
-                  setMessage("Registration for this event is not available yet.");
-                  return;
-                }
-                if (isRegistered) {
-                  return;
-                }
-                if (!userId) {
-                  router.push("/account");
-                  return;
-                }
-                setModalEventId(event.id);
-                setModalTitle(event.title);
-                setModalOpen(true);
-              }}
-              disabled={!canRegister || isRegistered}
-            >
-              {!canRegister
-                ? "Registration coming soon"
-                : isRegistered
-                  ? "Registered"
-                  : "Register"}
-            </button>
+            {isSundayLeague ? (
+              <>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => router.push(SUNDAY_LEAGUE_HREF)}
+                >
+                  View Details
+                </button>
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => router.push(SUNDAY_LEAGUE_HREF)}
+                >
+                  Register
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => setDetailEvent(event)}
+                >
+                  View Details
+                </button>
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => {
+                    if (!canRegister) {
+                      setMessage("Registration for this event is not available yet.");
+                      return;
+                    }
+                    if (isRegistered) {
+                      return;
+                    }
+                    if (!userId) {
+                      router.push("/account");
+                      return;
+                    }
+                    setModalEventId(event.id);
+                    setModalTitle(event.title);
+                    setModalOpen(true);
+                  }}
+                  disabled={!canRegister || isRegistered}
+                >
+                  {!canRegister
+                    ? "Registration coming soon"
+                    : isRegistered
+                      ? "Registered"
+                      : "Register"}
+                </button>
+              </>
+            )}
           </div>
         </div>
       </article>

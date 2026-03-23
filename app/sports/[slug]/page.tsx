@@ -11,6 +11,7 @@ import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { getEventSectionLabel, normalizeSportSlug, parseSportSectionHeaders, slugifySportValue, sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
+import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 import type { Event, Sport } from "@/lib/supabase/types";
 
@@ -134,32 +135,52 @@ export default function DynamicSportPage() {
 
     return (
       <div className="list list--grid">
-        {list.map((item) => (
-          <article key={item.id} className="soccer-card">
-            <div className="soccer-card__media">
-              {item.image ? (
-                <Image src={item.image} alt="" fill sizes="(max-width: 900px) 100vw, 33vw" />
-              ) : null}
-            </div>
-            <div className="soccer-card__body">
-              <p className="list__title">{item.title}</p>
-              <p className="muted">{primaryTimeLabel(item)}</p>
-              <div className="cta-row">
-                <button className="button ghost" type="button" onClick={() => setDetailEvent(item)}>
-                  View Details
-                </button>
-                <button
-                  className="button primary"
-                  type="button"
-                  disabled={!item.registration_enabled || isRegisteredEvent(item.id)}
-                  onClick={() => openModal(item.id, item.title)}
-                >
-                  {!item.registration_enabled ? "Registration coming soon" : isRegisteredEvent(item.id) ? "Registered" : "Sign up"}
-                </button>
+        {list.map((item) => {
+          const isSundayLeague = isRegularAslSundayLeagueEvent(item);
+
+          return (
+            <article key={item.id} className="soccer-card">
+              <div className="soccer-card__media">
+                {item.image ? (
+                  <Image src={item.image} alt="" fill sizes="(max-width: 900px) 100vw, 33vw" />
+                ) : null}
               </div>
-            </div>
-          </article>
-        ))}
+              <div className="soccer-card__body">
+                <p className="list__title">{item.title}</p>
+                <p className="muted">{primaryTimeLabel(item)}</p>
+                <div className="cta-row">
+                  {isSundayLeague ? (
+                    <>
+                      <Link className="button ghost" href={SUNDAY_LEAGUE_HREF}>
+                        View Details
+                      </Link>
+                      <Link className="button primary" href={`${SUNDAY_LEAGUE_HREF}#join-team`}>
+                        Join a Team
+                      </Link>
+                      <Link className="button ghost" href={`${SUNDAY_LEAGUE_HREF}#create-team`}>
+                        Create a Team
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <button className="button ghost" type="button" onClick={() => setDetailEvent(item)}>
+                        View Details
+                      </button>
+                      <button
+                        className="button primary"
+                        type="button"
+                        disabled={!item.registration_enabled || isRegisteredEvent(item.id)}
+                        onClick={() => openModal(item.id, item.title)}
+                      >
+                        {!item.registration_enabled ? "Registration coming soon" : isRegisteredEvent(item.id) ? "Registered" : "Sign up"}
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            </article>
+          );
+        })}
       </div>
     );
   };
@@ -171,30 +192,50 @@ export default function DynamicSportPage() {
 
     return (
       <div className="sport-event-list">
-        {list.map((event) => (
-          <article key={event.id} className="sport-event-card">
-            <div className="sport-event-card__body">
-              <p className="eyebrow">{sportTitle}</p>
-              <h3>{event.title}</h3>
-              <p className="sport-event__meta">
-                <span>{primaryTimeLabel(event)}</span>
-              </p>
-              <div className="sport-event__actions">
-                <button className="button ghost" type="button" onClick={() => setDetailEvent(event)}>
-                  View Details
-                </button>
-                <button
-                  className="button primary"
-                  type="button"
-                  disabled={!event.registration_enabled || isRegisteredEvent(event.id)}
-                  onClick={() => openModal(event.id, event.title)}
-                >
-                  {!event.registration_enabled ? "Registration coming soon" : isRegisteredEvent(event.id) ? "Registered" : "Sign up"}
-                </button>
+        {list.map((event) => {
+          const isSundayLeague = isRegularAslSundayLeagueEvent(event);
+
+          return (
+            <article key={event.id} className="sport-event-card">
+              <div className="sport-event-card__body">
+                <p className="eyebrow">{sportTitle}</p>
+                <h3>{event.title}</h3>
+                <p className="sport-event__meta">
+                  <span>{primaryTimeLabel(event)}</span>
+                </p>
+                <div className="sport-event__actions">
+                  {isSundayLeague ? (
+                    <>
+                      <Link className="button ghost" href={SUNDAY_LEAGUE_HREF}>
+                        View Details
+                      </Link>
+                      <Link className="button primary" href={`${SUNDAY_LEAGUE_HREF}#join-team`}>
+                        Join a Team
+                      </Link>
+                      <Link className="button ghost" href={`${SUNDAY_LEAGUE_HREF}#create-team`}>
+                        Create a Team
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      <button className="button ghost" type="button" onClick={() => setDetailEvent(event)}>
+                        View Details
+                      </button>
+                      <button
+                        className="button primary"
+                        type="button"
+                        disabled={!event.registration_enabled || isRegisteredEvent(event.id)}
+                        onClick={() => openModal(event.id, event.title)}
+                      >
+                        {!event.registration_enabled ? "Registration coming soon" : isRegisteredEvent(event.id) ? "Registered" : "Sign up"}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
     );
   };

@@ -1,11 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { EventDetailModal } from "@/components/event-detail-modal";
 import { RegistrationModal } from "@/components/registration-modal";
 import { supabase } from "@/lib/supabase/client";
+import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 
 type HomeEvent = {
@@ -137,6 +139,7 @@ export function HomeUpcomingEvents() {
         {events.map((event, idx) => {
           const canRegister = Boolean(event.registration_enabled);
           const isRegistered = isRegisteredEvent(event.id);
+          const isSundayLeague = isRegularAslSundayLeagueEvent(event);
           return (
             <article key={`${event.id}-${idx}`} className="event-card">
               <div
@@ -160,32 +163,48 @@ export function HomeUpcomingEvents() {
                     </div>
                   </div>
                   <div className="cta-row">
-                    <button className="button ghost" type="button" onClick={() => setDetailEvent(event)}>
-                      View Details
-                    </button>
-                    <button
-                      className="button primary"
-                      type="button"
-                      onClick={() => {
-                        if (!canRegister) {
-                          setMessage("Registration for this event is not available yet.");
-                          return;
-                        }
-                        if (isRegistered) {
-                          return;
-                        }
-                        if (!userId) {
-                          router.push("/account");
-                          return;
-                        }
-                        setModalEventId(event.id);
-                        setModalTitle(event.title);
-                        setModalOpen(true);
-                      }}
-                      disabled={!canRegister || isRegistered}
-                    >
-                      {!canRegister ? "Registration coming soon" : isRegistered ? "Registered" : "Register"}
-                    </button>
+                    {isSundayLeague ? (
+                      <>
+                        <Link className="button ghost" href={SUNDAY_LEAGUE_HREF}>
+                          View Details
+                        </Link>
+                        <Link className="button primary" href={`${SUNDAY_LEAGUE_HREF}#join-team`}>
+                          Join a Team
+                        </Link>
+                        <Link className="button ghost" href={`${SUNDAY_LEAGUE_HREF}#create-team`}>
+                          Create a Team
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <button className="button ghost" type="button" onClick={() => setDetailEvent(event)}>
+                          View Details
+                        </button>
+                        <button
+                          className="button primary"
+                          type="button"
+                          onClick={() => {
+                            if (!canRegister) {
+                              setMessage("Registration for this event is not available yet.");
+                              return;
+                            }
+                            if (isRegistered) {
+                              return;
+                            }
+                            if (!userId) {
+                              router.push("/account");
+                              return;
+                            }
+                            setModalEventId(event.id);
+                            setModalTitle(event.title);
+                            setModalOpen(true);
+                          }}
+                          disabled={!canRegister || isRegistered}
+                        >
+                          {!canRegister ? "Registration coming soon" : isRegistered ? "Registered" : "Register"}
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
