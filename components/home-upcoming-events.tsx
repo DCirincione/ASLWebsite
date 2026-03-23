@@ -162,18 +162,23 @@ export function HomeUpcomingEvents() {
                       <span>{event.location || "Location TBD"}</span>
                     </div>
                   </div>
-                  <div className="cta-row">
+                  <div className="event-card__actions">
                     {isSundayLeague ? (
                       <>
-                        <Link className="button ghost" href={SUNDAY_LEAGUE_HREF}>
+                        <button
+                          className="button ghost"
+                          type="button"
+                          onClick={() => router.push(SUNDAY_LEAGUE_HREF)}
+                        >
                           View Details
-                        </Link>
-                        <Link className="button primary" href={`${SUNDAY_LEAGUE_HREF}#join-team`}>
-                          Join a Team
-                        </Link>
-                        <Link className="button ghost" href={`${SUNDAY_LEAGUE_HREF}#create-team`}>
-                          Create a Team
-                        </Link>
+                        </button>
+                        <button
+                          className="button primary"
+                          type="button"
+                          onClick={() => router.push(SUNDAY_LEAGUE_HREF)}
+                        >
+                          Register
+                        </button>
                       </>
                     ) : (
                       <>

@@ -2217,6 +2217,26 @@ html[data-theme="dark"] .contact-form textarea:focus {
   background: rgba(255, 255, 255, 0.08);
 }
 
+html[data-theme="dark"] .sunday-league-inquiries__form input,
+html[data-theme="dark"] .sunday-league-inquiries__form textarea {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #1f2a40;
+  color: #e8edf7;
+}
+
+html[data-theme="dark"] .sunday-league-inquiries__form input::placeholder,
+html[data-theme="dark"] .sunday-league-inquiries__form textarea::placeholder {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .sunday-league-inquiries__form input:focus,
+html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
+  border-color: rgba(233, 93, 42, 0.6);
+  box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #e8edf7;
+}
+
 
 
 
