@@ -81,6 +81,8 @@ type ContactMessage = {
   name: string;
   email: string;
   message: string;
+  is_read?: boolean | null;
+  read_at?: string | null;
   created_at?: string | null;
 };
 type UserDirectoryRecord = {
@@ -100,6 +102,7 @@ type UserManageForm = {
   status: "active" | "suspended";
   reason: string;
 };
+type ContactFilter = "all" | "unread" | "read";
 
 const FLYER_BUCKET = "flyers";
 const SPORT_GENDER_OPTIONS: SportGender[] = ["open", "coed", "men", "women"];
@@ -113,6 +116,14 @@ const FIELD_TYPE_OPTIONS: RegistrationFieldType[] = [
   "checkbox",
   "file",
 ];
+
+const isMissingContactReadColumnError = (message?: string | null) =>
+  typeof message === "string" &&
+  (message.includes("Could not find the 'is_read' column") ||
+    message.includes("Could not find the 'read_at' column") ||
+    message.includes("column contact_messages.is_read does not exist") ||
+    message.includes("column contact_messages.read_at does not exist") ||
+    message.includes("schema cache"));
 
 const slugifyFieldName = (value: string) =>
   value
@@ -249,6 +260,9 @@ export default function AdminPage() {
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   const [loadingContactMessages, setLoadingContactMessages] = useState(false);
   const [contactMessagesError, setContactMessagesError] = useState<string | null>(null);
+  const [contactFilter, setContactFilter] = useState<ContactFilter>("all");
+  const [contactSearch, setContactSearch] = useState("");
+  const [savingContactMessageId, setSavingContactMessageId] = useState<string | null>(null);
   const [users, setUsers] = useState<UserDirectoryRecord[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
@@ -485,19 +499,64 @@ export default function AdminPage() {
     setLoadingContactMessages(true);
     setContactMessagesError(null);
 
-    const { data, error } = await supabase
+    const fullQuery = await supabase
       .from("contact_messages")
-      .select("id,name,email,message,created_at")
+      .select("id,name,email,message,is_read,read_at,created_at")
       .order("created_at", { ascending: false });
 
-    if (error) {
+    if (fullQuery.error && isMissingContactReadColumnError(fullQuery.error.message)) {
+      const legacyQuery = await supabase
+        .from("contact_messages")
+        .select("id,name,email,message,created_at")
+        .order("created_at", { ascending: false });
+
+      if (legacyQuery.error) {
+        setContactMessages([]);
+        setContactMessagesError(legacyQuery.error.message ?? "Could not load contact messages.");
+      } else {
+        setContactMessages((legacyQuery.data ?? []) as ContactMessage[]);
+      }
+    } else if (fullQuery.error) {
       setContactMessages([]);
-      setContactMessagesError(error.message ?? "Could not load contact messages.");
+      setContactMessagesError(fullQuery.error.message ?? "Could not load contact messages.");
     } else {
-      setContactMessages((data ?? []) as ContactMessage[]);
+      setContactMessages((fullQuery.data ?? []) as ContactMessage[]);
     }
 
     setLoadingContactMessages(false);
+  };
+
+  const markContactMessageRead = async (messageId: string) => {
+    if (!supabase) return;
+    setSavingContactMessageId(messageId);
+    setContactMessagesError(null);
+
+    const readAt = new Date().toISOString();
+    const { error } = await supabase
+      .from("contact_messages")
+      .update({
+        is_read: true,
+        read_at: readAt,
+      })
+      .eq("id", messageId);
+
+    if (error) {
+      if (isMissingContactReadColumnError(error.message)) {
+        setContactMessages((prev) =>
+          prev.map((message) => (message.id === messageId ? { ...message, is_read: true, read_at: readAt } : message))
+        );
+        setContactMessagesError("Read status needs the latest Supabase migration to persist after refresh.");
+      } else {
+        setContactMessagesError(error.message ?? "Could not update message.");
+      }
+      setSavingContactMessageId(null);
+      return;
+    }
+
+    setContactMessages((prev) =>
+      prev.map((message) => (message.id === messageId ? { ...message, is_read: true, read_at: readAt } : message))
+    );
+    setSavingContactMessageId(null);
   };
 
   const loadRegistrations = async () => {
@@ -1941,6 +2000,21 @@ export default function AdminPage() {
     );
   };
 
+  const filteredContactMessages = contactMessages.filter((message) => {
+    const isRead = Boolean(message.is_read);
+    if (contactFilter === "read" && !isRead) return false;
+    if (contactFilter === "unread" && isRead) return false;
+
+    const query = contactSearch.trim().toLowerCase();
+    if (!query) return true;
+
+    return [message.name, message.email, message.message]
+      .filter(Boolean)
+      .some((value) => value.toLowerCase().includes(query));
+  });
+
+  const unreadContactCount = contactMessages.filter((message) => !message.is_read).length;
+
   return (
     <div className="account-page">
       <AccessibilityControls />
@@ -2954,7 +3028,7 @@ export default function AdminPage() {
                   <div className="account-card__header">
                     <div>
                       <h2>Inbox</h2>
-                      <p className="muted">Latest messages appear first.</p>
+                      <p className="muted">Latest messages appear first. Unread: {unreadContactCount}</p>
                     </div>
                     <button
                       className="button ghost"
@@ -2965,23 +3039,73 @@ export default function AdminPage() {
                       {loadingContactMessages ? "Refreshing..." : "Refresh"}
                     </button>
                   </div>
+                  <div className="contact-inbox-toolbar">
+                    <div className="contact-inbox-toolbar__filters">
+                      <button
+                        className={`button ghost${contactFilter === "all" ? " is-active" : ""}`}
+                        type="button"
+                        onClick={() => setContactFilter("all")}
+                      >
+                        All
+                      </button>
+                      <button
+                        className={`button ghost${contactFilter === "unread" ? " is-active" : ""}`}
+                        type="button"
+                        onClick={() => setContactFilter("unread")}
+                      >
+                        Unread
+                      </button>
+                      <button
+                        className={`button ghost${contactFilter === "read" ? " is-active" : ""}`}
+                        type="button"
+                        onClick={() => setContactFilter("read")}
+                      >
+                        Read
+                      </button>
+                    </div>
+                    <div className="search-panel__input contact-inbox-toolbar__search">
+                      <input
+                        type="search"
+                        placeholder="Search name, email, or message"
+                        value={contactSearch}
+                        onChange={(event) => setContactSearch(event.target.value)}
+                        aria-label="Search contact messages"
+                      />
+                    </div>
+                  </div>
                   {contactMessagesError ? <p className="form-help error">{contactMessagesError}</p> : null}
                   {loadingContactMessages ? <p className="muted">Loading messages...</p> : null}
-                  {!loadingContactMessages && contactMessages.length === 0 ? (
-                    <p className="muted">No contact messages yet.</p>
+                  {!loadingContactMessages && filteredContactMessages.length === 0 ? (
+                    <p className="muted">{contactMessages.length === 0 ? "No contact messages yet." : "No messages match those filters."}</p>
                   ) : null}
-                  {!loadingContactMessages && contactMessages.length > 0 ? (
+                  {!loadingContactMessages && filteredContactMessages.length > 0 ? (
                     <div className="event-list">
-                      {contactMessages.map((message) => (
-                        <article key={message.id} className="event-card-simple">
+                      {filteredContactMessages.map((message) => (
+                        <article key={message.id} className={`event-card-simple contact-message-card${message.is_read ? "" : " is-unread"}`}>
                           <div className="event-card__header">
                             <h3>{message.name}</h3>
+                            <div className="cta-row">
+                              <span className={`pill ${message.is_read ? "pill--muted" : "pill--accent"}`}>
+                                {message.is_read ? "Read" : "Unread"}
+                              </span>
+                              {!message.is_read ? (
+                                <button
+                                  className="button ghost"
+                                  type="button"
+                                  onClick={() => void markContactMessageRead(message.id)}
+                                  disabled={savingContactMessageId === message.id}
+                                >
+                                  {savingContactMessageId === message.id ? "Saving..." : "Mark Read"}
+                                </button>
+                              ) : null}
+                            </div>
                           </div>
                           <div className="event-card__meta">
                             <p className="muted">Email: {message.email}</p>
                             <p className="muted">Received: {formatMessageDate(message.created_at)}</p>
+                            {message.read_at ? <p className="muted">Read: {formatMessageDate(message.read_at)}</p> : null}
                           </div>
-                          <p className="muted">{message.message}</p>
+                          <p className="muted contact-message-card__preview">{message.message}</p>
                         </article>
                       ))}
                     </div>

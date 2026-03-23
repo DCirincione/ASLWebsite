@@ -2283,6 +2283,67 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   word-break: break-word;
 }
 
+.contact-inbox-toolbar {
+  display: grid;
+  grid-template-columns: 1fr minmax(280px, 360px);
+  gap: 12px;
+  align-items: center;
+  margin-top: 14px;
+}
+
+.contact-inbox-toolbar__filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.contact-inbox-toolbar__filters .button,
+.contact-message-card .button {
+  padding: 8px 12px;
+  font-size: 0.92rem;
+}
+
+.contact-inbox-toolbar__filters .button.is-active {
+  background: rgba(233, 93, 42, 0.1);
+  border-color: rgba(233, 93, 42, 0.28);
+  color: #c2410c;
+}
+
+.contact-inbox-toolbar__search {
+  grid-template-columns: 1fr;
+}
+
+.contact-message-card {
+  padding: 12px 14px;
+  gap: 6px;
+}
+
+.contact-message-card.is-unread {
+  border-color: rgba(233, 93, 42, 0.28);
+  box-shadow: 0 10px 24px rgba(233, 93, 42, 0.08);
+}
+
+.contact-message-card .event-card__header {
+  align-items: flex-start;
+}
+
+.contact-message-card .event-card__header h3 {
+  font-size: 1rem;
+}
+
+.contact-message-card .event-card__meta {
+  gap: 2px;
+}
+
+.contact-message-card__preview {
+  margin: 0;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
 .user-directory {
   margin-top: 12px;
   border: 1px solid var(--border);
@@ -3338,6 +3399,10 @@ html[data-theme="dark"] .run-club-overview__flyer img {
     grid-template-columns: 1fr;
   }
 
+  .contact-inbox-toolbar {
+    grid-template-columns: 1fr;
+  }
+
   .cta-section {
     padding: 28px 18px;
   }
@@ -3419,6 +3484,17 @@ html[data-theme="dark"] .account-form textarea:focus {
   border-color: rgba(233, 93, 42, 0.6);
   box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.2);
   background: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="dark"] .contact-inbox-toolbar__filters .button.is-active {
+  background: rgba(233, 93, 42, 0.16);
+  border-color: rgba(233, 93, 42, 0.32);
+  color: #f4b78a;
+}
+
+html[data-theme="dark"] .contact-message-card.is-unread {
+  border-color: rgba(233, 93, 42, 0.3);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.22);
 }
 
 html[data-theme="dark"] .account-form__link-action {

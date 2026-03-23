@@ -480,6 +480,8 @@ export type ContactMessage = {
   name: string;
   email: string;
   message: string;
+  is_read?: boolean | null;
+  read_at?: string | null;
   created_at?: string | null;
 };
 
@@ -488,6 +490,8 @@ export type ContactMessageInsert = {
   name: string;
   email: string;
   message: string;
+  is_read?: boolean | null;
+  read_at?: string | null;
   created_at?: string | null;
 };
 
@@ -496,6 +500,8 @@ export type ContactMessageUpdate = {
   name?: string;
   email?: string;
   message?: string;
+  is_read?: boolean | null;
+  read_at?: string | null;
   created_at?: string | null;
 };
 

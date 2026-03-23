@@ -128,14 +128,14 @@ export default function ContactPage() {
                 <span className="contact-icon">✉️</span>
                 <div>
                   <p className="list__title">Email</p>
-                  <p className="muted">joeandfrancismail@gmail.com</p>
+                  <p className="muted">admin@aldrichsports.com</p>
                 </div>
               </div>
               <div className="contact-item">
                 <span className="contact-icon">📞</span>
                 <div>
                   <p className="list__title">Phone</p>
-                  <p className="muted">(631) 644-0871 / (631) 905-9595</p>
+                  <p className="muted">(631) 644-0871 | (631) 905-9595</p>
                 </div>
               </div>
               <div className="contact-item">
@@ -152,7 +152,7 @@ export default function ContactPage() {
                 <Link className="button ghost" href="https://www.instagram.com/aldrichsportsleague/" target="_blank">
                   Instagram
                 </Link>
-                <Link className="button ghost" href="https://www.facebook.com/profile.php?id=61558144266881" target="_blank">
+                <Link className="button ghost" href="https://www.facebook.com/profile.php?id=61587240961647" target="_blank">
                   Facebook
                 </Link>
               </div>
