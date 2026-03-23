@@ -15,6 +15,15 @@ const getSupabase = () => {
   return createClient(supabaseUrl, key);
 };
 
+const getMissingSupabaseConfig = () => {
+  const missing: string[] = [];
+  if (!supabaseUrl) missing.push("NEXT_PUBLIC_SUPABASE_URL");
+  if (!supabaseAnonKey && !supabaseServiceRoleKey) {
+    missing.push("NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY");
+  }
+  return missing;
+};
+
 const escapeHtml = (value: string) =>
   value
     .replaceAll("&", "&amp;")
@@ -29,14 +38,14 @@ const sendContactEmail = async (payload: { name: string; email: string; message:
   }
 
   const html = `
-    <h2>New Contact Message</h2>
+    <h2>ASL Inquiry</h2>
     <p><strong>Name:</strong> ${escapeHtml(payload.name)}</p>
     <p><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
     <p><strong>Message:</strong></p>
     <p>${escapeHtml(payload.message).replaceAll("\n", "<br />")}</p>
   `;
 
-  const text = `New Contact Message
+  const text = `ASL Inquiry
 
 Name: ${payload.name}
 Email: ${payload.email}
@@ -53,7 +62,7 @@ ${payload.message}`;
     body: JSON.stringify({
       from: contactFromEmail,
       to: contactToEmail.split(",").map((entry) => entry.trim()).filter(Boolean),
-      subject: `New contact form message from ${payload.name}`,
+      subject: "ASL Inquiry",
       reply_to: payload.email,
       html,
       text,
@@ -85,35 +94,53 @@ export async function POST(req: NextRequest) {
     }
 
     const supabase = getSupabase();
-    if (!supabase) {
-      return NextResponse.json({ error: "Supabase is not configured." }, { status: 500 });
-    }
+    const missingSupabaseConfig = getMissingSupabaseConfig();
+    let storageError: string | null = null;
 
-    const { error: insertError } = await supabase.from("contact_messages").insert({
-      name,
-      email,
-      message,
-    });
+    if (supabase) {
+      const { error: insertError } = await supabase.from("contact_messages").insert({
+        name,
+        email,
+        message,
+      });
 
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message ?? "Could not save message." }, { status: 500 });
+      if (insertError) {
+        storageError = insertError.message ?? "Could not save message.";
+      }
+    } else {
+      storageError = `Supabase is not configured. Missing ${missingSupabaseConfig.join(", ")}.`;
     }
 
     try {
       const emailResult = await sendContactEmail({ name, email, message });
       if (emailResult.skipped) {
         return NextResponse.json({
-          ok: true,
-          message:
-            "Message saved. Email forwarding is not configured yet. Set RESEND_API_KEY, CONTACT_TO_EMAIL, and CONTACT_FROM_EMAIL.",
+          ok: !storageError,
+          message: storageError
+            ? `${storageError} Email forwarding is also not configured yet. Set RESEND_API_KEY, CONTACT_TO_EMAIL, and CONTACT_FROM_EMAIL.`
+            : "Message saved. Email forwarding is not configured yet. Set RESEND_API_KEY, CONTACT_TO_EMAIL, and CONTACT_FROM_EMAIL.",
         });
       }
     } catch (error) {
       const messageText = error instanceof Error ? error.message : "Could not send email notification.";
+      const responseMessage = storageError ? storageError : "Message saved, but the email notification failed.";
+      return NextResponse.json(
+        {
+          ok: !storageError,
+          error: responseMessage,
+          message: responseMessage,
+          email_error: messageText,
+          storage_error: storageError ?? undefined,
+        },
+        { status: storageError ? 500 : 200 }
+      );
+    }
+
+    if (storageError) {
       return NextResponse.json({
         ok: true,
-        message: "Message saved, but the email notification failed.",
-        email_error: messageText,
+        message: "Email sent, but the message was not saved to the admin inbox.",
+        storage_error: storageError,
       });
     }
 

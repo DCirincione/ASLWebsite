@@ -22,44 +22,48 @@ export default function ContactPage() {
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    const name = form.name.trim();
-    const email = form.email.trim();
-    const message = form.message.trim();
-    if (!name || !email || !message) {
-      setStatus({ type: "error", message: "Name, email, and message are required." });
-      return;
-    }
+    try {
+      const name = form.name.trim();
+      const email = form.email.trim();
+      const message = form.message.trim();
+      if (!name || !email || !message) {
+        setStatus({ type: "error", message: "Name, email, and message are required." });
+        return;
+      }
 
-    setStatus({ type: "loading" });
-    const response = await fetch("/api/contact", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        name,
-        email,
-        message,
-      }),
-    });
-
-    const json = (await response.json()) as { error?: string; message?: string; email_error?: string };
-
-    if (!response.ok) {
-      setStatus({ type: "error", message: json.error ?? "Could not send message." });
-      return;
-    }
-
-    if (json.email_error) {
-      setStatus({
-        type: "error",
-        message: json.message ?? "Message saved, but the email notification failed.",
+      setStatus({ type: "loading" });
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          message,
+        }),
       });
-      return;
-    }
 
-    setStatus({ type: "success", message: json.message ?? "Message sent. We will get back to you soon." });
-    setForm({ name: "", email: "", message: "" });
+      const json = (await response.json()) as { error?: string; message?: string; email_error?: string };
+
+      if (!response.ok) {
+        setStatus({ type: "error", message: json.error ?? json.message ?? "Could not send message." });
+        return;
+      }
+
+      if (json.email_error) {
+        setStatus({
+          type: "error",
+          message: json.email_error || json.message || "Message saved, but the email notification failed.",
+        });
+        return;
+      }
+
+      setStatus({ type: "success", message: json.message ?? "Message sent. We will get back to you soon." });
+      setForm({ name: "", email: "", message: "" });
+    } catch {
+      setStatus({ type: "error", message: "Could not send message." });
+    }
   };
 
   return (

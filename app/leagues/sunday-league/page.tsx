@@ -1,12 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { supabase } from "@/lib/supabase/client";
 
 type SundayLeagueSection = "overview" | "rules" | "teams" | "leaderboards" | "schedule" | "inquiries";
+type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
 
 const sectionOrder: Array<{ id: SundayLeagueSection; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -150,6 +151,12 @@ const leaderboardRows = [
 export default function SundayLeaguePage() {
   const [activeSection, setActiveSection] = useState<SundayLeagueSection>("overview");
   const [overviewFlyer, setOverviewFlyer] = useState<string>("/sundayLeague/champs2025.jpeg");
+  const [status, setStatus] = useState<Status>({ type: "idle" });
+  const [inquiryForm, setInquiryForm] = useState({
+    name: "",
+    email: "",
+    message: "",
+  });
 
   useEffect(() => {
     const normalize = (value?: string | null) => (value ?? "").trim().toLowerCase();
@@ -203,6 +210,59 @@ export default function SundayLeaguePage() {
 
     void loadFlyer();
   }, []);
+
+  const updateInquiryForm = (key: keyof typeof inquiryForm, value: string) => {
+    setInquiryForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleInquirySubmit = async (event: FormEvent) => {
+    event.preventDefault();
+
+    try {
+      const name = inquiryForm.name.trim();
+      const email = inquiryForm.email.trim();
+      const message = inquiryForm.message.trim();
+
+      if (!name || !email || !message) {
+        setStatus({ type: "error", message: "Name, email, and message are required." });
+        return;
+      }
+
+      setStatus({ type: "loading" });
+
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          email,
+          message,
+        }),
+      });
+
+      const json = (await response.json()) as { error?: string; message?: string; email_error?: string };
+
+      if (!response.ok) {
+        setStatus({ type: "error", message: json.error ?? json.message ?? "Could not send message." });
+        return;
+      }
+
+      if (json.email_error) {
+        setStatus({
+          type: "error",
+          message: json.email_error || json.message || "Message saved, but the email notification failed.",
+        });
+        return;
+      }
+
+      setStatus({ type: "success", message: json.message ?? "Message sent. We will get back to you soon." });
+      setInquiryForm({ name: "", email: "", message: "" });
+    } catch {
+      setStatus({ type: "error", message: "Could not send message." });
+    }
+  };
 
   const renderContent = () => {
     switch (activeSection) {
@@ -329,13 +389,48 @@ export default function SundayLeaguePage() {
           <div className="sunday-league-inquiries">
             <h2>Inquiries</h2>
             <p className="sunday-league-inquiries__prompt">Sunday League Questions?</p>
-            <form className="sunday-league-inquiries__form">
-              <textarea placeholder="Type here..." aria-label="Sunday League questions" />
+            <form className="sunday-league-inquiries__form" onSubmit={handleInquirySubmit}>
+              <label className="form-control">
+                <span>Name</span>
+                <input
+                  type="text"
+                  name="name"
+                  placeholder="Your name"
+                  value={inquiryForm.name}
+                  onChange={(event) => updateInquiryForm("name", event.target.value)}
+                  required
+                />
+              </label>
+              <label className="form-control">
+                <span>Email</span>
+                <input
+                  type="email"
+                  name="email"
+                  placeholder="you@email.com"
+                  value={inquiryForm.email}
+                  onChange={(event) => updateInquiryForm("email", event.target.value)}
+                  required
+                />
+              </label>
+              <label className="form-control">
+                <span>Message</span>
+                <textarea
+                  name="message"
+                  placeholder="Type here..."
+                  aria-label="Sunday League questions"
+                  value={inquiryForm.message}
+                  onChange={(event) => updateInquiryForm("message", event.target.value)}
+                  required
+                />
+              </label>
               <div className="sunday-league-inquiries__actions">
-                <button className="button primary" type="button">
-                  Submit
+                <button className="button primary" type="submit" disabled={status.type === "loading"}>
+                  {status.type === "loading" ? "Sending..." : "Submit"}
                 </button>
               </div>
+              {status.message ? (
+                <p className={`form-help ${status.type === "error" ? "error" : "muted"}`}>{status.message}</p>
+              ) : null}
             </form>
           </div>
         );
