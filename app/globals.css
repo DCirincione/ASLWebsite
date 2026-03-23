@@ -1187,10 +1187,15 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   display: grid;
   gap: 16px;
   min-height: 440px;
+  align-content: start;
   border: 1px solid var(--border);
   border-radius: 18px;
   padding: 28px;
   background: rgba(255, 255, 255, 0.58);
+}
+
+.sunday-league-rule-box .sunday-league-panel-box {
+  min-height: 0;
 }
 
 .sunday-league-team-header {
