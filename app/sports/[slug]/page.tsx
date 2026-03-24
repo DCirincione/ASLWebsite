@@ -276,7 +276,8 @@ export default function DynamicSportPage() {
   const heroDescription =
     sport?.short_description?.trim() ||
     "Browse active leagues, events, and registration options for this sport.";
-  const heroImage = sport?.image_url?.trim() || "/ASLLogo.png";
+  const heroImage = sportSlug === "soccer" ? sport?.image_url?.trim() || "/sports_images/soccer/soccerLogoTest.png" : "/ASLLogo.png";
+  const heroAlt = sportSlug === "soccer" ? sport?.title ?? "Soccer" : "ASL Logo";
 
   return (
     <PageShell>
@@ -308,7 +309,7 @@ export default function DynamicSportPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src={heroImage} alt={sport?.title ?? "Sport"} fill priority />
+            <Image src={heroImage} alt={heroAlt} fill priority />
           </div>
         </div>
       </Section>

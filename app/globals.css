@@ -3055,6 +3055,11 @@ html[data-theme="dark"] .pill--muted {
   height: 180px;
 }
 
+.soccer-hero__logo img {
+  object-fit: contain;
+  object-position: top right;
+}
+
 .soccer-hero .tag {
   display: inline-flex;
   align-items: center;

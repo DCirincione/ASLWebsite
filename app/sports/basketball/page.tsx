@@ -179,7 +179,7 @@ export default function BasketballPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/basketball/champst2025.jpeg" alt="Aldrich Basketball" fill priority />
+            <Image src="/ASLLogo.png" alt="ASL Logo" fill priority />
           </div>
         </div>
       </Section>

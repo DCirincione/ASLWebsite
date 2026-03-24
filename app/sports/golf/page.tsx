@@ -74,6 +74,7 @@ export default function GolfPage() {
   const openModal = (eventId?: string | null, title?: string) => {
     const normalizedEventId = eventId?.trim();
     if (!normalizedEventId || isRegisteredEvent(normalizedEventId)) return;
+    setDetailEvent(null);
     setModalEventId(normalizedEventId);
     setModalTitle(title ?? null);
     setModalOpen(true);
@@ -142,7 +143,7 @@ export default function GolfPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/golf/golf.jpg" alt="Aldrich Golf" fill priority />
+            <Image src="/ASLLogo.png" alt="ASL Logo" fill priority />
           </div>
         </div>
       </Section>

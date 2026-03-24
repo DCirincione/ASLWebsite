@@ -92,6 +92,7 @@ export default function YouthSoccerPage() {
   const openModal = (eventId?: string | null, title?: string) => {
     const normalizedEventId = eventId?.trim();
     if (!normalizedEventId || isRegisteredEvent(normalizedEventId)) return;
+    setDetailEvent(null);
     setModalEventId(normalizedEventId);
     setModalTitle(title ?? null);
     setModalOpen(true);
@@ -171,7 +172,7 @@ export default function YouthSoccerPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/sports_images/soccer/soccerLogoTest.png" alt="Aldrich Youth Soccer" fill priority />
+            <Image src="/ASLLogo.png" alt="ASL Logo" fill priority />
           </div>
         </div>
       </Section>
