@@ -257,6 +257,9 @@ export default function AdminPage() {
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
   const [registrationsError, setRegistrationsError] = useState<string | null>(null);
+  const [selectedRegistrationEventId, setSelectedRegistrationEventId] = useState<string | null>(null);
+  const [registrationsEventFilter, setRegistrationsEventFilter] = useState("all");
+  const [registrationsUserFilter, setRegistrationsUserFilter] = useState("");
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   const [loadingContactMessages, setLoadingContactMessages] = useState(false);
   const [contactMessagesError, setContactMessagesError] = useState<string | null>(null);
@@ -588,6 +591,7 @@ export default function AdminPage() {
 
     if (submissions.length === 0) {
       setRegistrations([]);
+      setSelectedRegistrationEventId(null);
       setLoadingRegistrations(false);
       return;
     }
@@ -632,6 +636,9 @@ export default function AdminPage() {
     });
 
     setRegistrations(resolved);
+    setSelectedRegistrationEventId((current) =>
+      current && resolved.some((row) => row.event_id === current) ? current : null
+    );
     setLoadingRegistrations(false);
   };
 
@@ -1883,11 +1890,35 @@ export default function AdminPage() {
     return date.toLocaleString();
   };
 
-  const registrationCountByEvent = registrations.reduce<Record<string, number>>((acc, row) => {
-    const key = row.event_title || "Unknown event";
-    acc[key] = (acc[key] ?? 0) + 1;
-    return acc;
-  }, {});
+  const registrationSummary = Object.values(
+    registrations.reduce<Record<string, { event_id: string; event_title: string; count: number }>>((acc, row) => {
+      const key = row.event_id;
+      if (!acc[key]) {
+        acc[key] = {
+          event_id: row.event_id,
+          event_title: row.event_title || "Unknown event",
+          count: 0,
+        };
+      }
+      acc[key].count += 1;
+      return acc;
+    }, {})
+  ).sort((a, b) => b.count - a.count);
+  const selectedRegistrationRows = selectedRegistrationEventId
+    ? registrations.filter((row) => row.event_id === selectedRegistrationEventId)
+    : [];
+  const selectedRegistrationEvent =
+    registrationSummary.find((item) => item.event_id === selectedRegistrationEventId) ?? null;
+  const filteredRegistrations = registrations.filter((row) => {
+    if (registrationsEventFilter !== "all" && row.event_id !== registrationsEventFilter) return false;
+    const term = registrationsUserFilter.trim().toLowerCase();
+    if (!term) return true;
+    return (
+      row.user_name.toLowerCase().includes(term) ||
+      row.user_email.toLowerCase().includes(term) ||
+      row.user_id.toLowerCase().includes(term)
+    );
+  });
 
   const filteredUsers = users.filter((user) => {
     const term = usersSearch.trim().toLowerCase();
@@ -2239,7 +2270,7 @@ export default function AdminPage() {
               {eventsError ? <p className="form-help error">{eventsError}</p> : null}
               {!loadingEvents && events.length === 0 ? <p className="muted">No events found.</p> : null}
               {!loadingEvents && events.length > 0 ? (
-                <div className="event-list">
+                <div className="event-list admin-existing-events-list">
                   {events.map((event) => (
                     <article key={event.id} className="event-card-simple">
                       <div className="event-card__header">
@@ -2467,7 +2498,7 @@ export default function AdminPage() {
                   {sportsError ? <p className="form-help error">{sportsError}</p> : null}
                   {!loadingSports && sports.length === 0 ? <p className="muted">No sports found.</p> : null}
                   {!loadingSports && sports.length > 0 ? (
-                    <div className="event-list">
+                    <div className="event-list admin-scroll-panel">
                       {sports.map((sport) => (
                         <article key={sport.id} className="event-card-simple">
                           <div className="event-card__header">
@@ -2686,7 +2717,7 @@ export default function AdminPage() {
                     <p className="muted">No articles found.</p>
                   ) : null}
                   {!loadingCommunity && communityArticles.length > 0 ? (
-                    <div className="event-list">
+                    <div className="event-list admin-scroll-panel">
                       {communityArticles.map((article) => (
                         <article key={article.id} className="event-card-simple">
                           <div className="event-card__header">
@@ -2815,42 +2846,125 @@ export default function AdminPage() {
                     <p className="muted">No registrations found.</p>
                   ) : null}
                   {!loadingRegistrations && registrations.length > 0 ? (
-                    <ul className="list" style={{ display: "grid", gap: 8 }}>
-                      {Object.entries(registrationCountByEvent)
-                        .sort((a, b) => b[1] - a[1])
-                        .map(([eventTitle, count]) => (
-                          <li key={eventTitle} className="team-card">
+                    <ul className="list admin-registration-summary-list" style={{ display: "grid", gap: 8 }}>
+                      {registrationSummary.map((item) => (
+                        <li key={item.event_id}>
+                          <button
+                            className={`team-card admin-registration-summary ${selectedRegistrationEventId === item.event_id ? "is-active" : ""}`}
+                            type="button"
+                            onClick={() => setSelectedRegistrationEventId(item.event_id)}
+                          >
                             <div className="team-card__info">
-                              <p className="list__title">{eventTitle}</p>
-                              <p className="muted">{count} signup{count === 1 ? "" : "s"}</p>
+                              <p className="list__title">{item.event_title}</p>
+                              <p className="muted">{item.count} signup{item.count === 1 ? "" : "s"}</p>
                             </div>
-                          </li>
-                        ))}
+                          </button>
+                        </li>
+                      ))}
                     </ul>
                   ) : null}
                 </section>
                 <section className="account-card">
                   <h2>All Signups</h2>
                   {!loadingRegistrations && registrations.length > 0 ? (
-                    <div className="event-list">
-                      {registrations.map((row) => (
-                        <article key={row.id} className="event-card-simple">
-                          <div className="event-card__header">
-                            <h3>{row.event_title}</h3>
-                          </div>
-                          <div className="event-card__meta">
-                            <p className="muted">User: {row.user_name}</p>
-                            <p className="muted">Email: {row.user_email}</p>
-                            {row.user_phone ? <p className="muted">Phone: {row.user_phone}</p> : null}
-                            {row.submitted_at ? (
-                              <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
-                            ) : null}
-                          </div>
-                        </article>
-                      ))}
-                    </div>
+                    <>
+                      <div className="admin-signups-toolbar">
+                        <div className="form-control admin-signups-toolbar__field">
+                          <label htmlFor="registrations-event-filter">Filter by event</label>
+                          <select
+                            id="registrations-event-filter"
+                            value={registrationsEventFilter}
+                            onChange={(event) => setRegistrationsEventFilter(event.target.value)}
+                          >
+                            <option value="all">All events</option>
+                            {registrationSummary.map((item) => (
+                              <option key={item.event_id} value={item.event_id}>
+                                {item.event_title}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-control admin-signups-toolbar__field">
+                          <label htmlFor="registrations-user-filter">Filter by user</label>
+                          <input
+                            id="registrations-user-filter"
+                            value={registrationsUserFilter}
+                            onChange={(event) => setRegistrationsUserFilter(event.target.value)}
+                            placeholder="Name, email, or user ID"
+                          />
+                        </div>
+                      </div>
+                      {filteredRegistrations.length === 0 ? (
+                        <p className="muted">No signups match the current filters.</p>
+                      ) : (
+                        <div className="event-list admin-scroll-panel">
+                          {filteredRegistrations.map((row) => (
+                            <article key={row.id} className="event-card-simple">
+                              <div className="event-card__header">
+                                <h3>{row.event_title}</h3>
+                              </div>
+                              <div className="event-card__meta">
+                                <p className="muted">User: {row.user_name}</p>
+                                <p className="muted">Email: {row.user_email}</p>
+                                {row.user_phone ? <p className="muted">Phone: {row.user_phone}</p> : null}
+                                {row.submitted_at ? (
+                                  <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
+                                ) : null}
+                              </div>
+                            </article>
+                          ))}
+                        </div>
+                      )}
+                    </>
                   ) : null}
                 </section>
+                {selectedRegistrationEvent ? (
+                  <div
+                    className="event-detail-backdrop"
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={`${selectedRegistrationEvent.event_title} registrations`}
+                    onClick={() => setSelectedRegistrationEventId(null)}
+                  >
+                    <div className="event-detail" onClick={(event) => event.stopPropagation()}>
+                      <div className="event-detail__header">
+                        <div>
+                          <p className="eyebrow">Registration Summary</p>
+                          <h2>{selectedRegistrationEvent.event_title}</h2>
+                          <p className="muted">
+                            {selectedRegistrationEvent.count} signup{selectedRegistrationEvent.count === 1 ? "" : "s"} for this event.
+                          </p>
+                        </div>
+                        <div className="event-detail__header-actions">
+                          <button
+                            className="button ghost"
+                            type="button"
+                            onClick={() => setSelectedRegistrationEventId(null)}
+                          >
+                            Close
+                          </button>
+                        </div>
+                      </div>
+                      <div className="event-list" style={{ marginTop: 16 }}>
+                        {selectedRegistrationRows.map((row) => (
+                          <article key={row.id} className="event-card-simple">
+                            <div className="event-card__header">
+                              <h3>{row.user_name}</h3>
+                            </div>
+                            <div className="event-card__meta">
+                              <p className="muted">Email: {row.user_email}</p>
+                              {row.user_phone ? <p className="muted">Phone: {row.user_phone}</p> : null}
+                              <p className="muted">User ID: {row.user_id}</p>
+                              {row.submitted_at ? (
+                                <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
+                              ) : null}
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </>
             ) : null}
             {activeModule === "users" ? (
@@ -2885,7 +2999,7 @@ export default function AdminPage() {
                   {loadingUsers ? <p className="muted">Loading users...</p> : null}
                   {!loadingUsers && filteredUsers.length === 0 ? <p className="muted">No users found.</p> : null}
                   {!loadingUsers && filteredUsers.length > 0 ? (
-                    <div className="user-directory">
+                    <div className="user-directory admin-user-directory-scroll">
                       <div className="user-directory__header">
                         <span>USER</span>
                         <span>ROLE</span>
@@ -3079,7 +3193,7 @@ export default function AdminPage() {
                     <p className="muted">{contactMessages.length === 0 ? "No contact messages yet." : "No messages match those filters."}</p>
                   ) : null}
                   {!loadingContactMessages && filteredContactMessages.length > 0 ? (
-                    <div className="event-list">
+                    <div className="event-list admin-scroll-panel">
                       {filteredContactMessages.map((message) => (
                         <article key={message.id} className={`event-card-simple contact-message-card${message.is_read ? "" : " is-unread"}`}>
                           <div className="event-card__header">
@@ -3144,7 +3258,7 @@ export default function AdminPage() {
                   {loadingFlyers || loadingEvents ? <p className="muted">Loading flyers...</p> : null}
                   {!loadingFlyers && !loadingEvents && events.length === 0 ? <p className="muted">No events found.</p> : null}
                   {!loadingFlyers && !loadingEvents && events.length > 0 ? (
-                    <div className="event-list">
+                    <div className="event-list admin-scroll-panel">
                       {events.map((event) => {
                         const flyer = flyerByEventId.get(event.id);
                         const detailsValue = flyerDetailsDrafts[event.id] ?? flyer?.details ?? "";
