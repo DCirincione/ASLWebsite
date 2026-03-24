@@ -188,33 +188,33 @@ export default function PublicProfilePage() {
           </section>
         )}
 
-        <section className="account-card">
-          <div className="account-card__header">
-            <div>
-              <h3>Teams</h3>
-              <p className="muted">Teams this player belongs to.</p>
+        {loadingTeams || teams.length > 0 ? (
+          <section className="account-card">
+            <div className="account-card__header">
+              <div>
+                <h3>Teams</h3>
+                <p className="muted">Teams this player belongs to.</p>
+              </div>
             </div>
-          </div>
-          {loadingTeams ? (
-            <p className="muted">Loading teams...</p>
-          ) : teams.length === 0 ? (
-            <p className="muted">No teams listed.</p>
-          ) : (
-            <ul className="list list--grid">
-              {teams.map((team) => (
-                <li key={team.id} className="team-card">
-                  <div className="team-card__logo">
-                    <img src={team.logo_url ?? "/team-placeholder.svg"} alt="" />
-                  </div>
-                  <div className="team-card__info">
-                    <p className="list__title">{team.team_name}</p>
-                    <p className="muted">{team.role ?? "Player"}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+            {loadingTeams ? (
+              <p className="muted">Loading teams...</p>
+            ) : (
+              <ul className="list list--grid">
+                {teams.map((team) => (
+                  <li key={team.id} className="team-card">
+                    <div className="team-card__logo">
+                      <img src={team.logo_url ?? "/team-placeholder.svg"} alt="" />
+                    </div>
+                    <div className="team-card__info">
+                      <p className="list__title">{team.team_name}</p>
+                      <p className="muted">{team.role ?? "Player"}</p>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : null}
 
         <section className="account-card">
           <div className="account-card__header">

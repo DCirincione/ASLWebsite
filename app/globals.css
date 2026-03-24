@@ -116,6 +116,11 @@ html[data-theme="dark"] .program-card {
   border-color: #1f2a40;
 }
 
+html[data-theme="dark"] .program-card h3,
+html[data-theme="dark"] .program-card p {
+  color: #e8edf7;
+}
+
 html[data-theme="dark"] .sunday-league-promo,
 html[data-theme="dark"] .sunday-league-panel-box,
 html[data-theme="dark"] .sunday-league-team-card,
@@ -3705,5 +3710,95 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
 
   .callout {
     align-items: flex-start;
+  }
+}
+
+.submission-review {
+  width: min(860px, 100%);
+}
+
+.submission-review__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(240px, 0.8fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.submission-review__list {
+  display: grid;
+  gap: 12px;
+}
+
+.submission-review__row {
+  border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  padding-bottom: 12px;
+}
+
+.submission-review__row:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.submission-review__label {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.submission-review__value {
+  margin: 0;
+  color: #475569;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.submission-review__value--pre {
+  font: inherit;
+}
+
+.submission-review__attachments {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+}
+
+.submission-review__attachment-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.submission-review__attachment-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.submission-review__attachment-actions .button {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+html[data-theme="dark"] .submission-review__row {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="dark"] .submission-review__label {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .submission-review__value,
+html[data-theme="dark"] .submission-review__attachments {
+  color: #cbd5e1;
+}
+
+@media (max-width: 960px) {
+  .submission-review__layout {
+    grid-template-columns: 1fr;
   }
 }

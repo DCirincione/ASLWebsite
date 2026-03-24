@@ -5,10 +5,11 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { createId } from "@/lib/create-id";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
-import type { Event, Friend, Profile, TeamMembership } from "@/lib/supabase/types";
+import type { Event, Friend, JsonValue, Profile, TeamMembership } from "@/lib/supabase/types";
 
 type ProfileData = Profile & {
   team_memberships: TeamMembership[];
@@ -71,6 +72,28 @@ const fallbackEvents: Event[] = [
 
 type SubmissionRow = {
   event_id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  answers?: Record<string, JsonValue | undefined> | null;
+  attachments?: string[] | null;
+  waiver_accepted?: boolean | null;
+  created_at?: string | null;
+};
+
+type EventSubmissionSummary = {
+  event_id: string;
+  name: string;
+  email: string;
+  phone?: string | null;
+  answers?: Record<string, JsonValue | undefined> | null;
+  attachments?: string[] | null;
+  waiver_accepted?: boolean | null;
+  created_at?: string | null;
+};
+
+type RegisteredEventItem = Event & {
+  submission?: EventSubmissionSummary | null;
 };
 
 type ProfileFormState = {
@@ -118,9 +141,11 @@ export default function AccountPage() {
   // Teams
   const [teams, setTeams] = useState<TeamMembership[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
-  const [registeredEvents, setRegisteredEvents] = useState<Event[] | null>(null);
+  const [registeredEvents, setRegisteredEvents] = useState<RegisteredEventItem[] | null>(null);
   const [eventsStatus, setEventsStatus] = useState<"loading" | "ready" | "error">("loading");
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [selectedSubmission, setSelectedSubmission] = useState<EventSubmissionSummary | null>(null);
+  const [selectedSubmissionEventTitle, setSelectedSubmissionEventTitle] = useState<string | null>(null);
 
   // Friends
   const [friends, setFriends] = useState<FriendWithAvatar[]>([]);
@@ -395,19 +420,38 @@ export default function AccountPage() {
       setEventsStatus("loading");
       const { data: submissions, error: submissionsError } = await supabase
         .from("event_submissions")
-        .select("event_id")
+        .select("event_id,name,email,phone,answers,attachments,waiver_accepted,created_at")
         .eq("user_id", userId);
 
       if (submissionsError) {
-        setRegisteredEvents(fallbackEvents);
+        setRegisteredEvents(fallbackEvents as RegisteredEventItem[]);
         setEventsStatus("ready");
         setEventsError("Could not load your saved events yet.");
         return;
       }
 
-      const eventIds = Array.from(
-        new Set((submissions as SubmissionRow[]).map((row) => row.event_id).filter(Boolean))
-      );
+      const submissionRows = (submissions ?? []) as SubmissionRow[];
+      const latestSubmissionByEvent = new Map<string, EventSubmissionSummary>();
+      for (const row of submissionRows) {
+        if (!row.event_id) continue;
+        const existing = latestSubmissionByEvent.get(row.event_id);
+        const nextCreatedAt = row.created_at ? new Date(row.created_at).getTime() : 0;
+        const existingCreatedAt = existing?.created_at ? new Date(existing.created_at).getTime() : 0;
+        if (!existing || nextCreatedAt >= existingCreatedAt) {
+          latestSubmissionByEvent.set(row.event_id, {
+            event_id: row.event_id,
+            name: row.name,
+            email: row.email,
+            phone: row.phone ?? null,
+            answers: row.answers ?? null,
+            attachments: row.attachments ?? null,
+            waiver_accepted: row.waiver_accepted ?? false,
+            created_at: row.created_at ?? null,
+          });
+        }
+      }
+
+      const eventIds = Array.from(new Set(submissionRows.map((row) => row.event_id).filter(Boolean)));
 
       if (eventIds.length === 0) {
         setRegisteredEvents([]);
@@ -421,13 +465,18 @@ export default function AccountPage() {
         .in("id", eventIds);
 
       if (eventError) {
-        setRegisteredEvents(fallbackEvents);
+        setRegisteredEvents(fallbackEvents as RegisteredEventItem[]);
         setEventsStatus("ready");
         setEventsError("Could not load event details. Showing sample schedule.");
         return;
       }
 
-      setRegisteredEvents((eventData ?? []) as Event[]);
+      setRegisteredEvents(
+        ((eventData ?? []) as Event[]).map((event) => ({
+          ...event,
+          submission: latestSubmissionByEvent.get(event.id) ?? null,
+        }))
+      );
       setEventsStatus("ready");
     };
 
@@ -838,6 +887,20 @@ export default function AccountPage() {
                       {event.location ? <p className="muted">Location: {event.location}</p> : null}
                     </div>
                     {event.description ? <p className="muted">{event.description}</p> : null}
+                    {event.submission ? (
+                      <div style={{ marginTop: 12 }}>
+                        <button
+                          className="button ghost"
+                          type="button"
+                          onClick={() => {
+                            setSelectedSubmission(event.submission ?? null);
+                            setSelectedSubmissionEventTitle(event.title);
+                          }}
+                        >
+                          View Submission
+                        </button>
+                      </div>
+                    ) : null}
                   </article>
                 );
               })}
@@ -850,39 +913,36 @@ export default function AccountPage() {
           </div>
         </section>
 
-        <section className="account-card">
-          <div className="account-card__header">
-            <div>
-              <h2>My Team</h2>
-              <p className="muted">Manage your teams and roster.</p>
+        {loadingTeams || teams.length > 0 ? (
+          <section className="account-card">
+            <div className="account-card__header">
+              <div>
+                <h2>My Team</h2>
+                <p className="muted">Manage your teams and roster.</p>
+              </div>
             </div>
-            <Link className="button primary" href="/register">
-              Create / Join
-            </Link>
-          </div>
-          {loadingTeams ? (
-            <p className="muted">Loading your teams...</p>
-          ) : teams.length === 0 ? (
-            <p className="muted">No teams yet. Register or join a team to get started.</p>
-          ) : (
-            <ul className="list list--grid">
-              {teams.map((team) => (
-                <li key={team.id} className="team-card">
-                  <div className="team-card__logo">
-                    <img src={team.logo_url ?? "/team-placeholder.svg"} alt="" />
-                  </div>
-                  <div className="team-card__info">
-                    <p className="list__title">{team.team_name}</p>
-                    <p className="muted">{team.role ?? "Player"}</p>
-                  </div>
-                  <Link className="button ghost" href="/sports">
-                    View Schedule
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+            {loadingTeams ? (
+              <p className="muted">Loading your teams...</p>
+            ) : (
+              <ul className="list list--grid">
+                {teams.map((team) => (
+                  <li key={team.id} className="team-card">
+                    <div className="team-card__logo">
+                      <img src={team.logo_url ?? "/team-placeholder.svg"} alt="" />
+                    </div>
+                    <div className="team-card__info">
+                      <p className="list__title">{team.team_name}</p>
+                      <p className="muted">{team.role ?? "Player"}</p>
+                    </div>
+                    <Link className="button ghost" href="/sports">
+                      View Schedule
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : null}
 
         <section className="account-card">
           <h2>Friends</h2>
@@ -1085,6 +1145,28 @@ export default function AccountPage() {
           </section>
           {error ? <p className="form-help error">{error}</p> : null}
         </section>
+
+        <SubmissionReviewModal
+          open={Boolean(selectedSubmission && selectedSubmissionEventTitle)}
+          submission={
+            selectedSubmission && selectedSubmissionEventTitle
+              ? {
+                  eventTitle: selectedSubmissionEventTitle,
+                  submittedAt: selectedSubmission.created_at,
+                  name: selectedSubmission.name,
+                  email: selectedSubmission.email,
+                  phone: selectedSubmission.phone,
+                  answers: selectedSubmission.answers,
+                  attachments: selectedSubmission.attachments,
+                  waiverAccepted: selectedSubmission.waiver_accepted,
+                }
+              : null
+          }
+          onClose={() => {
+            setSelectedSubmission(null);
+            setSelectedSubmissionEventTitle(null);
+          }}
+        />
       </div>
     </div>
   );
