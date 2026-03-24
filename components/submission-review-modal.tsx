@@ -19,6 +19,7 @@ type SubmissionReview = {
 type SubmissionReviewModalProps = {
   open: boolean;
   submission: SubmissionReview | null;
+  onEdit?: () => void;
   onClose: () => void;
 };
 
@@ -65,7 +66,7 @@ const filenameFromPath = (path: string) => {
   return parts[parts.length - 1] || path;
 };
 
-export function SubmissionReviewModal({ open, submission, onClose }: SubmissionReviewModalProps) {
+export function SubmissionReviewModal({ open, submission, onEdit, onClose }: SubmissionReviewModalProps) {
   const [resolvedAttachments, setResolvedAttachments] = useState<ResolvedAttachment[]>([]);
   const [loadingAttachments, setLoadingAttachments] = useState(false);
 
@@ -142,6 +143,11 @@ export function SubmissionReviewModal({ open, submission, onClose }: SubmissionR
             <p className="muted">Submitted {formatSubmittedAt(submission.submittedAt)}</p>
           </div>
           <div className="event-detail__header-actions">
+            {onEdit ? (
+              <button className="button primary" type="button" onClick={onEdit}>
+                Edit Submission
+              </button>
+            ) : null}
             <button className="button ghost" type="button" onClick={onClose}>
               Close
             </button>

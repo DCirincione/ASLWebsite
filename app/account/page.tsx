@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { RegistrationModal } from "@/components/registration-modal";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { createId } from "@/lib/create-id";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
@@ -71,6 +72,7 @@ const fallbackEvents: Event[] = [
 ];
 
 type SubmissionRow = {
+  id: string;
   event_id: string;
   name: string;
   email: string;
@@ -82,6 +84,7 @@ type SubmissionRow = {
 };
 
 type EventSubmissionSummary = {
+  id: string;
   event_id: string;
   name: string;
   email: string;
@@ -146,6 +149,10 @@ export default function AccountPage() {
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [selectedSubmission, setSelectedSubmission] = useState<EventSubmissionSummary | null>(null);
   const [selectedSubmissionEventTitle, setSelectedSubmissionEventTitle] = useState<string | null>(null);
+  const [editingSubmission, setEditingSubmission] = useState<EventSubmissionSummary | null>(null);
+  const [editingSubmissionEventId, setEditingSubmissionEventId] = useState<string | null>(null);
+  const [editingSubmissionEventTitle, setEditingSubmissionEventTitle] = useState<string | null>(null);
+  const [eventsRefreshKey, setEventsRefreshKey] = useState(0);
 
   // Friends
   const [friends, setFriends] = useState<FriendWithAvatar[]>([]);
@@ -420,7 +427,7 @@ export default function AccountPage() {
       setEventsStatus("loading");
       const { data: submissions, error: submissionsError } = await supabase
         .from("event_submissions")
-        .select("event_id,name,email,phone,answers,attachments,waiver_accepted,created_at")
+        .select("id,event_id,name,email,phone,answers,attachments,waiver_accepted,created_at")
         .eq("user_id", userId);
 
       if (submissionsError) {
@@ -439,6 +446,7 @@ export default function AccountPage() {
         const existingCreatedAt = existing?.created_at ? new Date(existing.created_at).getTime() : 0;
         if (!existing || nextCreatedAt >= existingCreatedAt) {
           latestSubmissionByEvent.set(row.event_id, {
+            id: row.id,
             event_id: row.event_id,
             name: row.name,
             email: row.email,
@@ -481,7 +489,7 @@ export default function AccountPage() {
     };
 
     loadEvents();
-  }, [userId]);
+  }, [userId, eventsRefreshKey]);
 
   // Load friend requests + accepted friends
   useEffect(() => {
@@ -1162,9 +1170,41 @@ export default function AccountPage() {
                 }
               : null
           }
+          onEdit={
+            selectedSubmission && selectedSubmissionEventTitle
+              ? () => {
+                  setEditingSubmission(selectedSubmission);
+                  setEditingSubmissionEventId(selectedSubmission.event_id);
+                  setEditingSubmissionEventTitle(selectedSubmissionEventTitle);
+                  setSelectedSubmission(null);
+                  setSelectedSubmissionEventTitle(null);
+                }
+              : undefined
+          }
           onClose={() => {
             setSelectedSubmission(null);
             setSelectedSubmissionEventTitle(null);
+          }}
+        />
+        <RegistrationModal
+          open={Boolean(editingSubmission && editingSubmissionEventId)}
+          eventId={editingSubmissionEventId}
+          contextTitle={editingSubmissionEventTitle ?? undefined}
+          mode="edit"
+          submissionId={editingSubmission?.id ?? null}
+          initialSubmission={editingSubmission}
+          onClose={() => {
+            setEditingSubmission(null);
+            setEditingSubmissionEventId(null);
+            setEditingSubmissionEventTitle(null);
+          }}
+          onSubmitted={() => {
+            setEditingSubmission(null);
+            setEditingSubmissionEventId(null);
+            setEditingSubmissionEventTitle(null);
+            setSelectedSubmission(null);
+            setSelectedSubmissionEventTitle(null);
+            setEventsRefreshKey((prev) => prev + 1);
           }}
         />
       </div>

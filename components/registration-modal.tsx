@@ -42,6 +42,17 @@ type RegistrationModalProps = {
   open: boolean;
   eventId: string | null;
   contextTitle?: string;
+  mode?: "create" | "edit";
+  submissionId?: string | null;
+  initialSubmission?: {
+    id: string;
+    name: string;
+    email: string;
+    phone?: string | null;
+    answers?: Record<string, JsonValue | undefined> | null;
+    attachments?: string[] | null;
+    waiver_accepted?: boolean | null;
+  } | null;
   onClose: () => void;
   onSubmitted?: () => void;
 };
@@ -93,7 +104,16 @@ const schemaRequiresWaiver = (schema: JsonValue | null | undefined) => {
   return Boolean((schema as RegistrationSchema).require_waiver);
 };
 
-export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubmitted }: RegistrationModalProps) {
+export function RegistrationModal({
+  open,
+  eventId,
+  contextTitle,
+  mode = "create",
+  submissionId = null,
+  initialSubmission = null,
+  onClose,
+  onSubmitted,
+}: RegistrationModalProps) {
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [eventConfig, setEventConfig] = useState<EventRegistration | null>(null);
@@ -169,19 +189,25 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
       setValues((prev) => {
         const nextValues: Record<string, any> = {
           ...DEFAULT_VALUES,
-          email: prev.email || "",
-          name: prev.name || "",
-          phone: prev.phone || "",
+          email: initialSubmission?.email ?? (prev.email || ""),
+          name: initialSubmission?.name ?? (prev.name || ""),
+          phone: initialSubmission?.phone ?? (prev.phone || ""),
+          waiver_accepted: Boolean(initialSubmission?.waiver_accepted),
         };
         for (const field of normalized) {
-          nextValues[field.name] = field.type === "checkbox" ? false : "";
+          const savedValue = initialSubmission?.answers?.[field.name];
+          if (savedValue !== undefined) {
+            nextValues[field.name] = field.type === "checkbox" ? Boolean(savedValue) : savedValue;
+          } else {
+            nextValues[field.name] = field.type === "checkbox" ? false : "";
+          }
         }
         return nextValues;
       });
       setLoadingEvent(false);
     };
     void load();
-  }, [open, eventId]);
+  }, [open, eventId, initialSubmission]);
 
   const updateValue = (name: string, value: any) => {
     setValues((prev) => ({ ...prev, [name]: value }));
@@ -201,7 +227,11 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
       for (const field of fields) {
         if (!field.required) continue;
         if (field.type === "file") {
-          if (!files[field.name]?.length) return `${field.label} is required.`;
+          const existingValue = values[field.name];
+          const hasExistingFile =
+            (typeof existingValue === "string" && existingValue.trim().length > 0) ||
+            (Array.isArray(existingValue) && existingValue.length > 0);
+          if (!files[field.name]?.length && !hasExistingFile) return `${field.label} is required.`;
         } else if (field.type === "checkbox") {
           if (!values[field.name]) return `${field.label} is required.`;
         } else if (!String(values[field.name] ?? "").trim()) {
@@ -238,7 +268,7 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
       return;
     }
 
-    if (!eventConfig.allow_multiple_registrations) {
+    if (mode === "create" && !eventConfig.allow_multiple_registrations) {
       const { data: existing, error: existingError } = await client
         .from("event_submissions")
         .select("id")
@@ -258,7 +288,7 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
       }
     }
 
-    if (eventConfig.registration_limit && eventConfig.registration_limit > 0) {
+    if (mode === "create" && eventConfig.registration_limit && eventConfig.registration_limit > 0) {
       const { count, error: countError } = await client
         .from("event_submissions")
         .select("id", { count: "exact", head: true })
@@ -277,10 +307,14 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
 
     setStatus({ type: "loading" });
     const answers: Record<string, JsonValue> = {};
-    const attachments: string[] = [];
-
     for (const field of fields) {
-      if (field.type === "file") continue;
+      if (field.type === "file") {
+        const existingValue = values[field.name];
+        if (existingValue !== undefined && existingValue !== null && existingValue !== "") {
+          answers[field.name] = existingValue as JsonValue;
+        }
+        continue;
+      }
       answers[field.name] = (values[field.name] ?? "") as JsonValue;
     }
 
@@ -299,12 +333,22 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
         }
         const finalPath = data?.path ?? path;
         storedPaths.push(finalPath);
-        attachments.push(finalPath);
       }
       answers[fieldName] = (storedPaths.length === 1 ? storedPaths[0] : storedPaths) as JsonValue;
     }
 
-    const { error } = await client.from("event_submissions").insert({
+    const attachments = fields
+      .filter((field) => field.type === "file")
+      .flatMap((field) => {
+        const value = answers[field.name];
+        if (typeof value === "string" && value.trim()) return [value];
+        if (Array.isArray(value)) {
+          return value.filter((entry): entry is string => typeof entry === "string" && entry.trim().length > 0);
+        }
+        return [];
+      });
+
+    const payload = {
       event_id: eventConfig.id,
       user_id: userId,
       name: values.name.trim(),
@@ -314,14 +358,19 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
       attachments,
       waiver_accepted: Boolean(values.waiver_accepted),
       waiver_accepted_at: values.waiver_accepted ? new Date().toISOString() : null,
-    });
+    };
+
+    const { error } =
+      mode === "edit" && submissionId
+        ? await client.from("event_submissions").update(payload).eq("id", submissionId).eq("user_id", userId)
+        : await client.from("event_submissions").insert(payload);
 
     if (error) {
-      setStatus({ type: "error", message: error.message ?? "Could not submit registration." });
+      setStatus({ type: "error", message: error.message ?? `Could not ${mode === "edit" ? "update" : "submit"} registration.` });
       return;
     }
 
-    setStatus({ type: "success", message: "Registration submitted!" });
+    setStatus({ type: "success", message: mode === "edit" ? "Submission updated!" : "Registration submitted!" });
     onSubmitted?.();
     onClose();
   };
@@ -333,7 +382,7 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
       <div className="register-modal">
         <div className="register-modal__header">
           <div>
-            <p className="eyebrow">Register</p>
+            <p className="eyebrow">{mode === "edit" ? "Edit Submission" : "Register"}</p>
             <h2>{eventConfig?.title || contextTitle || "Event registration"}</h2>
             {contextTitle ? <p className="muted">{contextTitle}</p> : null}
           </div>
@@ -482,10 +531,23 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
                         id={id}
                         name={field.name}
                         type="file"
-                        required={field.required}
+                        required={field.required && !values[field.name]}
                         multiple
                         onChange={(e) => updateFiles(field.name, e.target.files)}
                       />
+                      {values[field.name] ? (
+                        <p className="form-help muted">
+                          Current file{Array.isArray(values[field.name]) && values[field.name].length !== 1 ? "s" : ""}:{" "}
+                          {Array.isArray(values[field.name])
+                            ? values[field.name]
+                                .filter((entry: unknown): entry is string => typeof entry === "string")
+                                .map((entry: string) => entry.split("/").pop() || entry)
+                                .join(", ")
+                            : typeof values[field.name] === "string"
+                              ? values[field.name].split("/").pop() || values[field.name]
+                              : ""}
+                        </p>
+                      ) : null}
                       {field.help ? <p className="form-help muted">{field.help}</p> : null}
                     </div>
                   );
@@ -544,7 +606,13 @@ export function RegistrationModal({ open, eventId, contextTitle, onClose, onSubm
                   Cancel
                 </button>
                 <button className="button primary" type="submit" disabled={status.type === "loading"}>
-                  {status.type === "loading" ? "Submitting..." : "Submit registration"}
+                  {status.type === "loading"
+                    ? mode === "edit"
+                      ? "Saving..."
+                      : "Submitting..."
+                    : mode === "edit"
+                      ? "Save changes"
+                      : "Submit registration"}
                 </button>
               </div>
             </div>
