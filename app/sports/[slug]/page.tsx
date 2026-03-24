@@ -123,6 +123,7 @@ export default function DynamicSportPage() {
   const openModal = (eventId?: string | null, title?: string) => {
     const normalizedEventId = eventId?.trim();
     if (!normalizedEventId || isRegisteredEvent(normalizedEventId)) return;
+    setDetailEvent(null);
     setModalEventId(normalizedEventId);
     setModalTitle(title ?? null);
     setModalOpen(true);
