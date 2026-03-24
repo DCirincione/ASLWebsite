@@ -199,6 +199,11 @@ export default function DynamicSportPage() {
 
           return (
             <article key={event.id} className="sport-event-card">
+              {event.image ? (
+                <div className="sport-event-card__media">
+                  <Image src={event.image} alt="" width={200} height={130} />
+                </div>
+              ) : null}
               <div className="sport-event-card__body">
                 <p className="eyebrow">{sportTitle}</p>
                 <h3>{event.title}</h3>

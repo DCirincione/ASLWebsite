@@ -3180,7 +3180,7 @@ html[data-theme="dark"] .pill--muted {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
-  margin: 12px 0 16px;
+  margin: 10px 0 0;
 }
 
 .sport-event__info {
@@ -3220,23 +3220,32 @@ html[data-theme="dark"] .pill--muted {
   border: 1px solid var(--border);
   border-radius: 14px;
   display: grid;
-  grid-template-columns: 2.2fr 0.8fr;
-  gap: 12px;
-  padding: 12px;
-  align-items: center;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  align-items: stretch;
+  overflow: hidden;
 }
 
 .sport-event-card__media {
   width: 100%;
-  max-width: 200px;
-  justify-self: end;
+  height: 100%;
+  min-height: 100%;
 }
 
 .sport-event-card__media img {
+  display: block;
   width: 100%;
-  height: 130px;
-  border-radius: 12px;
-  object-fit: contain;
+  height: 100%;
+  border-radius: 0;
+  object-fit: cover;
+}
+
+.sport-event-card__body {
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .sport-event-card__body h3 {
@@ -3250,8 +3259,7 @@ html[data-theme="dark"] .pill--muted {
   }
 
   .sport-event-card__media {
-    max-width: 220px;
-    justify-self: start;
+    min-height: 180px;
   }
 }
 

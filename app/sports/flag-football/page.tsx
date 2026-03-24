@@ -209,6 +209,11 @@ export default function FlagFootballPage() {
           <div className="sport-event-list">
             {byType.featuredEvents.map((ev) => (
               <article key={ev.id} className="sport-event-card">
+                {ev.image ? (
+                  <div className="sport-event-card__media">
+                    <Image src={ev.image} alt="" width={200} height={130} />
+                  </div>
+                ) : null}
                 <div className="sport-event-card__body">
                   <p className="eyebrow">Flag Football</p>
                   <h3>{ev.title}</h3>
