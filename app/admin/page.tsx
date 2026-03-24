@@ -983,7 +983,7 @@ export default function AdminPage() {
                         checked={field.required}
                         onChange={(e) => updateRegistrationField(target, field.id, "required", e.target.checked)}
                       />
-                      <span>Required foield</span>
+                      <span>Required field</span>
                     </label>
                   </div>
 
