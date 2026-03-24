@@ -8,6 +8,7 @@ import { AccessibilityControls } from "@/components/accessibility-controls";
 import { RegistrationModal } from "@/components/registration-modal";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { createId } from "@/lib/create-id";
+import { isWaitlistEvent } from "@/lib/event-signups";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Friend, JsonValue, Profile, TeamMembership } from "@/lib/supabase/types";
@@ -469,7 +470,7 @@ export default function AccountPage() {
 
       const { data: eventData, error: eventError } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,host_type,registration_program_slug")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,signup_mode,registration_program_slug")
         .in("id", eventIds);
 
       if (eventError) {
@@ -864,7 +865,7 @@ export default function AccountPage() {
           <div className="account-card__header">
             <div>
               <h2>My Events</h2>
-              <p className="muted">Events you have signed up for.</p>
+              <p className="muted">Events you registered for or joined the waitlist for.</p>
             </div>
           </div>
           {eventsError ? (
@@ -876,7 +877,7 @@ export default function AccountPage() {
             <p className="muted">Loading your events...</p>
           ) : (registeredEvents ?? []).length === 0 ? (
             <p className="muted">
-              No events yet. <Link href="/events">Browse upcoming events</Link> to join.
+              No event submissions yet. <Link href="/events">Browse upcoming events</Link> to join.
             </p>
           ) : (
             <div className="event-list">
@@ -891,6 +892,7 @@ export default function AccountPage() {
                       <h3>{event.title}</h3>
                     </div>
                     <div className="event-card__meta">
+                      <p className="muted">{isWaitlistEvent(event) ? "Status: Joined waitlist" : "Status: Registered"}</p>
                       {dateToShow ? <p className="muted">Date: {dateToShow}</p> : null}
                       {event.location ? <p className="muted">Location: {event.location}</p> : null}
                     </div>

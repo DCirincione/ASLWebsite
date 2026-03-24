@@ -6,6 +6,12 @@ import { useRouter } from "next/navigation";
 
 import { EventDetailModal } from "@/components/event-detail-modal";
 import { RegistrationModal } from "@/components/registration-modal";
+import {
+  getSignupActionLabel,
+  getSignupSubmittedLabel,
+  getSignupUnavailableLabel,
+  getSignupUnavailableMessage,
+} from "@/lib/event-signups";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
@@ -20,6 +26,7 @@ type HomeEvent = {
   description?: string | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
+  signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
   registration_enabled?: boolean | null;
   image?: string | null;
@@ -100,7 +107,7 @@ export function HomeUpcomingEvents() {
       setLoading(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,registration_program_slug,registration_enabled")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,registration_enabled")
         .order("start_date", { ascending: true, nullsFirst: false })
         .limit(4);
 
@@ -190,7 +197,7 @@ export function HomeUpcomingEvents() {
                           type="button"
                           onClick={() => {
                             if (!canRegister) {
-                              setMessage("Registration for this event is not available yet.");
+                              setMessage(getSignupUnavailableMessage(event));
                               return;
                             }
                             if (isRegistered) {
@@ -206,7 +213,7 @@ export function HomeUpcomingEvents() {
                           }}
                           disabled={!canRegister || isRegistered}
                         >
-                          {!canRegister ? "Registration coming soon" : isRegistered ? "Registered" : "Register"}
+                          {!canRegister ? getSignupUnavailableLabel(event) : isRegistered ? getSignupSubmittedLabel(event) : getSignupActionLabel(event)}
                         </button>
                       </>
                     )}
@@ -232,7 +239,7 @@ export function HomeUpcomingEvents() {
         onClose={() => setDetailEvent(null)}
         onRegister={(event) => {
           if (!event.registration_enabled) {
-            setMessage("Registration for this event is not available yet.");
+            setMessage(getSignupUnavailableMessage(event));
             return;
           }
           if (isRegisteredEvent(event.id)) {

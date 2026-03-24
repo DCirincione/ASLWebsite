@@ -9,6 +9,7 @@ import { EventDetailModal } from "@/components/event-detail-modal";
 import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
+import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import { getEventSectionLabel, normalizeSportSlug, parseSportSectionHeaders, slugifySportValue, sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
@@ -66,7 +67,7 @@ export default function DynamicSportPage() {
         supabase.from("sports").select("*").order("title", { ascending: true }),
         supabase
           .from("events")
-          .select("id,title,start_date,end_date,time_info,location,description,registration_program_slug,image_url,registration_enabled")
+          .select("id,title,start_date,end_date,time_info,location,description,signup_mode,registration_program_slug,image_url,registration_enabled")
           .order("start_date", { ascending: true, nullsFirst: false }),
       ]);
 
@@ -173,7 +174,7 @@ export default function DynamicSportPage() {
                         disabled={!item.registration_enabled || isRegisteredEvent(item.id)}
                         onClick={() => openModal(item.id, item.title)}
                       >
-                        {!item.registration_enabled ? "Registration coming soon" : isRegisteredEvent(item.id) ? "Registered" : "Sign up"}
+                        {!item.registration_enabled ? getSignupUnavailableLabel(item) : isRegisteredEvent(item.id) ? getSignupSubmittedLabel(item) : getSignupActionLabel(item)}
                       </button>
                     </>
                   )}
@@ -228,7 +229,7 @@ export default function DynamicSportPage() {
                         disabled={!event.registration_enabled || isRegisteredEvent(event.id)}
                         onClick={() => openModal(event.id, event.title)}
                       >
-                        {!event.registration_enabled ? "Registration coming soon" : isRegisteredEvent(event.id) ? "Registered" : "Sign up"}
+                        {!event.registration_enabled ? getSignupUnavailableLabel(event) : isRegisteredEvent(event.id) ? getSignupSubmittedLabel(event) : getSignupActionLabel(event)}
                       </button>
                     </>
                   )}

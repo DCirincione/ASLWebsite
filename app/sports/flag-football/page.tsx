@@ -8,6 +8,7 @@ import { EventDetailModal } from "@/components/event-detail-modal";
 import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
+import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 import type { Event } from "@/lib/supabase/types";
@@ -41,7 +42,7 @@ export default function FlagFootballPage() {
       setLoadingEvents(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,registration_program_slug,image_url,registration_enabled")
+        .select("id,title,start_date,end_date,time_info,location,description,signup_mode,registration_program_slug,image_url,registration_enabled")
         .order("start_date", { ascending: true, nullsFirst: false });
 
       if (!error && data) {
@@ -144,7 +145,7 @@ export default function FlagFootballPage() {
                   disabled={!item.registration_enabled || isRegisteredEvent(item.id)}
                   onClick={() => openModal(item.id, item.title)}
                 >
-                  {!item.registration_enabled ? "Registration coming soon" : isRegisteredEvent(item.id) ? "Registered" : "Sign up"}
+                  {!item.registration_enabled ? getSignupUnavailableLabel(item) : isRegisteredEvent(item.id) ? getSignupSubmittedLabel(item) : getSignupActionLabel(item)}
                 </button>
               </div>
             </div>
@@ -224,7 +225,7 @@ export default function FlagFootballPage() {
                       disabled={!ev.registration_enabled || isRegisteredEvent(ev.id)}
                       onClick={() => openModal(ev.id, ev.title)}
                     >
-                      {!ev.registration_enabled ? "Registration coming soon" : isRegisteredEvent(ev.id) ? "Registered" : "Sign up"}
+                      {!ev.registration_enabled ? getSignupUnavailableLabel(ev) : isRegisteredEvent(ev.id) ? getSignupSubmittedLabel(ev) : getSignupActionLabel(ev)}
                     </button>
                   </div>
                 </div>

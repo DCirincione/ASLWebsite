@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 
+import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import { supabase } from "@/lib/supabase/client";
 
 type EventDetail = {
@@ -14,6 +15,7 @@ type EventDetail = {
   description?: string | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   image_url?: string | null;
+  signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
   registration_enabled?: boolean | null;
   image?: string | null;
@@ -180,10 +182,10 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
             <p className="muted">{event.location || "Location TBD"}</p>
           </div>
           <div className="event-detail__header-actions">
-            {event.registration_program_slug ? (
+            {event.registration_enabled ? (
               isRegistered ? (
                 <button className="button primary" type="button" disabled>
-                  Registered
+                  {getSignupSubmittedLabel(event)}
                 </button>
               ) : (
                 <button
@@ -191,11 +193,11 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
                   type="button"
                   onClick={() => onRegister?.(event)}
                 >
-                  Sign up
+                  {getSignupActionLabel(event)}
                 </button>
               )
             ) : (
-              <span className="muted">Registration coming soon</span>
+              <span className="muted">{getSignupUnavailableLabel(event)}</span>
             )}
             <button className="button ghost" type="button" onClick={onClose}>
               Close

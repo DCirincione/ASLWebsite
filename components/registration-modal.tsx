@@ -5,6 +5,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createId } from "@/lib/create-id";
+import {
+  getSignupDuplicateMessage,
+  getSignupModalEyebrow,
+  getSignupModalTitle,
+  getSignupSuccessMessage,
+  isWaitlistEvent,
+} from "@/lib/event-signups";
 import { supabase } from "@/lib/supabase/client";
 import type { JsonValue } from "@/lib/supabase/types";
 
@@ -29,6 +36,7 @@ type RegistrationSchema = {
 type EventRegistration = {
   id: string;
   title: string;
+  signup_mode?: "registration" | "waitlist" | null;
   registration_enabled?: boolean | null;
   registration_schema?: JsonValue | null;
   waiver_url?: string | null;
@@ -167,7 +175,7 @@ export function RegistrationModal({
 
       const { data: eventRow, error: eventError } = await client
         .from("events")
-        .select("id,title,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit")
+        .select("id,title,signup_mode,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit")
         .eq("id", eventId)
         .maybeSingle();
 
@@ -183,7 +191,7 @@ export function RegistrationModal({
         return;
       }
 
-      const normalized = parseSchemaFields(eventRow.registration_schema ?? null);
+      const normalized = isWaitlistEvent(eventRow as EventRegistration) ? [] : parseSchemaFields(eventRow.registration_schema ?? null);
       setEventConfig(eventRow as EventRegistration);
       setFields(normalized);
       setValues((prev) => {
@@ -219,11 +227,13 @@ export function RegistrationModal({
   };
 
   const waiverRequired = Boolean(eventConfig?.waiver_url || schemaRequiresWaiver(eventConfig?.registration_schema));
+  const waitlistMode = isWaitlistEvent(eventConfig);
 
   const validate = useMemo(() => {
     return () => {
       if (!values.name?.trim()) return "Name is required.";
       if (!values.email?.trim()) return "Email is required.";
+      if (waitlistMode && !values.phone?.trim()) return "Phone is required.";
       for (const field of fields) {
         if (!field.required) continue;
         if (field.type === "file") {
@@ -238,10 +248,10 @@ export function RegistrationModal({
           return `${field.label} is required.`;
         }
       }
-      if (waiverRequired && !values.waiver_accepted) return "You must accept the waiver to continue.";
+      if (!waitlistMode && waiverRequired && !values.waiver_accepted) return "You must accept the waiver to continue.";
       return null;
     };
-  }, [fields, files, values, waiverRequired]);
+  }, [fields, files, values, waiverRequired, waitlistMode]);
 
   const orderedFields = useMemo(() => {
     const primary = fields.filter((field) => field.type !== "checkbox" && field.type !== "file");
@@ -282,13 +292,13 @@ export function RegistrationModal({
       }
 
       if ((existing ?? []).length > 0) {
-        setStatus({ type: "error", message: "You are already registered for this event." });
+        setStatus({ type: "error", message: getSignupDuplicateMessage(eventConfig) });
         onSubmitted?.();
         return;
       }
     }
 
-    if (mode === "create" && eventConfig.registration_limit && eventConfig.registration_limit > 0) {
+    if (!waitlistMode && mode === "create" && eventConfig.registration_limit && eventConfig.registration_limit > 0) {
       const { count, error: countError } = await client
         .from("event_submissions")
         .select("id", { count: "exact", head: true })
@@ -370,7 +380,7 @@ export function RegistrationModal({
       return;
     }
 
-    setStatus({ type: "success", message: mode === "edit" ? "Submission updated!" : "Registration submitted!" });
+    setStatus({ type: "success", message: getSignupSuccessMessage(eventConfig, mode) });
     onSubmitted?.();
     onClose();
   };
@@ -382,8 +392,8 @@ export function RegistrationModal({
       <div className="register-modal">
         <div className="register-modal__header">
           <div>
-            <p className="eyebrow">{mode === "edit" ? "Edit Submission" : "Register"}</p>
-            <h2>{eventConfig?.title || contextTitle || "Event registration"}</h2>
+            <p className="eyebrow">{getSignupModalEyebrow(eventConfig, mode)}</p>
+            <h2>{eventConfig?.title || contextTitle || getSignupModalTitle(eventConfig)}</h2>
             {contextTitle ? <p className="muted">{contextTitle}</p> : null}
           </div>
           <button className="button ghost" type="button" onClick={onClose}>
@@ -439,12 +449,16 @@ export function RegistrationModal({
               </div>
               <div className="form-control">
                 <label htmlFor="field-phone">
-                  <span className="register-field-label">Phone</span>
+                  <span className="register-field-label">
+                    Phone
+                    {waitlistMode ? <span className="register-required">*</span> : null}
+                  </span>
                 </label>
                 <input
                   id="field-phone"
                   name="phone"
                   type="tel"
+                  required={waitlistMode}
                   value={values.phone || ""}
                   onChange={(e) => updateValue("phone", e.target.value)}
                 />

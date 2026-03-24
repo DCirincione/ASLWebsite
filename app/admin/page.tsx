@@ -4,10 +4,12 @@ import Link from "next/link";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { createId } from "@/lib/create-id";
+import type { SignupMode } from "@/lib/event-signups";
 import { parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
-import type { Event, Flyer, Sport } from "@/lib/supabase/types";
+import type { Event, Flyer, JsonValue, Sport } from "@/lib/supabase/types";
 
 type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type FormStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -42,6 +44,7 @@ type EventFormState = {
   description: string;
   host_type: HostType;
   image_url: string;
+  signup_mode: SignupMode;
   registration_program_slug: string;
   registration_enabled: boolean;
   waiver_url: string;
@@ -73,8 +76,12 @@ type RegistrationRecord = {
   user_name: string;
   user_email: string;
   user_phone?: string | null;
+  answers?: Record<string, JsonValue | undefined> | null;
+  attachments?: string[] | null;
+  waiver_accepted?: boolean | null;
   event_id: string;
   event_title: string;
+  signup_mode: SignupMode;
 };
 type ContactMessage = {
   id: string;
@@ -139,7 +146,7 @@ const createEmptyRegistrationField = (): RegistrationFieldEditor => ({
   required: false,
   placeholder: "",
   optionsText: "",
-  expanded: true,
+  expanded: false,
 });
 
 const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick<EventFormState, "require_waiver" | "registration_fields"> => {
@@ -258,8 +265,11 @@ export default function AdminPage() {
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
   const [registrationsError, setRegistrationsError] = useState<string | null>(null);
   const [selectedRegistrationEventId, setSelectedRegistrationEventId] = useState<string | null>(null);
+  const [selectedRegistrationSubmissionId, setSelectedRegistrationSubmissionId] = useState<string | null>(null);
   const [registrationsEventFilter, setRegistrationsEventFilter] = useState("all");
   const [registrationsUserFilter, setRegistrationsUserFilter] = useState("");
+  const [createRegistrationFieldsVisible, setCreateRegistrationFieldsVisible] = useState(false);
+  const [editRegistrationFieldsVisible, setEditRegistrationFieldsVisible] = useState(false);
   const [contactMessages, setContactMessages] = useState<ContactMessage[]>([]);
   const [loadingContactMessages, setLoadingContactMessages] = useState(false);
   const [contactMessagesError, setContactMessagesError] = useState<string | null>(null);
@@ -308,6 +318,7 @@ export default function AdminPage() {
     description: "",
     host_type: "aldrich",
     image_url: "",
+    signup_mode: "registration",
     registration_program_slug: "",
     registration_enabled: false,
     waiver_url: "",
@@ -324,6 +335,7 @@ export default function AdminPage() {
     description: "",
     host_type: "aldrich",
     image_url: "",
+    signup_mode: "registration",
     registration_program_slug: "",
     registration_enabled: false,
     waiver_url: "",
@@ -395,7 +407,7 @@ export default function AdminPage() {
     setEventsError(null);
     const { data, error } = await supabase
       .from("events")
-      .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,registration_program_slug,registration_enabled,waiver_url,allow_multiple_registrations,registration_limit,registration_schema")
+      .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,registration_enabled,waiver_url,allow_multiple_registrations,registration_limit,registration_schema")
       .order("start_date", { ascending: true, nullsFirst: false });
 
     if (!error && data) {
@@ -569,7 +581,7 @@ export default function AdminPage() {
 
     const { data: submissionData, error: submissionError } = await supabase
       .from("event_submissions")
-      .select("id,event_id,user_id,name,email,phone,created_at")
+      .select("id,event_id,user_id,name,email,phone,answers,attachments,waiver_accepted,created_at")
       .order("created_at", { ascending: false });
 
     if (submissionError) {
@@ -586,6 +598,9 @@ export default function AdminPage() {
       name: string;
       email: string;
       phone?: string | null;
+      answers?: Record<string, JsonValue | undefined> | null;
+      attachments?: string[] | null;
+      waiver_accepted?: boolean | null;
       created_at?: string | null;
     }>;
 
@@ -602,7 +617,7 @@ export default function AdminPage() {
       await Promise.all([
         supabase
           .from("events")
-          .select("id,title")
+          .select("id,title,signup_mode")
           .in("id", Array.from(new Set(submissions.map((row) => row.event_id).filter(Boolean)))),
         supabase
           .from("profiles")
@@ -619,10 +634,13 @@ export default function AdminPage() {
 
     const profiles = (profilesData ?? []) as Array<{ id: string; name: string | null }>;
     const profileById = new Map(profiles.map((row) => [row.id, row]));
-    const eventById = new Map(((eventsData ?? []) as Array<{ id: string; title: string }>).map((row) => [row.id, row.title]));
+    const eventById = new Map(
+      ((eventsData ?? []) as Array<{ id: string; title: string; signup_mode?: SignupMode | null }>).map((row) => [row.id, row])
+    );
 
     const resolved: RegistrationRecord[] = submissions.map((row) => {
       const profile = profileById.get(row.user_id);
+      const eventInfo = eventById.get(row.event_id);
       return {
         id: row.id,
         submitted_at: row.created_at ?? null,
@@ -630,8 +648,12 @@ export default function AdminPage() {
         user_name: profile?.name?.trim() || row.name || "Unknown user",
         user_email: row.email,
         user_phone: row.phone ?? null,
+        answers: row.answers ?? null,
+        attachments: row.attachments ?? null,
+        waiver_accepted: row.waiver_accepted ?? false,
         event_id: row.event_id,
-        event_title: eventById.get(row.event_id) ?? "Unknown event",
+        event_title: eventInfo?.title ?? "Unknown event",
+        signup_mode: eventInfo?.signup_mode === "waitlist" ? "waitlist" : "registration",
       };
     });
 
@@ -729,6 +751,7 @@ export default function AdminPage() {
       description: "",
       host_type: "aldrich",
       image_url: "",
+      signup_mode: "registration",
       registration_program_slug: "",
       registration_enabled: false,
       waiver_url: "",
@@ -744,6 +767,7 @@ export default function AdminPage() {
 
   const openCreateEventForm = () => {
     resetForm();
+    setCreateRegistrationFieldsVisible(false);
     setFormStatus({ type: "idle" });
     setShowCreateEventForm(true);
   };
@@ -756,6 +780,7 @@ export default function AdminPage() {
 
   const closeCreateEventForm = () => {
     resetForm();
+    setCreateRegistrationFieldsVisible(false);
     setFormStatus({ type: "idle" });
     setShowCreateEventForm(false);
   };
@@ -769,6 +794,7 @@ export default function AdminPage() {
   const startEditing = (event: Event) => {
     const registrationState = parseRegistrationSchemaState(event.registration_schema);
     setEditingId(event.id);
+    setEditRegistrationFieldsVisible(false);
     setEditForm({
       title: event.title ?? "",
       start_date: event.start_date ?? "",
@@ -778,6 +804,7 @@ export default function AdminPage() {
       description: event.description ?? "",
       host_type: event.host_type ?? "aldrich",
       image_url: event.image_url ?? "",
+      signup_mode: event.signup_mode === "waitlist" ? "waitlist" : "registration",
       registration_program_slug: event.registration_program_slug ?? "",
       registration_enabled: Boolean(event.registration_enabled),
       waiver_url: event.waiver_url ?? "",
@@ -796,6 +823,7 @@ export default function AdminPage() {
 
   const cancelEditing = () => {
     setEditingId(null);
+    setEditRegistrationFieldsVisible(false);
   };
 
   const cancelEditingSport = () => {
@@ -873,6 +901,19 @@ export default function AdminPage() {
     setEditForm(apply);
   };
 
+  const setAllRegistrationFieldsExpanded = (target: "create" | "edit", expanded: boolean) => {
+    const apply = (prev: EventFormState) => ({
+      ...prev,
+      registration_fields: prev.registration_fields.map((field) => ({ ...field, expanded })),
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+    setEditForm(apply);
+  };
+
   const removeRegistrationField = (target: "create" | "edit", fieldId: string) => {
     const apply = (prev: EventFormState) => ({
       ...prev,
@@ -905,8 +946,13 @@ export default function AdminPage() {
     setEditForm(apply);
   };
 
-  const renderRegistrationBuilder = (target: "create" | "edit", state: EventFormState) => (
-    <div style={{ display: "grid", gap: 16 }}>
+  const renderRegistrationBuilder = (target: "create" | "edit", state: EventFormState) => {
+    const fieldsVisible = target === "create" ? createRegistrationFieldsVisible : editRegistrationFieldsVisible;
+    const setFieldsVisible = target === "create" ? setCreateRegistrationFieldsVisible : setEditRegistrationFieldsVisible;
+    const hasFields = state.registration_fields.length > 0;
+
+    return (
+      <div style={{ display: "grid", gap: 16 }}>
       <div style={{ display: "grid", gap: 12 }}>
         <div className="account-card__header">
           <div>
@@ -916,13 +962,24 @@ export default function AdminPage() {
             </p>
           </div>
         </div>
-        <div>
-          <button className="button ghost" type="button" onClick={() => addRegistrationField(target)}>
-            Add field
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button className="button ghost" type="button" onClick={() => setFieldsVisible(!fieldsVisible)}>
+            {fieldsVisible ? "Collapse all" : "Expand all"}
           </button>
+          {fieldsVisible ? (
+            <button className="button ghost" type="button" onClick={() => addRegistrationField(target)}>
+              Add field
+            </button>
+          ) : null}
         </div>
 
-        {state.registration_fields.length === 0 ? (
+        {!fieldsVisible ? (
+          <p className="muted">
+            {hasFields
+              ? `${state.registration_fields.length} extra field${state.registration_fields.length === 1 ? "" : "s"} hidden.`
+              : "Extra fields are hidden."}
+          </p>
+        ) : state.registration_fields.length === 0 ? (
           <p className="muted">No extra fields yet.</p>
         ) : (
           state.registration_fields.map((field, index) => (
@@ -1051,7 +1108,8 @@ export default function AdminPage() {
         </label>
       </div>
     </div>
-  );
+    );
+  };
 
   const handleCreateEvent = async (event: FormEvent) => {
     event.preventDefault();
@@ -1066,7 +1124,8 @@ export default function AdminPage() {
     }
 
     setFormStatus({ type: "loading" });
-    const registrationSchema = buildRegistrationSchema(form);
+    const isWaitlist = form.signup_mode === "waitlist";
+    const registrationSchema = isWaitlist ? null : buildRegistrationSchema(form);
     const payload = {
       title: form.title.trim(),
       start_date: form.start_date || null,
@@ -1076,11 +1135,12 @@ export default function AdminPage() {
       description: form.description.trim() || null,
       host_type: form.host_type || null,
       image_url: form.image_url.trim() || null,
+      signup_mode: form.signup_mode,
       registration_program_slug: form.registration_program_slug.trim() || null,
       registration_enabled: form.registration_enabled,
-      waiver_url: form.waiver_url.trim() || null,
+      waiver_url: isWaitlist ? null : form.waiver_url.trim() || null,
       allow_multiple_registrations: false,
-      registration_limit: form.registration_limit.trim() ? Number(form.registration_limit) : null,
+      registration_limit: isWaitlist ? null : form.registration_limit.trim() ? Number(form.registration_limit) : null,
       registration_schema: registrationSchema,
     };
 
@@ -1163,7 +1223,8 @@ export default function AdminPage() {
     }
 
     setSavingEditId(eventId);
-    const registrationSchema = buildRegistrationSchema(editForm);
+    const isWaitlist = editForm.signup_mode === "waitlist";
+    const registrationSchema = isWaitlist ? null : buildRegistrationSchema(editForm);
     const payload = {
       title: editForm.title.trim(),
       start_date: editForm.start_date || null,
@@ -1173,11 +1234,12 @@ export default function AdminPage() {
       description: editForm.description.trim() || null,
       host_type: editForm.host_type || null,
       image_url: editForm.image_url.trim() || null,
+      signup_mode: editForm.signup_mode,
       registration_program_slug: editForm.registration_program_slug.trim() || null,
       registration_enabled: editForm.registration_enabled,
-      waiver_url: editForm.waiver_url.trim() || null,
+      waiver_url: isWaitlist ? null : editForm.waiver_url.trim() || null,
       allow_multiple_registrations: false,
-      registration_limit: editForm.registration_limit.trim() ? Number(editForm.registration_limit) : null,
+      registration_limit: isWaitlist ? null : editForm.registration_limit.trim() ? Number(editForm.registration_limit) : null,
       registration_schema: registrationSchema,
     };
 
@@ -1891,19 +1953,22 @@ export default function AdminPage() {
   };
 
   const registrationSummary = Object.values(
-    registrations.reduce<Record<string, { event_id: string; event_title: string; count: number }>>((acc, row) => {
+    registrations.reduce<Record<string, { event_id: string; event_title: string; count: number; signup_mode: SignupMode }>>((acc, row) => {
       const key = row.event_id;
       if (!acc[key]) {
         acc[key] = {
           event_id: row.event_id,
           event_title: row.event_title || "Unknown event",
           count: 0,
+          signup_mode: row.signup_mode,
         };
       }
       acc[key].count += 1;
       return acc;
     }, {})
   ).sort((a, b) => b.count - a.count);
+  const waitlistRegistrationSummary = registrationSummary.filter((item) => item.signup_mode === "waitlist");
+  const directRegistrationSummary = registrationSummary.filter((item) => item.signup_mode !== "waitlist");
   const selectedRegistrationRows = selectedRegistrationEventId
     ? registrations.filter((row) => row.event_id === selectedRegistrationEventId)
     : [];
@@ -1919,6 +1984,8 @@ export default function AdminPage() {
       row.user_id.toLowerCase().includes(term)
     );
   });
+  const selectedRegistrationSubmission =
+    registrations.find((row) => row.id === selectedRegistrationSubmissionId) ?? null;
 
   const filteredUsers = users.filter((user) => {
     const term = usersSearch.trim().toLowerCase();
@@ -2204,6 +2271,17 @@ export default function AdminPage() {
                       </div>
                     </div>
                     <div className="form-control">
+                      <label htmlFor="event-signup-mode">Signup mode</label>
+                      <select
+                        id="event-signup-mode"
+                        value={form.signup_mode}
+                        onChange={(e) => update("signup_mode", e.target.value as SignupMode)}
+                      >
+                        <option value="registration">Registration</option>
+                        <option value="waitlist">Waitlist / interest</option>
+                      </select>
+                    </div>
+                    <div className="form-control">
                       <label htmlFor="event-program-slug">Registration program slug</label>
                       <input
                         id="event-program-slug"
@@ -2217,6 +2295,7 @@ export default function AdminPage() {
                         id="event-waiver-url"
                         value={form.waiver_url}
                         onChange={(e) => update("waiver_url", e.target.value)}
+                        disabled={form.signup_mode === "waitlist"}
                       />
                     </div>
                     <div className="form-control">
@@ -2227,6 +2306,7 @@ export default function AdminPage() {
                         min="1"
                         value={form.registration_limit}
                         onChange={(e) => update("registration_limit", e.target.value)}
+                        disabled={form.signup_mode === "waitlist"}
                       />
                     </div>
                   </div>
@@ -2237,10 +2317,14 @@ export default function AdminPage() {
                         checked={form.registration_enabled}
                         onChange={(e) => update("registration_enabled", e.target.checked)}
                       />
-                      <span>Enable event registration</span>
+                      <span>Accept signups</span>
                     </label>
                   </div>
-                  {renderRegistrationBuilder("create", form)}
+                  {form.signup_mode === "waitlist" ? (
+                    <p className="muted">Waitlist events only collect name, email, and phone. Custom fields, waivers, and limits are disabled.</p>
+                  ) : (
+                    renderRegistrationBuilder("create", form)
+                  )}
                   <div className="cta-row">
                     <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
                       {formStatus.type === "loading" ? "Saving..." : "Create Event"}
@@ -2283,7 +2367,10 @@ export default function AdminPage() {
                           <p className="muted">Program: {event.registration_program_slug}</p>
                         ) : null}
                         <p className="muted">
-                          Registration: {event.registration_enabled ? "Enabled" : "Disabled"}
+                          Signup mode: {event.signup_mode === "waitlist" ? "Waitlist / interest" : "Registration"}
+                        </p>
+                        <p className="muted">
+                          Signup status: {event.registration_enabled ? "Open" : "Closed"}
                         </p>
                       </div>
                       <div className="cta-row">
@@ -2389,6 +2476,17 @@ export default function AdminPage() {
                               </div>
                             </div>
                             <div className="form-control">
+                              <label htmlFor={`edit-signup-mode-${event.id}`}>Signup mode</label>
+                              <select
+                                id={`edit-signup-mode-${event.id}`}
+                                value={editForm.signup_mode}
+                                onChange={(e) => updateEdit("signup_mode", e.target.value as SignupMode)}
+                              >
+                                <option value="registration">Registration</option>
+                                <option value="waitlist">Waitlist / interest</option>
+                              </select>
+                            </div>
+                            <div className="form-control">
                               <label htmlFor={`edit-slug-${event.id}`}>Registration program slug</label>
                               <input
                                 id={`edit-slug-${event.id}`}
@@ -2402,6 +2500,7 @@ export default function AdminPage() {
                                 id={`edit-waiver-url-${event.id}`}
                                 value={editForm.waiver_url}
                                 onChange={(e) => updateEdit("waiver_url", e.target.value)}
+                                disabled={editForm.signup_mode === "waitlist"}
                               />
                             </div>
                             <div className="form-control">
@@ -2412,6 +2511,7 @@ export default function AdminPage() {
                                 min="1"
                                 value={editForm.registration_limit}
                                 onChange={(e) => updateEdit("registration_limit", e.target.value)}
+                                disabled={editForm.signup_mode === "waitlist"}
                               />
                             </div>
                           </div>
@@ -2422,10 +2522,14 @@ export default function AdminPage() {
                                 checked={editForm.registration_enabled}
                                 onChange={(e) => updateEdit("registration_enabled", e.target.checked)}
                               />
-                              <span>Enable event registration</span>
+                              <span>Accept signups</span>
                             </label>
                           </div>
-                          {renderRegistrationBuilder("edit", editForm)}
+                          {editForm.signup_mode === "waitlist" ? (
+                            <p className="muted">Waitlist events only collect name, email, and phone. Custom fields, waivers, and limits are disabled.</p>
+                          ) : (
+                            renderRegistrationBuilder("edit", editForm)
+                          )}
                           <div className="cta-row">
                             <button
                               className="button primary"
@@ -2823,13 +2927,13 @@ export default function AdminPage() {
               <>
                 <section className="account-card">
                   <h2>Event Registrations</h2>
-                  <p className="muted">See who signed up for which event.</p>
+                  <p className="muted">See who signed up for which event, including waitlist-only events.</p>
                 </section>
                 <section className="account-card">
                   <div className="account-card__header">
                     <div>
                       <h2>Registration Summary</h2>
-                      <p className="muted">Count of signups by event.</p>
+                      <p className="muted">Count of signups by event, grouped by signup mode.</p>
                     </div>
                     <button
                       className="button ghost"
@@ -2846,22 +2950,54 @@ export default function AdminPage() {
                     <p className="muted">No registrations found.</p>
                   ) : null}
                   {!loadingRegistrations && registrations.length > 0 ? (
-                    <ul className="list admin-registration-summary-list" style={{ display: "grid", gap: 8 }}>
-                      {registrationSummary.map((item) => (
-                        <li key={item.event_id}>
-                          <button
-                            className={`team-card admin-registration-summary ${selectedRegistrationEventId === item.event_id ? "is-active" : ""}`}
-                            type="button"
-                            onClick={() => setSelectedRegistrationEventId(item.event_id)}
-                          >
-                            <div className="team-card__info">
-                              <p className="list__title">{item.event_title}</p>
-                              <p className="muted">{item.count} signup{item.count === 1 ? "" : "s"}</p>
-                            </div>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
+                    <div style={{ display: "grid", gap: 20 }}>
+                      <div>
+                        <h3 style={{ marginBottom: 8 }}>Registration Events</h3>
+                        {directRegistrationSummary.length === 0 ? (
+                          <p className="muted">No registration events have submissions yet.</p>
+                        ) : (
+                          <ul className="list admin-registration-summary-list" style={{ display: "grid", gap: 8 }}>
+                            {directRegistrationSummary.map((item) => (
+                              <li key={item.event_id}>
+                                <button
+                                  className={`team-card admin-registration-summary ${selectedRegistrationEventId === item.event_id ? "is-active" : ""}`}
+                                  type="button"
+                                  onClick={() => setSelectedRegistrationEventId(item.event_id)}
+                                >
+                                  <div className="team-card__info">
+                                    <p className="list__title">{item.event_title}</p>
+                                    <p className="muted">{item.count} signup{item.count === 1 ? "" : "s"}</p>
+                                  </div>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                      <div>
+                        <h3 style={{ marginBottom: 8 }}>Waitlisted Events</h3>
+                        {waitlistRegistrationSummary.length === 0 ? (
+                          <p className="muted">No waitlisted events have submissions yet.</p>
+                        ) : (
+                          <ul className="list admin-registration-summary-list" style={{ display: "grid", gap: 8 }}>
+                            {waitlistRegistrationSummary.map((item) => (
+                              <li key={item.event_id}>
+                                <button
+                                  className={`team-card admin-registration-summary ${selectedRegistrationEventId === item.event_id ? "is-active" : ""}`}
+                                  type="button"
+                                  onClick={() => setSelectedRegistrationEventId(item.event_id)}
+                                >
+                                  <div className="team-card__info">
+                                    <p className="list__title">{item.event_title}</p>
+                                    <p className="muted">Waitlist • {item.count} signup{item.count === 1 ? "" : "s"}</p>
+                                  </div>
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
                   ) : null}
                 </section>
                 <section className="account-card">
@@ -2879,7 +3015,7 @@ export default function AdminPage() {
                             <option value="all">All events</option>
                             {registrationSummary.map((item) => (
                               <option key={item.event_id} value={item.event_id}>
-                                {item.event_title}
+                                {item.event_title}{item.signup_mode === "waitlist" ? " (Waitlist)" : ""}
                               </option>
                             ))}
                           </select>
@@ -2904,12 +3040,22 @@ export default function AdminPage() {
                                 <h3>{row.event_title}</h3>
                               </div>
                               <div className="event-card__meta">
+                                <p className="muted">Type: {row.signup_mode === "waitlist" ? "Waitlist" : "Registration"}</p>
                                 <p className="muted">User: {row.user_name}</p>
                                 <p className="muted">Email: {row.user_email}</p>
                                 {row.user_phone ? <p className="muted">Phone: {row.user_phone}</p> : null}
                                 {row.submitted_at ? (
                                   <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
                                 ) : null}
+                              </div>
+                              <div className="cta-row">
+                                <button
+                                  className="button ghost"
+                                  type="button"
+                                  onClick={() => setSelectedRegistrationSubmissionId(row.id)}
+                                >
+                                  View Submission
+                                </button>
                               </div>
                             </article>
                           ))}
@@ -2929,10 +3075,10 @@ export default function AdminPage() {
                     <div className="event-detail" onClick={(event) => event.stopPropagation()}>
                       <div className="event-detail__header">
                         <div>
-                          <p className="eyebrow">Registration Summary</p>
+                          <p className="eyebrow">{selectedRegistrationEvent.signup_mode === "waitlist" ? "Waitlist Summary" : "Registration Summary"}</p>
                           <h2>{selectedRegistrationEvent.event_title}</h2>
                           <p className="muted">
-                            {selectedRegistrationEvent.count} signup{selectedRegistrationEvent.count === 1 ? "" : "s"} for this event.
+                            {selectedRegistrationEvent.count} signup{selectedRegistrationEvent.count === 1 ? "" : "s"} for this {selectedRegistrationEvent.signup_mode === "waitlist" ? "waitlist event" : "event"}.
                           </p>
                         </div>
                         <div className="event-detail__header-actions">
@@ -2952,6 +3098,7 @@ export default function AdminPage() {
                               <h3>{row.user_name}</h3>
                             </div>
                             <div className="event-card__meta">
+                              <p className="muted">Type: {row.signup_mode === "waitlist" ? "Waitlist" : "Registration"}</p>
                               <p className="muted">Email: {row.user_email}</p>
                               {row.user_phone ? <p className="muted">Phone: {row.user_phone}</p> : null}
                               <p className="muted">User ID: {row.user_id}</p>
@@ -2959,12 +3106,39 @@ export default function AdminPage() {
                                 <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
                               ) : null}
                             </div>
+                            <div className="cta-row">
+                              <button
+                                className="button ghost"
+                                type="button"
+                                onClick={() => setSelectedRegistrationSubmissionId(row.id)}
+                              >
+                                View Submission
+                              </button>
+                            </div>
                           </article>
                         ))}
                       </div>
                     </div>
                   </div>
                 ) : null}
+                <SubmissionReviewModal
+                  open={Boolean(selectedRegistrationSubmission)}
+                  submission={
+                    selectedRegistrationSubmission
+                      ? {
+                          eventTitle: selectedRegistrationSubmission.event_title,
+                          submittedAt: selectedRegistrationSubmission.submitted_at,
+                          name: selectedRegistrationSubmission.user_name,
+                          email: selectedRegistrationSubmission.user_email,
+                          phone: selectedRegistrationSubmission.user_phone,
+                          answers: selectedRegistrationSubmission.answers ?? null,
+                          attachments: selectedRegistrationSubmission.attachments ?? null,
+                          waiverAccepted: selectedRegistrationSubmission.waiver_accepted ?? false,
+                        }
+                      : null
+                  }
+                  onClose={() => setSelectedRegistrationSubmissionId(null)}
+                />
               </>
             ) : null}
             {activeModule === "users" ? (
