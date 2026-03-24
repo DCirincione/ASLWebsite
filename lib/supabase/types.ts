@@ -187,27 +187,6 @@ export type EventUpdate = {
   registration_limit?: number | null;
 };
 
-export type EventSignup = {
-  id: string;
-  user_id: string;
-  event_id: string;
-  created_at?: string | null;
-};
-
-export type EventSignupInsert = {
-  id?: string;
-  user_id: string;
-  event_id: string;
-  created_at?: string | null;
-};
-
-export type EventSignupUpdate = {
-  id?: string;
-  user_id?: string;
-  event_id?: string;
-  created_at?: string | null;
-};
-
 export type EventSubmission = {
   id: string;
   event_id: string;
@@ -539,12 +518,6 @@ export type Database = {
         Row: Event;
         Insert: EventInsert;
         Update: EventUpdate;
-        Relationships: [];
-      };
-      event_signups: {
-        Row: EventSignup;
-        Insert: EventSignupInsert;
-        Update: EventSignupUpdate;
         Relationships: [];
       };
       event_submissions: {
