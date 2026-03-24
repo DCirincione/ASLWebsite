@@ -213,7 +213,7 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
           <div className="event-detail__info">
             <h3>More information</h3>
             {moreInfo ? (
-              <p>{moreInfo}</p>
+              <p className="event-detail__copy">{moreInfo}</p>
             ) : (
               <p className="muted">Event details will be added soon.</p>
             )}

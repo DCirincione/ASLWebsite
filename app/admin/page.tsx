@@ -2983,7 +2983,7 @@ export default function AdminPage() {
                       {loadingUsers ? "Refreshing..." : "Refresh"}
                     </button>
                   </div>
-                  <div className="form-control" style={{ marginTop: 12 }}>
+                  <div className="form-control admin-user-search" style={{ marginTop: 12 }}>
                     <label htmlFor="users-search">Search users</label>
                     <input
                       id="users-search"
@@ -3300,7 +3300,7 @@ export default function AdminPage() {
                             ) : (
                               <p className="muted">No flyer uploaded yet.</p>
                             )}
-                            <div className="form-control">
+                            <div className="form-control admin-flyer-details-field">
                               <label htmlFor={`flyer-details-${event.id}`}>Details</label>
                               <textarea
                                 id={`flyer-details-${event.id}`}
