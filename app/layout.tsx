@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "ASL Website",
+  title: "Aldrich Sports",
   description: "Next.js App Router starter with shared components.",
   formatDetection: {
     telephone: false,
