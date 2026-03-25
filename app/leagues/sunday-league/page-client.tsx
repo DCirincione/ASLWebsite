@@ -16,7 +16,7 @@ import {
 } from "@/lib/sunday-league";
 import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
-import type { SundayLeagueLeaderboard, SundayLeagueTeam } from "@/lib/supabase/types";
+import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam } from "@/lib/supabase/types";
 
 type SundayLeagueSection = "overview" | "rules" | "teams" | "leaderboards" | "schedule" | "inquiries";
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -175,17 +175,6 @@ const rules = [
   },
 ];
 
-const scheduleColumns = [
-  {
-    field: "Black Sheep Field",
-    games: ["Game 1: Riverhead FC vs Beer Bellyz", "Game 3: Purple Bombers vs Black Sheep", "Game 5: Open Slot vs Southold Select"],
-  },
-  {
-    field: "Magic Fountain Field",
-    games: ["Game 2: North Fork United vs Magic Fountain", "Game 4: Southold Select vs Riverhead FC", "Game 6: Beer Bellyz vs Purple Bombers"],
-  },
-];
-
 const createEmptyTeamForm = (): TeamFormState => ({
   division: 1,
   captain_name: "",
@@ -220,8 +209,10 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
   const [overviewFlyer, setOverviewFlyer] = useState<string>("/sundayLeague/champs2025.jpeg");
   const [teams, setTeams] = useState<SundayLeagueTeam[]>([]);
   const [leaderboard, setLeaderboard] = useState<SundayLeagueLeaderboard[]>([]);
+  const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+  const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>({ type: "idle" });
   const [teamStatus, setTeamStatus] = useState<Status>({ type: "idle" });
@@ -288,13 +279,15 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
       if (!supabase) {
         setLoadingTeams(false);
         setLoadingLeaderboard(false);
+        setLoadingSchedule(false);
         return;
       }
 
-      const [{ data: sessionData }, teamsResponse, leaderboardResponse] = await Promise.all([
+      const [{ data: sessionData }, teamsResponse, leaderboardResponse, scheduleResponse] = await Promise.all([
         supabase.auth.getSession(),
         supabase.from("sunday_league_teams").select("*").order("division", { ascending: true }).order("slot_number", { ascending: true }),
         supabase.from("sunday_league_leaderboard").select("*"),
+        supabase.from("sunday_league_schedule_weeks").select("*").order("week_number", { ascending: true }),
       ]);
 
       const session = sessionData.session;
@@ -313,8 +306,13 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
         setLeaderboard((leaderboardResponse.data ?? []) as SundayLeagueLeaderboard[]);
       }
 
+      if (!scheduleResponse.error) {
+        setScheduleWeeks((scheduleResponse.data ?? []) as SundayLeagueScheduleWeek[]);
+      }
+
       setLoadingTeams(false);
       setLoadingLeaderboard(false);
+      setLoadingSchedule(false);
     };
 
     void load();
@@ -595,7 +593,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
               </p>
             </div>
             <div className="sunday-league-promo">
-              <Image src={overviewFlyer} alt="Soccer league flyer" fill sizes="(max-width: 900px) 100vw, 420px" />
+              <Image src={overviewFlyer} alt="Soccer league flyer" fill sizes="(max-width: 900px) 100vw, 420px" loading="eager" />
             </div>
           </div>
         );
@@ -706,17 +704,31 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
         return (
           <div className="sunday-league-schedule">
             <h2>Schedule</h2>
-            <p className="sunday-league-schedule__date">Sunday, May 31st · 12:00pm - 2:00pm · Division 2</p>
-            <div className="sunday-league-schedule__grid">
-              {scheduleColumns.map((column) => (
-                <div key={column.field} className="sunday-league-schedule__column">
-                  <h3>{column.field}</h3>
-                  {column.games.map((game) => (
-                    <p key={game}>{game}</p>
-                  ))}
-                </div>
-              ))}
-            </div>
+            {loadingSchedule ? <p className="muted">Loading schedule...</p> : null}
+            {!loadingSchedule && scheduleWeeks.length === 0 ? (
+              <p className="muted">No weekly schedule has been posted yet.</p>
+            ) : null}
+            {!loadingSchedule ? (
+              <div className="sunday-league-schedule__weeks">
+                {scheduleWeeks.map((week) => (
+                  <article key={week.id} className="sunday-league-panel-box sunday-league-schedule__week">
+                    <div className="sunday-league-stack">
+                      <p className="eyebrow">Week {week.week_number}</p>
+                      <div className="sunday-league-schedule__grid">
+                        <div className="sunday-league-schedule__column">
+                          <h3>Black Sheep Field</h3>
+                          <p className="sunday-league-schedule__body">{week.black_sheep_field_schedule}</p>
+                        </div>
+                        <div className="sunday-league-schedule__column">
+                          <h3>Magic Fountain Field</h3>
+                          <p className="sunday-league-schedule__body">{week.magic_fountain_field_schedule}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : null}
           </div>
         );
 

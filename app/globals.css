@@ -1375,6 +1375,15 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   font-weight: 700;
 }
 
+.sunday-league-schedule__weeks {
+  display: grid;
+  gap: 18px;
+}
+
+.sunday-league-schedule__week {
+  min-height: 0;
+}
+
 .sunday-league-schedule__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1388,6 +1397,10 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 
 .sunday-league-schedule__column h3 {
   line-height: 1.05;
+}
+
+.sunday-league-schedule__body {
+  white-space: pre-wrap;
 }
 
 .sunday-league-inquiries__prompt {

@@ -10,13 +10,14 @@ import { createId } from "@/lib/create-id";
 import type { SignupMode } from "@/lib/event-signups";
 import { parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
-import type { Event, Flyer, JsonValue, Sport } from "@/lib/supabase/types";
+import type { Event, Flyer, JsonValue, Sport, SundayLeagueScheduleWeek } from "@/lib/supabase/types";
 
 type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type FormStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
 type AdminModule =
   | "none"
   | "events"
+  | "sundayLeague"
   | "community"
   | "contact"
   | "sports"
@@ -61,6 +62,10 @@ type SportFormState = {
   short_description: string;
   section_headers: string;
   image_url: string;
+};
+type SundayLeagueScheduleFormState = {
+  blackSheepField: string;
+  magicFountainField: string;
 };
 type CommunityArticle = {
   id: string;
@@ -213,6 +218,11 @@ const createEmptySportForm = (): SportFormState => ({
   image_url: "",
 });
 
+const createEmptySundayLeagueScheduleForm = (): SundayLeagueScheduleFormState => ({
+  blackSheepField: "",
+  magicFountainField: "",
+});
+
 const mapSportToForm = (sport: Sport): SportFormState => ({
   title: sport.title ?? "",
   players_per_team: sport.players_per_team?.toString() ?? "",
@@ -255,6 +265,16 @@ export default function AdminPage() {
   const [loadingFlyers, setLoadingFlyers] = useState(false);
   const [flyersError, setFlyersError] = useState<string | null>(null);
   const [flyersStatus, setFlyersStatus] = useState<FormStatus>({ type: "idle" });
+  const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
+  const [loadingScheduleWeeks, setLoadingScheduleWeeks] = useState(false);
+  const [scheduleWeeksError, setScheduleWeeksError] = useState<string | null>(null);
+  const [scheduleWeeksStatus, setScheduleWeeksStatus] = useState<FormStatus>({ type: "idle" });
+  const [showCreateScheduleWeekForm, setShowCreateScheduleWeekForm] = useState(false);
+  const [scheduleWeekForm, setScheduleWeekForm] = useState<SundayLeagueScheduleFormState>(createEmptySundayLeagueScheduleForm());
+  const [editingScheduleWeekId, setEditingScheduleWeekId] = useState<string | null>(null);
+  const [editScheduleWeekForm, setEditScheduleWeekForm] = useState<SundayLeagueScheduleFormState>(createEmptySundayLeagueScheduleForm());
+  const [savingScheduleWeekId, setSavingScheduleWeekId] = useState<string | null>(null);
+  const [deletingScheduleWeekId, setDeletingScheduleWeekId] = useState<string | null>(null);
   const [uploadingFlyerEventId, setUploadingFlyerEventId] = useState<string | null>(null);
   const [savingFlyerEventId, setSavingFlyerEventId] = useState<string | null>(null);
   const [deletingFlyerEventId, setDeletingFlyerEventId] = useState<string | null>(null);
@@ -356,6 +376,12 @@ export default function AdminPage() {
       id: "events",
       title: "Events",
       description: "Create, edit, and remove site events.",
+      enabled: true,
+    },
+    {
+      id: "sundayLeague",
+      title: "Sunday League",
+      description: "Post weekly schedule text for both Sunday League fields.",
       enabled: true,
     },
     {
@@ -468,6 +494,26 @@ export default function AdminPage() {
       }, {})
     );
     setLoadingFlyers(false);
+  };
+
+  const loadScheduleWeeks = async () => {
+    if (!supabase) return;
+    setLoadingScheduleWeeks(true);
+    setScheduleWeeksError(null);
+
+    const { data, error } = await supabase
+      .from("sunday_league_schedule_weeks")
+      .select("*")
+      .order("week_number", { ascending: true });
+
+    if (error) {
+      setScheduleWeeks([]);
+      setScheduleWeeksError(error.message ?? "Could not load Sunday League schedule.");
+    } else {
+      setScheduleWeeks((data ?? []) as SundayLeagueScheduleWeek[]);
+    }
+
+    setLoadingScheduleWeeks(false);
   };
 
   const loadCommunityArticles = async () => {
@@ -766,6 +812,14 @@ export default function AdminPage() {
     setSportForm(createEmptySportForm());
   };
 
+  const resetScheduleWeekForm = () => {
+    setScheduleWeekForm(createEmptySundayLeagueScheduleForm());
+  };
+
+  const resetEditScheduleWeekForm = () => {
+    setEditScheduleWeekForm(createEmptySundayLeagueScheduleForm());
+  };
+
   const openCreateEventForm = () => {
     resetForm();
     setCreateRegistrationFieldsVisible(false);
@@ -779,6 +833,12 @@ export default function AdminPage() {
     setShowCreateSportForm(true);
   };
 
+  const openCreateScheduleWeekForm = () => {
+    resetScheduleWeekForm();
+    setScheduleWeeksStatus({ type: "idle" });
+    setShowCreateScheduleWeekForm(true);
+  };
+
   const closeCreateEventForm = () => {
     resetForm();
     setCreateRegistrationFieldsVisible(false);
@@ -790,6 +850,12 @@ export default function AdminPage() {
     resetSportForm();
     setSportsStatus({ type: "idle" });
     setShowCreateSportForm(false);
+  };
+
+  const closeCreateScheduleWeekForm = () => {
+    resetScheduleWeekForm();
+    setScheduleWeeksStatus({ type: "idle" });
+    setShowCreateScheduleWeekForm(false);
   };
 
   const startEditing = (event: Event) => {
@@ -831,12 +897,40 @@ export default function AdminPage() {
     setEditingSportId(null);
   };
 
+  const startEditingScheduleWeek = (week: SundayLeagueScheduleWeek) => {
+    setEditingScheduleWeekId(week.id);
+    setEditScheduleWeekForm({
+      blackSheepField: week.black_sheep_field_schedule ?? "",
+      magicFountainField: week.magic_fountain_field_schedule ?? "",
+    });
+    setScheduleWeeksStatus({ type: "idle" });
+  };
+
+  const cancelEditingScheduleWeek = () => {
+    setEditingScheduleWeekId(null);
+    resetEditScheduleWeekForm();
+  };
+
   const updateEdit = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setEditForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const updateEditSport = <K extends keyof SportFormState>(key: K, value: SportFormState[K]) => {
     setEditSportForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateScheduleWeekForm = <K extends keyof SundayLeagueScheduleFormState>(
+    key: K,
+    value: SundayLeagueScheduleFormState[K],
+  ) => {
+    setScheduleWeekForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateEditScheduleWeekForm = <K extends keyof SundayLeagueScheduleFormState>(
+    key: K,
+    value: SundayLeagueScheduleFormState[K],
+  ) => {
+    setEditScheduleWeekForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const updateRegistrationField = (
@@ -1441,6 +1535,102 @@ export default function AdminPage() {
     }
   };
 
+  const getNextScheduleWeekNumber = () =>
+    scheduleWeeks.reduce((max, week) => Math.max(max, week.week_number), 0) + 1;
+
+  const handleCreateScheduleWeek = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) {
+      setScheduleWeeksStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+
+    const blackSheepField = scheduleWeekForm.blackSheepField.trim();
+    const magicFountainField = scheduleWeekForm.magicFountainField.trim();
+
+    if (!blackSheepField || !magicFountainField) {
+      setScheduleWeeksStatus({ type: "error", message: "Both field schedule text boxes are required." });
+      return;
+    }
+
+    setScheduleWeeksStatus({ type: "loading" });
+
+    const { error } = await supabase.from("sunday_league_schedule_weeks").insert({
+      week_number: getNextScheduleWeekNumber(),
+      black_sheep_field_schedule: blackSheepField,
+      magic_fountain_field_schedule: magicFountainField,
+    });
+
+    if (error) {
+      setScheduleWeeksStatus({ type: "error", message: error.message ?? "Could not add schedule week." });
+      return;
+    }
+
+    setScheduleWeeksStatus({ type: "success", message: "Schedule week added." });
+    resetScheduleWeekForm();
+    setShowCreateScheduleWeekForm(false);
+    await loadScheduleWeeks();
+  };
+
+  const handleSaveScheduleWeek = async (weekId: string) => {
+    if (!supabase) {
+      setScheduleWeeksStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+
+    const blackSheepField = editScheduleWeekForm.blackSheepField.trim();
+    const magicFountainField = editScheduleWeekForm.magicFountainField.trim();
+
+    if (!blackSheepField || !magicFountainField) {
+      setScheduleWeeksStatus({ type: "error", message: "Both field schedule text boxes are required." });
+      return;
+    }
+
+    setSavingScheduleWeekId(weekId);
+    setScheduleWeeksStatus({ type: "loading" });
+
+    const { error } = await supabase
+      .from("sunday_league_schedule_weeks")
+      .update({
+        black_sheep_field_schedule: blackSheepField,
+        magic_fountain_field_schedule: magicFountainField,
+      })
+      .eq("id", weekId);
+
+    setSavingScheduleWeekId(null);
+
+    if (error) {
+      setScheduleWeeksStatus({ type: "error", message: error.message ?? "Could not save schedule week." });
+      return;
+    }
+
+    setScheduleWeeksStatus({ type: "success", message: "Schedule week updated." });
+    cancelEditingScheduleWeek();
+    await loadScheduleWeeks();
+  };
+
+  const handleDeleteScheduleWeek = async (week: SundayLeagueScheduleWeek) => {
+    if (!supabase) return;
+    const confirmed = window.confirm(`Delete Week ${week.week_number}? This cannot be undone.`);
+    if (!confirmed) return;
+
+    setDeletingScheduleWeekId(week.id);
+    const { error } = await supabase.from("sunday_league_schedule_weeks").delete().eq("id", week.id);
+    setDeletingScheduleWeekId(null);
+
+    if (error) {
+      setScheduleWeeksStatus({ type: "error", message: error.message ?? "Could not delete schedule week." });
+      return;
+    }
+
+    if (editingScheduleWeekId === week.id) {
+      cancelEditingScheduleWeek();
+    }
+
+    setScheduleWeeksStatus({ type: "success", message: `Week ${week.week_number} deleted.` });
+    await loadScheduleWeeks();
+  };
+
   const getFlyerName = (event: Event) => {
     return event.registration_program_slug?.trim() || event.title.trim();
   };
@@ -1559,6 +1749,9 @@ export default function AdminPage() {
     setActiveModule(module);
     if (module === "events") {
       void loadEvents();
+    }
+    if (module === "sundayLeague") {
+      void loadScheduleWeeks();
     }
     if (module === "sports") {
       void loadSports();
@@ -2549,6 +2742,154 @@ export default function AdminPage() {
                 </div>
               ) : null}
             </section>
+              </>
+            ) : null}
+            {activeModule === "sundayLeague" ? (
+              <>
+                <section className="account-card">
+                  <h2>Sunday League Schedule</h2>
+                  <p className="muted">Post weekly schedule text for Black Sheep Field and Magic Fountain Field.</p>
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Add Week</h2>
+                      <p className="muted">The next saved week will be Week {scheduleWeeks.reduce((max, week) => Math.max(max, week.week_number), 0) + 1}.</p>
+                    </div>
+                    {!showCreateScheduleWeekForm ? (
+                      <button className="button primary" type="button" onClick={openCreateScheduleWeekForm}>
+                        Add Week
+                      </button>
+                    ) : null}
+                  </div>
+                  {showCreateScheduleWeekForm ? (
+                    <form className="register-form" onSubmit={handleCreateScheduleWeek}>
+                      <div className="register-form-grid">
+                        <div className="form-control">
+                          <label htmlFor="schedule-week-black-sheep">Black Sheep Field *</label>
+                          <textarea
+                            id="schedule-week-black-sheep"
+                            value={scheduleWeekForm.blackSheepField}
+                            onChange={(e) => updateScheduleWeekForm("blackSheepField", e.target.value)}
+                            rows={8}
+                            required
+                          />
+                        </div>
+                        <div className="form-control">
+                          <label htmlFor="schedule-week-magic-fountain">Magic Fountain Field *</label>
+                          <textarea
+                            id="schedule-week-magic-fountain"
+                            value={scheduleWeekForm.magicFountainField}
+                            onChange={(e) => updateScheduleWeekForm("magicFountainField", e.target.value)}
+                            rows={8}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="cta-row">
+                        <button className="button primary" type="submit" disabled={scheduleWeeksStatus.type === "loading"}>
+                          {scheduleWeeksStatus.type === "loading" ? "Saving..." : "Save Week"}
+                        </button>
+                        <button className="button ghost" type="button" onClick={closeCreateScheduleWeekForm}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+                  {scheduleWeeksStatus.message ? (
+                    <p className={`form-help ${scheduleWeeksStatus.type === "error" ? "error" : "muted"}`}>{scheduleWeeksStatus.message}</p>
+                  ) : null}
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Existing Weeks</h2>
+                      <p className="muted">Edit or remove previously posted Sunday League schedule weeks.</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => void loadScheduleWeeks()} disabled={loadingScheduleWeeks}>
+                      {loadingScheduleWeeks ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  {scheduleWeeksError ? <p className="form-help error">{scheduleWeeksError}</p> : null}
+                  {loadingScheduleWeeks ? <p className="muted">Loading schedule weeks...</p> : null}
+                  {!loadingScheduleWeeks && scheduleWeeks.length === 0 ? <p className="muted">No schedule weeks saved yet.</p> : null}
+                  {!loadingScheduleWeeks && scheduleWeeks.length > 0 ? (
+                    <div className="event-list admin-scroll-panel">
+                      {scheduleWeeks.map((week) => (
+                        <article key={week.id} className="event-card-simple">
+                          <div className="event-card__header">
+                            <h3>Week {week.week_number}</h3>
+                          </div>
+                          {editingScheduleWeekId === week.id ? (
+                            <div className="register-form" style={{ marginTop: 12 }}>
+                              <div className="register-form-grid">
+                                <div className="form-control">
+                                  <label htmlFor={`edit-schedule-black-sheep-${week.id}`}>Black Sheep Field *</label>
+                                  <textarea
+                                    id={`edit-schedule-black-sheep-${week.id}`}
+                                    value={editScheduleWeekForm.blackSheepField}
+                                    onChange={(e) => updateEditScheduleWeekForm("blackSheepField", e.target.value)}
+                                    rows={8}
+                                    required
+                                  />
+                                </div>
+                                <div className="form-control">
+                                  <label htmlFor={`edit-schedule-magic-fountain-${week.id}`}>Magic Fountain Field *</label>
+                                  <textarea
+                                    id={`edit-schedule-magic-fountain-${week.id}`}
+                                    value={editScheduleWeekForm.magicFountainField}
+                                    onChange={(e) => updateEditScheduleWeekForm("magicFountainField", e.target.value)}
+                                    rows={8}
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              <div className="cta-row">
+                                <button
+                                  className="button primary"
+                                  type="button"
+                                  onClick={() => void handleSaveScheduleWeek(week.id)}
+                                  disabled={savingScheduleWeekId === week.id}
+                                >
+                                  {savingScheduleWeekId === week.id ? "Saving..." : "Save"}
+                                </button>
+                                <button className="button ghost" type="button" onClick={cancelEditingScheduleWeek}>
+                                  Cancel
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="register-form-grid" style={{ marginTop: 12 }}>
+                                <div className="form-control">
+                                  <label>Black Sheep Field</label>
+                                  <textarea value={week.black_sheep_field_schedule} rows={8} readOnly />
+                                </div>
+                                <div className="form-control">
+                                  <label>Magic Fountain Field</label>
+                                  <textarea value={week.magic_fountain_field_schedule} rows={8} readOnly />
+                                </div>
+                              </div>
+                              <div className="cta-row">
+                                <button className="button ghost" type="button" onClick={() => startEditingScheduleWeek(week)}>
+                                  Edit
+                                </button>
+                                <button
+                                  className="button ghost"
+                                  type="button"
+                                  onClick={() => void handleDeleteScheduleWeek(week)}
+                                  disabled={deletingScheduleWeekId === week.id}
+                                >
+                                  {deletingScheduleWeekId === week.id ? "Deleting..." : "Delete"}
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
+                </section>
               </>
             ) : null}
             {activeModule === "sports" ? (

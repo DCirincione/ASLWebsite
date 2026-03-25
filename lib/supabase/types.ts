@@ -322,6 +322,33 @@ export type SundayLeagueLeaderboardUpdate = {
   updated_at?: string | null;
 };
 
+export type SundayLeagueScheduleWeek = {
+  id: string;
+  week_number: number;
+  black_sheep_field_schedule: string;
+  magic_fountain_field_schedule: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueScheduleWeekInsert = {
+  id?: string;
+  week_number: number;
+  black_sheep_field_schedule: string;
+  magic_fountain_field_schedule: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueScheduleWeekUpdate = {
+  id?: string;
+  week_number?: number;
+  black_sheep_field_schedule?: string;
+  magic_fountain_field_schedule?: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type Sport = {
   id: string;
   title: string;
@@ -620,6 +647,12 @@ export type Database = {
         Row: SundayLeagueLeaderboard;
         Insert: SundayLeagueLeaderboardInsert;
         Update: SundayLeagueLeaderboardUpdate;
+        Relationships: [];
+      };
+      sunday_league_schedule_weeks: {
+        Row: SundayLeagueScheduleWeek;
+        Insert: SundayLeagueScheduleWeekInsert;
+        Update: SundayLeagueScheduleWeekUpdate;
         Relationships: [];
       };
       sports: {
