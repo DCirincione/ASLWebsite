@@ -170,11 +170,11 @@ export default function SundayLeaguePublicTeamPage() {
 
                 <p className="sunday-league-team-board__established">Established {establishedLabel}</p>
                 <div className="sunday-league-team-board__record">
-                  <span>W 0</span>
+                  <span>0</span>
                   <span>-</span>
-                  <span>D 0</span>
+                  <span>0</span>
                   <span>-</span>
-                  <span>L 0</span>
+                  <span>0</span>
                 </div>
 
                 <section className="sunday-league-team-board__section">
