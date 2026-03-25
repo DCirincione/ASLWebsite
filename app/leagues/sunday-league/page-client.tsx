@@ -7,7 +7,13 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
-import { SUNDAY_LEAGUE_DIVISIONS, SUNDAY_LEAGUE_SLOT_COUNT, getNextOpenSundayLeagueSlot, type SundayLeagueDivision } from "@/lib/sunday-league";
+import {
+  SUNDAY_LEAGUE_DIVISIONS,
+  SUNDAY_LEAGUE_SLOT_COUNT,
+  getNextOpenSundayLeagueSlot,
+  getSundayLeagueDivisionLogoSrc,
+  type SundayLeagueDivision,
+} from "@/lib/sunday-league";
 import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
 import type { SundayLeagueTeam } from "@/lib/supabase/types";
@@ -556,7 +562,13 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                   className={`sunday-league-division-tab${selectedDivision === division.value ? " is-active" : ""}`}
                   onClick={() => setSelectedDivision(division.value)}
                 >
-                  <span>{division.label}</span>
+                  <Image
+                    src={getSundayLeagueDivisionLogoSrc(division.value)}
+                    alt={division.label}
+                    width={176}
+                    height={56}
+                    className="sunday-league-division-tab__image"
+                  />
                 </button>
               ))}
             </div>

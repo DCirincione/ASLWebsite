@@ -1261,19 +1261,21 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 }
 
 .sunday-league-division-tab {
-  border: 1px solid #111827;
-  background: #111827;
-  color: #ffffff;
-  border-radius: 999px;
-  padding: 10px 18px;
+  border: none;
+  background: transparent;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font: inherit;
-  font-weight: 700;
   cursor: pointer;
   transition: opacity 0.15s ease, transform 0.15s ease;
   opacity: 0.72;
+}
+
+.sunday-league-division-tab__image {
+  width: 220px;
+  height: auto;
+  display: block;
 }
 
 .sunday-league-division-tab.is-active {
@@ -1551,6 +1553,13 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   gap: 4px;
 }
 
+.sunday-league-team-page {
+  width: min(980px, 100%);
+  margin: 0 auto;
+  display: grid;
+  gap: 22px;
+}
+
 .sunday-league-team-portal__actions {
   margin-top: -8px;
   justify-content: flex-start;
@@ -1655,6 +1664,306 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   position: relative;
   width: 180px;
   height: 180px;
+}
+
+.sunday-league-team-board {
+  display: grid;
+  gap: 28px;
+  padding: 32px;
+  border-radius: 36px;
+  background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+  color: #f8fafc;
+  border: 1px solid var(--border);
+  box-shadow: var(--glow);
+}
+
+.sunday-league-team-board__hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 24px;
+  align-items: start;
+}
+
+.sunday-league-team-board__identity {
+  display: grid;
+  gap: 12px;
+}
+
+.sunday-league-team-board__title-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.sunday-league-team-board__title-row h2 {
+  margin: 0;
+  font-size: clamp(2.7rem, 5vw, 4.8rem);
+  line-height: 0.92;
+  letter-spacing: -0.04em;
+}
+
+.sunday-league-team-board__established,
+.sunday-league-team-board__captain,
+.sunday-league-team-board__section h3,
+.sunday-league-team-board__record {
+  text-transform: uppercase;
+}
+
+.sunday-league-team-board__established,
+.sunday-league-team-board__captain,
+.sunday-league-team-board__section h3 {
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.sunday-league-team-board__established {
+  margin: 0;
+  font-size: clamp(1rem, 1.6vw, 1.6rem);
+  text-align: center;
+}
+
+.sunday-league-team-board__captain {
+  margin: 0;
+  font-size: clamp(1rem, 1.5vw, 1.45rem);
+}
+
+.sunday-league-team-board__logo {
+  position: relative;
+  width: min(220px, 100%);
+  aspect-ratio: 1;
+  justify-self: end;
+}
+
+.sunday-league-team-board__record {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 18px;
+  font-size: clamp(2.6rem, 5vw, 5.4rem);
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+}
+
+.sunday-league-team-board__section {
+  display: grid;
+  gap: 18px;
+}
+
+.sunday-league-team-board__section h3 {
+  margin: 0;
+  font-size: clamp(2rem, 3vw, 3.2rem);
+  line-height: 1;
+}
+
+.sunday-league-team-board__roster {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, max-content));
+  gap: 18px;
+  justify-content: start;
+}
+
+.sunday-league-team-board__player-card {
+  width: 220px;
+  border-radius: 26px;
+  padding: 0;
+  display: grid;
+  color: #f8fafc;
+  background: transparent;
+  border: none;
+  filter: drop-shadow(0 18px 28px rgba(0, 0, 0, 0.22));
+}
+
+.sunday-league-team-board__player-card {
+  width: 220px;
+  display: grid;
+  gap: 14px;
+  padding: 14px 14px 16px;
+  border-radius: 30px;
+  background: linear-gradient(180deg, #171717, #121212);
+  border: 3px solid #d8ab07;
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.2);
+}
+
+.sunday-league-team-board__player-avatar-wrap {
+  display: grid;
+  place-items: center;
+  padding-top: 2px;
+}
+
+.sunday-league-team-board__player-avatar {
+  position: relative;
+  width: 128px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 8px solid rgba(255, 255, 255, 0.92);
+  background: #f8fafc;
+}
+
+.sunday-league-team-board__player-avatar img {
+  object-fit: cover;
+  object-position: center 57%;
+}
+
+.sunday-league-team-board__player-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.06);
+  min-width: 0;
+}
+
+.sunday-league-team-board__player-name,
+.sunday-league-team-board__player-number {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #f8fafc;
+}
+
+.sunday-league-team-board__player-name {
+  font-size: 0.9rem;
+  line-height: 1.0;
+  letter-spacing: -0.02em;
+  text-align: center;
+}
+
+.sunday-league-team-board__player-row {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 10px;
+}
+
+.sunday-league-team-board__player-flag {
+  margin: 0;
+  font-size: 2.2rem;
+  line-height: 1;
+  justify-self: center;
+}
+
+.sunday-league-team-board__player-flag--empty {
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.sunday-league-team-board__player-badge {
+  position: relative;
+  width: 42px;
+  height: 42px;
+}
+
+.sunday-league-team-board__player-number {
+  font-size: 1.95rem;
+  line-height: 1;
+  justify-self: center;
+}
+
+.sunday-league-team-board__player-division {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sunday-league-team-board__player-division-image {
+  width: 144px;
+  height: auto;
+  display: block;
+}
+
+
+.sunday-league-team-board__list {
+  display: grid;
+  gap: 12px;
+}
+
+.sunday-league-team-board__list-row {
+  padding: 16px 18px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="dark"] .sunday-league-team-board {
+  background: linear-gradient(180deg, var(--panel), var(--panel-strong));
+  color: #f8fafc;
+  border-color: #1f2a40;
+  box-shadow: none;
+}
+
+@media (max-width: 980px) {
+  .sunday-league-team-board__hero {
+    grid-template-columns: 1fr;
+  }
+
+  .sunday-league-team-board__logo {
+    justify-self: start;
+  }
+
+  .sunday-league-team-board__roster {
+    grid-template-columns: repeat(auto-fit, minmax(220px, max-content));
+  }
+}
+
+@media (max-width: 720px) {
+  .sunday-league-team-board {
+    padding: 22px;
+    border-radius: 28px;
+  }
+
+  .sunday-league-team-board__title-row {
+    gap: 10px;
+  }
+
+  .sunday-league-team-board__record {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .sunday-league-team-board__roster {
+    grid-template-columns: repeat(auto-fit, minmax(190px, max-content));
+  }
+
+  .sunday-league-team-board__player-card {
+    width: 190px;
+    padding: 12px;
+    border-radius: 26px;
+  }
+
+  .sunday-league-team-board__player-avatar {
+    width: 110px;
+  }
+
+  .sunday-league-team-board__player-panel {
+    padding: 12px;
+    border-radius: 20px;
+  }
+
+  .sunday-league-team-board__player-number {
+    font-size: 1.7rem;
+  }
+
+  .sunday-league-team-board__player-badge {
+    width: 36px;
+    height: 36px;
+  }
+}
+
+@media (max-width: 520px) {
+  .sunday-league-team-board__roster {
+    grid-template-columns: 1fr;
+    justify-content: stretch;
+  }
+
+  .sunday-league-team-board__player-card {
+    width: min(220px, 100%);
+  }
 }
 
 .why-grid {

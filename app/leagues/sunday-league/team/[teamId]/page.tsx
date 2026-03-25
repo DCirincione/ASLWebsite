@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -8,7 +9,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { createId } from "@/lib/create-id";
-import { getSundayLeagueColor } from "@/lib/sunday-league";
+import { getSundayLeagueColor, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
 import type { SundayLeagueTeam } from "@/lib/supabase/types";
 
@@ -45,6 +46,15 @@ type TeamPortalFormState = {
   agreements: Record<AgreementKey, boolean>;
 };
 
+type TeamRosterPlayer = {
+  id: string;
+  name: string;
+  position: string | null;
+  avatarUrl: string | null;
+  countryCode: string | null;
+  jerseyNumber: string | null;
+};
+
 const createTeamPortalFormState = (team: SundayLeagueTeam): TeamPortalFormState => ({
   captain_name: team.captain_name ?? "",
   team_name: team.team_name ?? "",
@@ -66,10 +76,62 @@ const createTeamPortalFormState = (team: SundayLeagueTeam): TeamPortalFormState 
   },
 });
 
+const buildTeamSchedule = (team: SundayLeagueTeam | null) => {
+  if (!team) return [];
+
+  return [
+    `Week 1: ${team.team_name} vs Opponent TBD`,
+    `Week 2: Matchday assignment coming soon`,
+    `Week 3: Schedule release pending division setup`,
+  ];
+};
+
+const buildTeamHistory = (team: SundayLeagueTeam | null) => {
+  if (!team) return [];
+
+  return [
+    `${team.division ?? "Division placement pending"} reserved for the upcoming season`,
+    team.deposit_status === "paid" ? "Deposit received and team spot confirmed" : "Deposit pending before final approval",
+    "Club history will expand after the first official league match",
+  ];
+};
+
+const getEstablishedLabel = (team: SundayLeagueTeam | null) => {
+  const raw = typeof team?.created_at === "string" ? team.created_at : "";
+  const year = raw.slice(0, 4);
+  return /^\d{4}$/.test(year) ? year : "2026";
+};
+
+const normalizeCountryCode = (value?: string | null) => {
+  const normalized = (value ?? "").trim().toUpperCase();
+  if (!normalized) return null;
+  if (/^[A-Z]{2}$/.test(normalized)) return normalized;
+
+  const callingCodeMap: Record<string, string> = {
+    "+1": "US",
+    "1": "US",
+    "+44": "GB",
+    "44": "GB",
+    "+52": "MX",
+    "52": "MX",
+    "+61": "AU",
+    "61": "AU",
+  };
+
+  return callingCodeMap[normalized] ?? null;
+};
+
+const countryCodeToFlag = (value?: string | null) => {
+  const normalized = normalizeCountryCode(value);
+  if (!normalized) return null;
+  return String.fromCodePoint(...Array.from(normalized).map((char) => 127397 + char.charCodeAt(0)));
+};
+
 export default function SundayLeagueTeamPortalPage() {
   const params = useParams<{ teamId: string }>();
   const teamId = params.teamId;
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
+  const [rosterPlayers, setRosterPlayers] = useState<TeamRosterPlayer[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [isEditing, setIsEditing] = useState(false);
   const [saveState, setSaveState] = useState<{ type: "idle" | "loading" | "success" | "error"; message?: string }>({ type: "idle" });
@@ -105,19 +167,38 @@ export default function SundayLeagueTeamPortalPage() {
       const nextTeam = data as SundayLeagueTeam;
       setTeam(nextTeam);
       setForm(createTeamPortalFormState(nextTeam));
+
+      if (!nextTeam.captain_is_playing) {
+        setRosterPlayers([]);
+        setStatus("ready");
+        return;
+      }
+
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id,name,avatar_url,country_code,positions")
+        .eq("id", nextTeam.user_id)
+        .maybeSingle();
+
+      setRosterPlayers([
+        {
+          id: nextTeam.user_id,
+          name: profileData?.name?.trim() || nextTeam.captain_name,
+          position: Array.isArray(profileData?.positions) ? profileData.positions[0] ?? null : null,
+          avatarUrl: profileData?.avatar_url ?? null,
+          countryCode: profileData?.country_code?.trim()?.toUpperCase() ?? null,
+          jerseyNumber: nextTeam.jersey_numbers?.[0]?.trim() || null,
+        },
+      ]);
       setStatus("ready");
     };
 
     void loadTeam();
   }, [teamId]);
 
-  const rosterRows = useMemo(() => {
-    const captainRow = team?.captain_is_playing ? `${team.captain_name} (Captain)` : null;
-    return Array.from({ length: 10 }, (_, index) => {
-      if (index === 0 && captainRow) return captainRow;
-      return "Open roster slot";
-    });
-  }, [team]);
+  const scheduleRows = useMemo(() => buildTeamSchedule(team), [team]);
+  const historyRows = useMemo(() => buildTeamHistory(team), [team]);
+  const establishedLabel = useMemo(() => getEstablishedLabel(team), [team]);
 
   const updateForm = <Key extends keyof TeamPortalFormState>(key: Key, value: TeamPortalFormState[Key]) => {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -237,7 +318,7 @@ export default function SundayLeagueTeamPortalPage() {
         <HistoryBackButton label="← Back" fallbackHref="/leagues/sunday-league" />
       </div>
       <section className="section sunday-league-flow-page">
-        <div className="sunday-league-flow-card">
+        <div className="sunday-league-team-page">
           {status === "loading" ? <p className="muted">Loading your team portal...</p> : null}
           {status === "no-session" ? <p className="form-help error">Sign in to view your team portal.</p> : null}
           {status === "error" ? <p className="form-help error">We could not load this team portal.</p> : null}
@@ -246,14 +327,103 @@ export default function SundayLeagueTeamPortalPage() {
             <>
               <div className="sunday-league-team-portal__heading">
                 <p className="eyebrow">Your Sunday League Team</p>
-                <p className="muted">Captain summary, jersey plan, and roster placeholders for your Aldrich Sunday League team.</p>
+                <p className="muted">Captain view for your club profile, roster board, schedule, and team history.</p>
               </div>
 
-              <article className="sunday-league-flow-summary__card sunday-league-public-team-card">
-                <div className="sunday-league-public-team-card__logo">
-                  <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="180px" />
+              <article className="sunday-league-team-board">
+                <div className="sunday-league-team-board__hero">
+                  <div className="sunday-league-team-board__identity">
+                    <div className="sunday-league-team-board__title-row">
+                      <h2>{team.team_name}</h2>
+                    </div>
+                    <p className="sunday-league-team-board__captain">Captain: {team.captain_name}</p>
+                  </div>
+                  <div className="sunday-league-team-board__logo">
+                    <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="220px" />
+                  </div>
                 </div>
-                <h2>{team.team_name}</h2>
+
+                <p className="sunday-league-team-board__established">Established {establishedLabel}</p>
+                <div className="sunday-league-team-board__record">
+                  <span>0</span>
+                  <span>-</span>
+                  <span>0</span>
+                  <span>-</span>
+                  <span>0</span>
+                </div>
+
+                <section className="sunday-league-team-board__section">
+                  <h3>Roster</h3>
+                  {rosterPlayers.length > 0 ? (
+                    <div className="sunday-league-team-board__roster">
+                      {rosterPlayers.map((player) => (
+                        <article key={player.id} className="sunday-league-team-board__player-card">
+                          <div className="sunday-league-team-board__player-avatar-wrap">
+                            <div className="sunday-league-team-board__player-avatar">
+                              <Image
+                                src={player.avatarUrl ?? "/avatar-placeholder.svg"}
+                                alt={player.name}
+                                fill
+                                sizes="180px"
+                              />
+                            </div>
+                          </div>
+                          <div className="sunday-league-team-board__player-panel">
+                            <p className="sunday-league-team-board__player-name">
+                              {player.name} - {player.position ?? "Player"}
+                            </p>
+                            <div className="sunday-league-team-board__player-row">
+                              {countryCodeToFlag(player.countryCode) ? (
+                                <p className="sunday-league-team-board__player-flag" aria-label={normalizeCountryCode(player.countryCode) ?? undefined}>
+                                  {countryCodeToFlag(player.countryCode)}
+                                </p>
+                              ) : (
+                                <span className="sunday-league-team-board__player-flag sunday-league-team-board__player-flag--empty" aria-hidden />
+                              )}
+                              <p className="sunday-league-team-board__player-number">#{player.jerseyNumber || "0"}</p>
+                              <div className="sunday-league-team-board__player-badge">
+                                <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="42px" />
+                              </div>
+                            </div>
+                            <div className="sunday-league-team-board__player-division">
+                              <Image
+                                src={getSundayLeagueDivisionLogoSrc(team.division as SundayLeagueDivision)}
+                                alt={`Division ${team.division}`}
+                                width={144}
+                                height={42}
+                                className="sunday-league-team-board__player-division-image"
+                              />
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="muted">No players have signed up for your roster yet.</p>
+                  )}
+                </section>
+
+                <section className="sunday-league-team-board__section">
+                  <h3>Schedule</h3>
+                  <div className="sunday-league-team-board__list">
+                    {scheduleRows.map((item) => (
+                      <div key={item} className="sunday-league-team-board__list-row">
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="sunday-league-team-board__section">
+                  <h3>History</h3>
+                  <div className="sunday-league-team-board__list">
+                    {historyRows.map((item) => (
+                      <div key={item} className="sunday-league-team-board__list-row">
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
               </article>
 
               <div className="sunday-league-inline-actions sunday-league-team-portal__actions">
@@ -382,19 +552,6 @@ export default function SundayLeagueTeamPortalPage() {
                   </div>
                 </article>
               ) : null}
-
-              <article className="sunday-league-flow-summary__card">
-                <h3>Roster Page</h3>
-                <p className="muted">Use this as the captain-facing home for roster edits and league admin follow-up.</p>
-                <div className="sunday-league-roster-list">
-                  {rosterRows.map((player, index) => (
-                    <div key={`${player}-${index}`} className="sunday-league-roster-row">
-                      <span>Player {index + 1}</span>
-                      <span>{player}</span>
-                    </div>
-                  ))}
-                </div>
-              </article>
             </>
           ) : null}
 

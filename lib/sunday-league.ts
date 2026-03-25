@@ -15,6 +15,9 @@ export const SUNDAY_LEAGUE_DIVISIONS: Array<{ value: SundayLeagueDivision; label
   { value: 2, label: "Division 2" },
 ];
 
+export const getSundayLeagueDivisionLogoSrc = (division: SundayLeagueDivision) =>
+  division === 1 ? "/divisions/Division1BlackSheepNew.png" : "/divisions/Division2MagicNew.png";
+
 const normalizeValue = (value?: string | null) => value?.trim().toLowerCase() ?? "";
 
 export const isRegularAslSundayLeagueEvent = (event?: SundayLeagueEventLike | null) => {

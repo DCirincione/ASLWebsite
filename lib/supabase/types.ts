@@ -13,6 +13,7 @@ export type Profile = {
   about: string | null;
   height_cm: number | null;
   weight_lbs: number | null;
+  country_code?: string | null;
 };
 
 export type ProfileInsert = {
@@ -30,6 +31,7 @@ export type ProfileInsert = {
   about?: string | null;
   height_cm?: number | null;
   weight_lbs?: number | null;
+  country_code?: string | null;
 };
 
 export type ProfileUpdate = {
@@ -47,6 +49,7 @@ export type ProfileUpdate = {
   about?: string | null;
   height_cm?: number | null;
   weight_lbs?: number | null;
+  country_code?: string | null;
 };
 
 export type Friend = {
