@@ -111,6 +111,7 @@ type ProfileFormState = {
 };
 
 type SaveStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
+type AccountSection = "events" | "team" | "friends";
 
 const emptyProfileForm: ProfileFormState = {
   name: "",
@@ -141,6 +142,7 @@ export default function AccountPage() {
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState<ProfileFormState>(emptyProfileForm);
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>({ type: "idle" });
+  const [activeSection, setActiveSection] = useState<AccountSection>("events");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Teams
@@ -703,38 +705,38 @@ export default function AccountPage() {
           ← Back
         </Link>
 
-        <header className="account-header">
-          <div className="account-header__info">
-            <div className="account-avatar" aria-hidden>
-              <Image src={avatarSrc} alt="" fill sizes="96px" />
+        <section className="account-card account-profile-card" id="profile">
+          <header className="account-header">
+            <div className="account-header__info">
+              <div className="account-avatar" aria-hidden>
+                <Image src={avatarSrc} alt="" fill sizes="96px" />
+              </div>
+              <div className="account-header__text">
+                <p className="eyebrow">Account</p>
+                <h1>{data.name}</h1>
+                <p className="muted">Manage your profile, events, teams, and friends.</p>
+              </div>
             </div>
-            <div className="account-header__text">
-              <p className="eyebrow">Account</p>
-              <h1>{data.name}</h1>
-              <p className="muted">Manage your profile, events, teams, and friends.</p>
-            </div>
-          </div>
-          <div className="account-create__actions">
-            {!isEditingProfile ? (
-              <button
-                className="button ghost"
-                type="button"
-                onClick={() => {
-                  setProfileForm(toProfileFormState(data));
-                  setProfileSaveStatus({ type: "idle" });
-                  setIsEditingProfile(true);
-                }}
-              >
-                Edit Profile
+            <div className="account-create__actions">
+              {!isEditingProfile ? (
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => {
+                    setProfileForm(toProfileFormState(data));
+                    setProfileSaveStatus({ type: "idle" });
+                    setIsEditingProfile(true);
+                  }}
+                >
+                  Edit Profile
+                </button>
+              ) : null}
+              <button className="button ghost" type="button" onClick={handleSignOut} disabled={signingOut}>
+                {signingOut ? "Signing out..." : "Sign out"}
               </button>
-            ) : null}
-            <button className="button ghost" type="button" onClick={handleSignOut} disabled={signingOut}>
-              {signingOut ? "Signing out..." : "Sign out"}
-            </button>
-          </div>
-        </header>
+            </div>
+          </header>
 
-        <section className="account-card" id="profile">
           <div className="account-card__header">
             <div>
               <h2>Profile</h2>
@@ -861,103 +863,145 @@ export default function AccountPage() {
           )}
         </section>
 
-        <section className="account-card" id="events">
-          <div className="account-card__header">
-            <div>
-              <h2>My Events</h2>
-              <p className="muted">Events you registered for or joined the waitlist for.</p>
-            </div>
+        <section className="account-card account-tabs-card">
+          <div className="account-tabs" role="tablist" aria-label="Account sections">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSection === "events"}
+              className={`account-tabs__button${activeSection === "events" ? " is-active" : ""}`}
+              onClick={() => setActiveSection("events")}
+            >
+              My Events
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSection === "friends"}
+              className={`account-tabs__button${activeSection === "friends" ? " is-active" : ""}`}
+              onClick={() => setActiveSection("friends")}
+            >
+              My Friends
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeSection === "team"}
+              className={`account-tabs__button${activeSection === "team" ? " is-active" : ""}`}
+              onClick={() => setActiveSection("team")}
+            >
+              My Team
+            </button>
           </div>
-          {eventsError ? (
-            <p className="muted" role="status" aria-live="polite">
-              {eventsError}
-            </p>
-          ) : null}
-          {eventsStatus === "loading" ? (
-            <p className="muted">Loading your events...</p>
-          ) : (registeredEvents ?? []).length === 0 ? (
-            <p className="muted">
-              No event submissions yet. <Link href="/events">Browse upcoming events</Link> to join.
-            </p>
-          ) : (
-            <div className="event-list">
-              {(registeredEvents ?? []).map((event) => {
-                const dateRange = formatDateRange(event.start_date, event.end_date);
-                const primaryDate = event.time_info?.trim() || null;
-                const fallbackDate = primaryDate ? null : dateRange;
-                const dateToShow = primaryDate || fallbackDate || null;
-                return (
-                  <article key={event.id} className="event-card-simple">
-                    <div className="event-card__header">
-                      <h3>{event.title}</h3>
-                    </div>
-                    <div className="event-card__meta">
-                      <p className="muted">{isWaitlistEvent(event) ? "Status: Joined waitlist" : "Status: Registered"}</p>
-                      {dateToShow ? <p className="muted">Date: {dateToShow}</p> : null}
-                      {event.location ? <p className="muted">Location: {event.location}</p> : null}
-                    </div>
-                    {event.description ? <p className="muted">{event.description}</p> : null}
-                    {event.submission ? (
-                      <div style={{ marginTop: 12 }}>
-                        <button
-                          className="button ghost"
-                          type="button"
-                          onClick={() => {
-                            setSelectedSubmission(event.submission ?? null);
-                            setSelectedSubmissionEventTitle(event.title);
-                          }}
-                        >
-                          View Submission
-                        </button>
-                      </div>
-                    ) : null}
-                  </article>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ marginTop: 12 }}>
-            <Link className="button primary" href="/events">
-              Browse Events
-            </Link>
-          </div>
-        </section>
 
-        {loadingTeams || teams.length > 0 ? (
-          <section className="account-card">
-            <div className="account-card__header">
-              <div>
-                <h2>Your Sunday League Team</h2>
-                <p className="muted">Manage your Sunday League team and roster.</p>
+          {activeSection === "events" ? (
+            <>
+              <div className="account-card__header">
+                <div>
+                  <h2>My Events</h2>
+                  <p className="muted">Events you registered for or joined the waitlist for.</p>
+                </div>
               </div>
-            </div>
-            {loadingTeams ? (
-              <p className="muted">Loading your teams...</p>
-            ) : (
-              <ul className="list list--grid">
-                {teams.map((team) => (
-                  <li key={team.id} className="team-card">
-                    <div className="team-card__logo">
-                      <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="80px" />
-                    </div>
-                    <div className="team-card__info">
-                      <p className="list__title">{team.team_name}</p>
-                      <p className="muted">Sunday League team</p>
-                    </div>
-                    <Link className="button ghost" href={`/leagues/sunday-league/team/${team.id}`}>
-                      Team Portal
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        ) : null}
+              {eventsError ? (
+                <p className="muted" role="status" aria-live="polite">
+                  {eventsError}
+                </p>
+              ) : null}
+              {eventsStatus === "loading" ? (
+                <p className="muted">Loading your events...</p>
+              ) : (registeredEvents ?? []).length === 0 ? (
+                <p className="muted">
+                  No event submissions yet. <Link href="/events">Browse upcoming events</Link> to join.
+                </p>
+              ) : (
+                <div className="event-list">
+                  {(registeredEvents ?? []).map((event) => {
+                    const dateRange = formatDateRange(event.start_date, event.end_date);
+                    const primaryDate = event.time_info?.trim() || null;
+                    const fallbackDate = primaryDate ? null : dateRange;
+                    const dateToShow = primaryDate || fallbackDate || null;
+                    return (
+                      <article key={event.id} className="event-card-simple">
+                        <div className="event-card__header">
+                          <h3>{event.title}</h3>
+                        </div>
+                        <div className="event-card__meta">
+                          <p className="muted">{isWaitlistEvent(event) ? "Status: Joined waitlist" : "Status: Registered"}</p>
+                          {dateToShow ? <p className="muted">Date: {dateToShow}</p> : null}
+                          {event.location ? <p className="muted">Location: {event.location}</p> : null}
+                        </div>
+                        {event.description ? <p className="muted">{event.description}</p> : null}
+                        {event.submission ? (
+                          <div style={{ marginTop: 12 }}>
+                            <button
+                              className="button ghost"
+                              type="button"
+                              onClick={() => {
+                                setSelectedSubmission(event.submission ?? null);
+                                setSelectedSubmissionEventTitle(event.title);
+                              }}
+                            >
+                              View Submission
+                            </button>
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+              <div style={{ marginTop: 12 }}>
+                <Link className="button primary" href="/events">
+                  Browse Events
+                </Link>
+              </div>
+            </>
+          ) : null}
 
-        <section className="account-card">
-          <h2>Friends</h2>
+          {activeSection === "team" ? (
+            <>
+              <div className="account-card__header">
+                <div>
+                  <h2>Your Sunday League Team</h2>
+                  <p className="muted">Manage your Sunday League team and roster.</p>
+                </div>
+              </div>
+              {loadingTeams ? (
+                <p className="muted">Loading your teams...</p>
+              ) : teams.length === 0 ? (
+                <p className="muted">
+                  No team yet. <Link href="/leagues/sunday-league">Go to Sunday League</Link> to create one.
+                </p>
+              ) : (
+                <ul className="list list--grid">
+                  {teams.map((team) => (
+                    <li key={team.id} className="team-card">
+                      <div className="team-card__logo">
+                        <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="80px" />
+                      </div>
+                      <div className="team-card__info">
+                        <p className="list__title">{team.team_name}</p>
+                        <p className="muted">Sunday League team</p>
+                      </div>
+                      <Link className="button ghost" href={`/leagues/sunday-league/team/${team.id}`}>
+                        Team Portal
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </>
+          ) : null}
 
-          <div className="search-panel">
+          {activeSection === "friends" ? (
+            <>
+              <div className="account-card__header account-card__header--compact">
+                <div>
+                  <h2>Friends</h2>
+                </div>
+              </div>
+
+              <div className="search-panel">
             <div className="search-panel__text">
               <p className="eyebrow">Find players</p>
               <h3>Search the community</h3>
@@ -1154,6 +1198,8 @@ export default function AccountPage() {
             )}
           </section>
           {error ? <p className="form-help error">{error}</p> : null}
+            </>
+          ) : null}
         </section>
 
         <SubmissionReviewModal

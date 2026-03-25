@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
-import { SUNDAY_LEAGUE_DIVISIONS, SUNDAY_LEAGUE_SLOT_COUNT, buildSundayLeagueSlots, getNextOpenSundayLeagueSlot, type SundayLeagueDivision } from "@/lib/sunday-league";
+import { SUNDAY_LEAGUE_DIVISIONS, SUNDAY_LEAGUE_SLOT_COUNT, getNextOpenSundayLeagueSlot, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
 import type { SundayLeagueTeam } from "@/lib/supabase/types";
@@ -305,8 +305,8 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     [teams, userId],
   );
 
-  const divisionSlots = useMemo(
-    () => buildSundayLeagueSlots(teams, selectedDivision, SUNDAY_LEAGUE_SLOT_COUNT),
+  const divisionTeams = useMemo(
+    () => teams.filter((team) => team.division === selectedDivision).sort((a, b) => a.slot_number - b.slot_number),
     [selectedDivision, teams],
   );
 
@@ -563,23 +563,22 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
 
             {loadingTeams ? <p className="muted">Loading division slots...</p> : null}
 
+            {!loadingTeams && divisionTeams.length === 0 ? (
+              <p className="muted">No teams added to this division yet.</p>
+            ) : null}
+
             <div className="sunday-league-team-grid">
-              {divisionSlots.map((slot) => (
-                <article
-                  key={`${slot.division}-${slot.slotNumber}`}
-                  className={`sunday-league-team-card${slot.team ? "" : " is-open-slot"}`}
-                >
+              {divisionTeams.map((team) => (
+                <article key={team.id} className="sunday-league-team-card">
                   <div className="sunday-league-team-card__logo">
-                    <TeamLogoImage src={slot.team?.team_logo_url} alt="" fill sizes="120px" />
+                    <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="120px" />
                   </div>
                   <div className="sunday-league-stack">
-                    <h3>{slot.team?.team_name ?? "Open slot"}</h3>
+                    <h3>{team.team_name}</h3>
                   </div>
-                  {slot.team ? (
-                    <Link className="button ghost sunday-league-team-card__button" href={`/leagues/sunday-league/teams/${slot.team.id}`}>
-                      View Team
-                    </Link>
-                  ) : null}
+                  <Link className="button ghost sunday-league-team-card__button" href={`/leagues/sunday-league/teams/${team.id}`}>
+                    View Team
+                  </Link>
                 </article>
               ))}
             </div>

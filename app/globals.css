@@ -2102,6 +2102,7 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin-top: 2px;
 }
 
 .form-help {
@@ -2201,6 +2202,52 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   padding: 18px;
 }
 
+.account-tabs-card {
+  display: grid;
+  gap: 18px;
+}
+
+.account-profile-card {
+  display: grid;
+  gap: 12px;
+}
+
+.account-tabs {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.account-tabs__button {
+  border: 1px solid #111827;
+  background: #111827;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 10px 18px;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  opacity: 0.72;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.account-tabs__button.is-active {
+  opacity: 1;
+  transform: translateY(-1px);
+}
+
+html[data-theme="dark"] .account-tabs__button {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #1f2a40;
+  color: #e8edf7;
+}
+
+html[data-theme="dark"] .account-tabs__button.is-active {
+  background: #e8edf7;
+  border-color: #e8edf7;
+  color: #0b1224;
+}
+
 .account-card__header {
   display: flex;
   align-items: flex-start;
@@ -2209,17 +2256,22 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   flex-wrap: wrap;
 }
 
+.account-card__header--compact {
+  margin-bottom: -14px;
+}
+
 .account-card__header h2,
 .account-card__header h3,
 .account-card__header p {
   margin-top: 0;
+  margin-bottom: 0;
 }
 
 .profile-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: 12px 16px;
-  margin-top: 12px;
+  margin-top: 6px;
 }
 
 .stat {
@@ -2322,15 +2374,16 @@ html[data-theme="dark"] .team-card__logo {
   border-color: #1f2a40;
 }
 
-
-
-
-
 .search-panel {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: 16px;
   align-items: center;
+  margin-top: -10px;
+}
+
+.account-card__header + .search-panel {
+  margin-top: -18px;
 }
 
 .search-panel__text h3 {

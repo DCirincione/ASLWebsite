@@ -18,11 +18,63 @@ type SportEvent = Event & { image?: string };
 export default function RunClubPage() {
   const [events, setEvents] = useState<SportEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [runClubFlyer, setRunClubFlyer] = useState("/ASLLogo.png");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalEventId, setModalEventId] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string | null>(null);
   const [detailEvent, setDetailEvent] = useState<SportEvent | null>(null);
   const { isRegisteredEvent, refreshRegisteredEvents } = useRegisteredEventIds();
+
+  useEffect(() => {
+    const normalize = (value?: string | null) => (value ?? "").trim().toLowerCase();
+    const toFlyerCandidates = (slug?: string | null) => {
+      const normalized = normalize(slug);
+      if (!normalized) return [];
+
+      const candidates = new Set<string>();
+      candidates.add(normalized);
+      candidates.add(`${normalized}-flyer`);
+
+      const suffixes = ["-league", "-clinic", "-pickup", "-tournament", "-event"];
+      for (const suffix of suffixes) {
+        if (normalized.endsWith(suffix)) {
+          const base = normalized.slice(0, -suffix.length);
+          if (base) {
+            candidates.add(base);
+            candidates.add(`${base}-flyer`);
+          }
+        }
+      }
+
+      return Array.from(candidates);
+    };
+
+    const loadFlyer = async () => {
+      if (!supabase) return;
+
+      const { data, error } = await supabase.from("flyers").select("*");
+      if (error || !data || data.length === 0) return;
+
+      const rows = data as Array<{
+        flyer_name?: string | null;
+        flyer_image_url?: string | null;
+        image_url?: string | null;
+      }>;
+
+      const candidates = toFlyerCandidates("run-club");
+      const flyer =
+        rows.find((row) => candidates.includes(normalize(row.flyer_name))) ||
+        rows.find((row) => normalize(row.flyer_name) === "run club") ||
+        null;
+
+      const flyerUrl = flyer?.flyer_image_url?.trim() || flyer?.image_url?.trim();
+      if (flyerUrl) {
+        setRunClubFlyer(flyerUrl);
+      }
+    };
+
+    void loadFlyer();
+  }, []);
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -165,9 +217,8 @@ export default function RunClubPage() {
         {loadingEvents ? <p className="muted">Loading runs...</p> : renderCards()}
         <div className="run-club-overview">
           <div className="run-club-overview__flyer">
-            <p className="eyebrow">Flyer</p>
             <Image
-              src="/ASLLogo.png"
+              src={runClubFlyer}
               alt="Run Club Flyer"
               width={420}
               height={560}
@@ -181,9 +232,6 @@ export default function RunClubPage() {
               Aldrich Run Club is built for all paces and experience levels. We meet for structured group runs that
               focus on consistency, encouragement, and community. Whether you are training for your first 5K or
               building a weekly routine, this is a place to stay accountable and run with a supportive crew.
-            </p>
-            <p className="muted">
-              Update this description and flyer anytime as your run schedule, goals, and format evolve.
             </p>
           </div>
         </div>
