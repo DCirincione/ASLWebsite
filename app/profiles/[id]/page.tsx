@@ -6,6 +6,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { HistoryBackButton } from "@/components/history-back-button";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
@@ -154,9 +155,7 @@ export default function PublicProfilePage() {
               </p>
             </div>
           </div>
-          <Link className="button ghost" href="/account">
-            ← Back
-          </Link>
+          <HistoryBackButton label="← Back" fallbackHref="/account" />
         </header>
 
         {status === "error" ? (

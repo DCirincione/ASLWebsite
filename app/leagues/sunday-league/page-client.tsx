@@ -61,7 +61,7 @@ const rules = [
     heading: "Format & Structure",
     items: [
       "5v5 format: 1 goalkeeper and 4 field players.",
-      "Maximum roster size is 15 players.",
+      "Maximum roster size is 10 players.",
       "Maximum players per matchday is 10.",
       "Minimum of 4 players required to play. Teams with 3 or fewer players forfeit.",
       "Games are XX minutes with a running clock.",

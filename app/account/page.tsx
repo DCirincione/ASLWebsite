@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { HistoryBackButton } from "@/components/history-back-button";
 import { RegistrationModal } from "@/components/registration-modal";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { TeamLogoImage } from "@/components/team-logo-image";
@@ -701,9 +702,7 @@ export default function AccountPage() {
     <div className="account-page">
       <AccessibilityControls />
       <div className="account-body shell" style={{ gap: 12 }}>
-        <Link className="button ghost" href="/">
-          ← Back
-        </Link>
+        <HistoryBackButton label="← Back" fallbackHref="/" />
 
         <section className="account-card account-profile-card" id="profile">
           <header className="account-header">

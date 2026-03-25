@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { HistoryBackButton } from "@/components/history-back-button";
 import { supabase } from "@/lib/supabase/client";
 
 const PASSWORD_RESET_REDIRECT = "https://aldrichsports.com/reset-password";
@@ -234,9 +234,7 @@ export default function AccountSettingsPage() {
       <AccessibilityControls />
       <div className="account-page">
         <div className="account-body shell">
-          <Link className="button ghost" href="/">
-            ← Back
-          </Link>
+          <HistoryBackButton label="← Back" fallbackHref="/" />
 
           {status === "loading" ? (
             <section className="account-card">

@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { getSundayLeagueColor } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
@@ -87,9 +87,7 @@ export default function SundayLeagueDepositPageClient({ teamId }: SundayLeagueDe
                 Continue to Your Sunday League Team
               </button>
             ) : null}
-            <Link className="button ghost" href="/leagues/sunday-league">
-              Back to League Hub
-            </Link>
+            <HistoryBackButton label="Back to League Hub" fallbackHref="/leagues/sunday-league" />
           </div>
         </div>
       </section>

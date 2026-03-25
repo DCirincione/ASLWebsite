@@ -1551,6 +1551,17 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   gap: 4px;
 }
 
+.sunday-league-team-portal__actions {
+  margin-top: -8px;
+  justify-content: flex-start;
+}
+
+.sunday-league-team-portal__heading {
+  display: grid;
+  gap: 4px;
+  margin-top: -10px;
+}
+
 .sunday-league-create-modal {
   width: min(960px, calc(100vw - 32px));
   max-height: min(92vh, 1100px);

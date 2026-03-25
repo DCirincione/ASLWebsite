@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { supabase } from "@/lib/supabase/client";
@@ -66,9 +66,7 @@ export default function SundayLeaguePublicTeamPage() {
       <section className="section sunday-league-flow-page">
         <div className="sunday-league-flow-card">
           <div className="sunday-league-inline-actions sunday-league-flow-card__back">
-            <Link className="button primary" href="/leagues/sunday-league?section=teams">
-              Back to Teams
-            </Link>
+            <HistoryBackButton className="button primary" label="Back to Teams" fallbackHref="/leagues/sunday-league?section=teams" />
           </div>
           <div className="sunday-league-flow-card__heading">
             <p className="eyebrow">Sunday League Team</p>
@@ -113,9 +111,7 @@ export default function SundayLeaguePublicTeamPage() {
           ) : null}
 
           <div className="sunday-league-inline-actions">
-            <Link className="button ghost" href="/leagues/sunday-league">
-              Back to League Hub
-            </Link>
+            <HistoryBackButton label="Back to League Hub" fallbackHref="/leagues/sunday-league" />
           </div>
         </div>
       </section>

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { HistoryBackButton } from "@/components/history-back-button";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { createId } from "@/lib/create-id";
 import type { SignupMode } from "@/lib/event-signups";
@@ -2117,9 +2118,7 @@ export default function AdminPage() {
     <div className="account-page">
       <AccessibilityControls />
       <div className="account-body shell">
-        <Link className="button ghost" href="/">
-          ← Back
-        </Link>
+        <HistoryBackButton label="← Back" fallbackHref="/" />
         {status === "loading" ? <p className="muted">Loading admin dashboard...</p> : null}
         {status === "no-session" ? (
           <p className="muted">

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { EventDetailModal } from "@/components/event-detail-modal";
+import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
@@ -179,6 +180,9 @@ export default function SoccerPage() {
 
   return (
     <PageShell>
+      <div style={{ paddingTop: 16 }}>
+        <HistoryBackButton label="← Back" fallbackHref="/sports" />
+      </div>
       <Section
         id="soccer-hero"
         eyebrow="Soccer"
