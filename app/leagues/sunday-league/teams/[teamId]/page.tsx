@@ -9,7 +9,7 @@ import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
-import type { SundayLeagueTeam } from "@/lib/supabase/types";
+import type { SundayLeagueScheduleWeek, SundayLeagueTeam } from "@/lib/supabase/types";
 
 type TeamRosterPlayer = {
   id: string;
@@ -18,16 +18,6 @@ type TeamRosterPlayer = {
   avatarUrl: string | null;
   countryCode: string | null;
   jerseyNumber: string | null;
-};
-
-const buildPublicSchedule = (team: SundayLeagueTeam | null) => {
-  if (!team) return [];
-
-  return [
-    `Week 1: ${team.team_name} vs Opponent TBD`,
-    `Week 2: Matchday assignment coming soon`,
-    `Week 3: Schedule release pending division setup`,
-  ];
 };
 
 const buildTeamHistory = (team: SundayLeagueTeam | null) => {
@@ -75,6 +65,7 @@ export default function SundayLeaguePublicTeamPage() {
   const params = useParams<{ teamId: string }>();
   const teamId = params.teamId;
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
+  const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
   const [rosterPlayers, setRosterPlayers] = useState<TeamRosterPlayer[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
@@ -127,7 +118,23 @@ export default function SundayLeaguePublicTeamPage() {
     void loadTeam();
   }, [teamId]);
 
-  const scheduleRows = useMemo(() => buildPublicSchedule(team), [team]);
+  useEffect(() => {
+    const loadScheduleWeeks = async () => {
+      if (!supabase) return;
+
+      const { data, error } = await supabase
+        .from("sunday_league_schedule_weeks")
+        .select("*")
+        .order("week_number", { ascending: true });
+
+      if (!error) {
+        setScheduleWeeks((data ?? []) as SundayLeagueScheduleWeek[]);
+      }
+    };
+
+    void loadScheduleWeeks();
+  }, []);
+
   const historyRows = useMemo(() => buildTeamHistory(team), [team]);
   const establishedLabel = useMemo(() => getEstablishedLabel(team), [team]);
 
@@ -223,13 +230,34 @@ export default function SundayLeaguePublicTeamPage() {
 
                 <section className="sunday-league-team-board__section">
                   <h3>Schedule</h3>
-                  <div className="sunday-league-team-board__list">
-                    {scheduleRows.map((item) => (
-                      <div key={item} className="sunday-league-team-board__list-row">
-                        <span>{item}</span>
+                  {scheduleWeeks.length === 0 ? <p className="muted">No weekly schedule has been posted yet.</p> : null}
+                  {scheduleWeeks.length > 0 ? (
+                    <div className="sunday-league-schedule__weeks">
+                      <div className="sunday-league-schedule__grid sunday-league-schedule__grid--header">
+                        <div className="sunday-league-schedule__column">
+                          <h3>Black Sheep Field</h3>
+                        </div>
+                        <div className="sunday-league-schedule__column">
+                          <h3>Magic Fountain Field</h3>
+                        </div>
                       </div>
-                    ))}
-                  </div>
+                      {scheduleWeeks.map((week) => (
+                        <article key={week.id} className="sunday-league-panel-box sunday-league-schedule__week">
+                          <div className="sunday-league-stack">
+                            <p className="eyebrow">Week {week.week_number}</p>
+                            <div className="sunday-league-schedule__grid">
+                              <div className="sunday-league-schedule__column">
+                                <p className="sunday-league-schedule__body">{week.black_sheep_field_schedule}</p>
+                              </div>
+                              <div className="sunday-league-schedule__column">
+                                <p className="sunday-league-schedule__body">{week.magic_fountain_field_schedule}</p>
+                              </div>
+                            </div>
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : null}
                 </section>
 
                 <section className="sunday-league-team-board__section">
