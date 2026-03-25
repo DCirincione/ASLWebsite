@@ -10,7 +10,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
-import type { Profile, SundayLeagueTeam } from "@/lib/supabase/types";
+import type { Event, Profile, SundayLeagueTeam } from "@/lib/supabase/types";
 
 type ProfileWithAvatar = Profile & { avatar_url?: string | null };
 type FriendRequest = {
@@ -21,6 +21,10 @@ type FriendRequest = {
 };
 type FriendSummary = { id: string; name: string; avatar_url?: string | null };
 type PublicSundayLeagueTeam = Pick<SundayLeagueTeam, "id" | "team_name" | "team_logo_url">;
+type PublicRegisteredEvent = Pick<
+  Event,
+  "id" | "title" | "start_date" | "end_date" | "time_info" | "location" | "description"
+>;
 
 const fallbackProfile: ProfileWithAvatar = {
   id: "demo",
@@ -35,6 +39,36 @@ const fallbackProfile: ProfileWithAvatar = {
   weight_lbs: null,
 };
 
+const parseDateUTC = (value?: string | null) => {
+  if (!value) return null;
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
+  const [year, month, day] = parts;
+  return new Date(Date.UTC(year, month - 1, day));
+};
+
+const formatDateRange = (start?: string | null, end?: string | null) => {
+  if (!start && !end) return "";
+  const startDate = parseDateUTC(start);
+  const endDate = parseDateUTC(end);
+  const opts: Intl.DateTimeFormatOptions = { month: "short", day: "numeric", timeZone: "UTC" };
+  if (startDate && endDate) {
+    if (startDate.getTime() === endDate.getTime()) {
+      return startDate.toLocaleDateString(undefined, opts);
+    }
+    const sameMonth = startDate.getMonth() === endDate.getMonth();
+    const sameYear = startDate.getFullYear() === endDate.getFullYear();
+    const startStr = startDate.toLocaleDateString(undefined, opts);
+    const endStr = endDate.toLocaleDateString(
+      undefined,
+      sameMonth && sameYear ? { day: "numeric", timeZone: "UTC" } : opts
+    );
+    return `${startStr} - ${endStr}`;
+  }
+  if (startDate) return startDate.toLocaleDateString(undefined, opts);
+  return "";
+};
+
 export default function PublicProfilePage() {
   const params = useParams<{ id: string }>();
   const profileId = params?.id;
@@ -42,8 +76,10 @@ export default function PublicProfilePage() {
   const [profile, setProfile] = useState<ProfileWithAvatar | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [teams, setTeams] = useState<PublicSundayLeagueTeam[]>([]);
+  const [registeredEvents, setRegisteredEvents] = useState<PublicRegisteredEvent[]>([]);
   const [friends, setFriends] = useState<FriendSummary[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
+  const [loadingEvents, setLoadingEvents] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(false);
 
   useEffect(() => {
@@ -90,6 +126,60 @@ export default function PublicProfilePage() {
       setLoadingTeams(false);
     };
     loadTeams();
+  }, [profileId]);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!profileId || !client) return;
+    const loadEvents = async () => {
+      setLoadingEvents(true);
+      const { data: submissions, error: submissionsError } = await client
+        .from("event_submissions")
+        .select("id,event_id,created_at")
+        .eq("user_id", profileId)
+        .order("created_at", { ascending: false });
+
+      if (submissionsError || !submissions) {
+        setLoadingEvents(false);
+        return;
+      }
+
+      const uniqueEventIds = Array.from(new Set(submissions.map((submission) => submission.event_id)));
+      if (uniqueEventIds.length === 0) {
+        setRegisteredEvents([]);
+        setLoadingEvents(false);
+        return;
+      }
+
+      const { data: events, error: eventsError } = await client
+        .from("events")
+        .select("id,title,start_date,end_date,time_info,location,description")
+        .in("id", uniqueEventIds);
+
+      if (eventsError || !events) {
+        setRegisteredEvents([]);
+        setLoadingEvents(false);
+        return;
+      }
+
+      const eventsById = new Map(
+        (events as PublicRegisteredEvent[]).map((event) => [event.id, event])
+      );
+      const orderedEvents: PublicRegisteredEvent[] = [];
+      const seenEventIds = new Set<string>();
+
+      submissions.forEach((submission) => {
+        if (seenEventIds.has(submission.event_id)) return;
+        const event = eventsById.get(submission.event_id);
+        if (!event) return;
+        orderedEvents.push(event);
+        seenEventIds.add(submission.event_id);
+      });
+
+      setRegisteredEvents(orderedEvents);
+      setLoadingEvents(false);
+    };
+    loadEvents();
   }, [profileId]);
 
   useEffect(() => {
@@ -218,6 +308,41 @@ export default function PublicProfilePage() {
             )}
           </section>
         ) : null}
+
+        <section className="account-card">
+          <div className="account-card__header">
+            <div>
+              <h3>Events</h3>
+              <p className="muted">Events this player is signed up for.</p>
+            </div>
+          </div>
+          {loadingEvents ? (
+            <p className="muted">Loading events...</p>
+          ) : registeredEvents.length === 0 ? (
+            <p className="muted">No event submissions yet.</p>
+          ) : (
+            <div className="event-list">
+              {registeredEvents.map((event) => {
+                const dateRange = formatDateRange(event.start_date, event.end_date);
+                const primaryDate = event.time_info?.trim() || null;
+                const fallbackDate = primaryDate ? null : dateRange;
+                const dateToShow = primaryDate || fallbackDate || null;
+                return (
+                  <article key={event.id} className="event-card-simple">
+                    <div className="event-card__header">
+                      <h3>{event.title}</h3>
+                    </div>
+                    <div className="event-card__meta">
+                      {dateToShow ? <p className="muted">Date: {dateToShow}</p> : null}
+                      {event.location ? <p className="muted">Location: {event.location}</p> : null}
+                    </div>
+                    {event.description ? <p className="muted">{event.description}</p> : null}
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
 
         <section className="account-card">
           <div className="account-card__header">
