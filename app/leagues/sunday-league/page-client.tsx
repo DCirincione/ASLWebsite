@@ -16,7 +16,7 @@ import {
 } from "@/lib/sunday-league";
 import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
-import type { SundayLeagueTeam } from "@/lib/supabase/types";
+import type { SundayLeagueLeaderboard, SundayLeagueTeam } from "@/lib/supabase/types";
 
 type SundayLeagueSection = "overview" | "rules" | "teams" | "leaderboards" | "schedule" | "inquiries";
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -40,6 +40,18 @@ type TeamFormState = {
   logo_description: string;
   jersey_numbers: string[];
   agreements: Record<AgreementKey, boolean>;
+};
+type LeaderboardTableRow = {
+  id: string;
+  team: string;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDistribution: string;
+  points: number;
+  gamesPlayed: number;
 };
 
 const sectionOrder: Array<{ id: SundayLeagueSection; label: string }> = [
@@ -174,13 +186,6 @@ const scheduleColumns = [
   },
 ];
 
-const leaderboardRows = [
-  { team: "Beer Bellyz FC", w: 23, d: 11, l: 5, gf: 50, ga: 16, gd: 34, pts: 80, gp: 39 },
-  { team: "Riverhead FC", w: 22, d: 10, l: 6, gf: 52, ga: 13, gd: 39, pts: 76, gp: 38 },
-  { team: "Purple Bombers", w: 13, d: 14, l: 11, gf: 32, ga: 27, gd: 5, pts: 53, gp: 38 },
-  { team: "Black Sheep", w: 12, d: 9, l: 14, gf: 28, ga: 26, gd: 2, pts: 45, gp: 35 },
-];
-
 const createEmptyTeamForm = (): TeamFormState => ({
   division: 1,
   captain_name: "",
@@ -214,7 +219,9 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
   const [selectedDivision, setSelectedDivision] = useState<SundayLeagueDivision>(1);
   const [overviewFlyer, setOverviewFlyer] = useState<string>("/sundayLeague/champs2025.jpeg");
   const [teams, setTeams] = useState<SundayLeagueTeam[]>([]);
+  const [leaderboard, setLeaderboard] = useState<SundayLeagueLeaderboard[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(true);
+  const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>({ type: "idle" });
   const [teamStatus, setTeamStatus] = useState<Status>({ type: "idle" });
@@ -280,12 +287,14 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     const load = async () => {
       if (!supabase) {
         setLoadingTeams(false);
+        setLoadingLeaderboard(false);
         return;
       }
 
-      const [{ data: sessionData }, teamsResponse] = await Promise.all([
+      const [{ data: sessionData }, teamsResponse, leaderboardResponse] = await Promise.all([
         supabase.auth.getSession(),
         supabase.from("sunday_league_teams").select("*").order("division", { ascending: true }).order("slot_number", { ascending: true }),
+        supabase.from("sunday_league_leaderboard").select("*"),
       ]);
 
       const session = sessionData.session;
@@ -300,7 +309,12 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
         setTeams((teamsResponse.data ?? []) as SundayLeagueTeam[]);
       }
 
+      if (!leaderboardResponse.error) {
+        setLeaderboard((leaderboardResponse.data ?? []) as SundayLeagueLeaderboard[]);
+      }
+
       setLoadingTeams(false);
+      setLoadingLeaderboard(false);
     };
 
     void load();
@@ -317,6 +331,70 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
   );
 
   const divisionCounts = useMemo(() => SUNDAY_LEAGUE_DIVISIONS, []);
+
+  const teamsById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
+
+  const leaderboardRows = useMemo(
+    () =>
+      leaderboard
+        .map((entry) => {
+          const team = teamsById.get(entry.team_id);
+          if (!team || team.division !== selectedDivision) return null;
+
+          return {
+            id: entry.id,
+            team: team.team_name,
+            wins: entry.wins,
+            draws: entry.draws,
+            losses: entry.losses,
+            goalsFor: entry.goals_for,
+            goalsAgainst: entry.goals_against,
+            goalDistribution: entry.goal_distribution,
+            points: entry.points,
+            gamesPlayed: entry.games_played,
+          };
+        })
+        .filter((row): row is LeaderboardTableRow => row !== null)
+        .sort((a, b) => {
+          const pointsDelta = b.points - a.points;
+          if (pointsDelta !== 0) return pointsDelta;
+
+          const winsDelta = b.wins - a.wins;
+          if (winsDelta !== 0) return winsDelta;
+
+          const goalDifferenceDelta = (b.goalsFor - b.goalsAgainst) - (a.goalsFor - a.goalsAgainst);
+          if (goalDifferenceDelta !== 0) return goalDifferenceDelta;
+
+          const goalsForDelta = b.goalsFor - a.goalsFor;
+          if (goalsForDelta !== 0) return goalsForDelta;
+
+          return a.team.localeCompare(b.team);
+        }),
+    [leaderboard, selectedDivision, teamsById],
+  );
+
+  const renderDivisionTabs = (ariaLabel: string) => (
+    <div className="sunday-league-division-tabs" role="tablist" aria-label={ariaLabel}>
+      {divisionCounts.map((division) => (
+        <button
+          key={division.value}
+          type="button"
+          role="tab"
+          aria-selected={selectedDivision === division.value}
+          className={`sunday-league-division-tab${selectedDivision === division.value ? " is-active" : ""}`}
+          onClick={() => setSelectedDivision(division.value)}
+        >
+          <Image
+            src={getSundayLeagueDivisionLogoSrc(division.value)}
+            alt={division.label}
+            width={176}
+            height={56}
+            className="sunday-league-division-tab__image"
+          />
+        </button>
+      ))}
+    </div>
+  );
 
   const updateInquiryForm = (key: keyof typeof inquiryForm, value: string) => {
     setInquiryForm((prev) => ({ ...prev, [key]: value }));
@@ -552,26 +630,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
               ) : null}
             </div>
 
-            <div className="sunday-league-division-tabs" role="tablist" aria-label="Sunday League divisions">
-              {divisionCounts.map((division) => (
-                <button
-                  key={division.value}
-                  type="button"
-                  role="tab"
-                  aria-selected={selectedDivision === division.value}
-                  className={`sunday-league-division-tab${selectedDivision === division.value ? " is-active" : ""}`}
-                  onClick={() => setSelectedDivision(division.value)}
-                >
-                  <Image
-                    src={getSundayLeagueDivisionLogoSrc(division.value)}
-                    alt={division.label}
-                    width={176}
-                    height={56}
-                    className="sunday-league-division-tab__image"
-                  />
-                </button>
-              ))}
-            </div>
+            {renderDivisionTabs("Sunday League divisions")}
 
             {loadingTeams ? <p className="muted">Loading division slots...</p> : null}
 
@@ -601,38 +660,45 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
         return (
           <div className="sunday-league-leaderboard">
             <h2>Leaderboard</h2>
-            <div className="sunday-league-table-wrap">
-              <table className="sunday-league-table">
-                <thead>
-                  <tr>
-                    <th>Team</th>
-                    <th>W</th>
-                    <th>D</th>
-                    <th>L</th>
-                    <th>GF</th>
-                    <th>GA</th>
-                    <th>GD</th>
-                    <th>PTS</th>
-                    <th>GP</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {leaderboardRows.map((row) => (
-                    <tr key={row.team}>
-                      <td>{row.team}</td>
-                      <td>{row.w}</td>
-                      <td>{row.d}</td>
-                      <td>{row.l}</td>
-                      <td>{row.gf}</td>
-                      <td>{row.ga}</td>
-                      <td>{row.gd}</td>
-                      <td>{row.pts}</td>
-                      <td>{row.gp}</td>
+            {renderDivisionTabs("Sunday League leaderboard divisions")}
+            {loadingLeaderboard ? <p className="muted">Loading leaderboard...</p> : null}
+            {!loadingLeaderboard && leaderboardRows.length === 0 ? (
+              <p className="muted">No leaderboard rows added for this division yet.</p>
+            ) : null}
+            {leaderboardRows.length > 0 ? (
+              <div className="sunday-league-table-wrap">
+                <table className="sunday-league-table">
+                  <thead>
+                    <tr>
+                      <th>Team</th>
+                      <th>W</th>
+                      <th>D</th>
+                      <th>L</th>
+                      <th>GF</th>
+                      <th>GA</th>
+                      <th>GF-GA</th>
+                      <th>PTS</th>
+                      <th>GP</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {leaderboardRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.team}</td>
+                        <td>{row.wins}</td>
+                        <td>{row.draws}</td>
+                        <td>{row.losses}</td>
+                        <td>{row.goalsFor}</td>
+                        <td>{row.goalsAgainst}</td>
+                        <td>{row.goalDistribution}</td>
+                        <td>{row.points}</td>
+                        <td>{row.gamesPlayed}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
           </div>
         );
 

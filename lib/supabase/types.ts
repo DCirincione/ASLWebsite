@@ -280,6 +280,48 @@ export type SundayLeagueTeamUpdate = {
   updated_at?: string | null;
 };
 
+export type SundayLeagueLeaderboard = {
+  id: string;
+  team_id: string;
+  wins: number;
+  draws: number;
+  losses: number;
+  goals_for: number;
+  goals_against: number;
+  goal_distribution: string;
+  points: number;
+  games_played: number;
+  forfeit_wins: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueLeaderboardInsert = {
+  id?: string;
+  team_id: string;
+  wins?: number;
+  draws?: number;
+  losses?: number;
+  goals_for?: number;
+  goals_against?: number;
+  forfeit_wins?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueLeaderboardUpdate = {
+  id?: string;
+  team_id?: string;
+  wins?: number;
+  draws?: number;
+  losses?: number;
+  goals_for?: number;
+  goals_against?: number;
+  forfeit_wins?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type Sport = {
   id: string;
   title: string;
@@ -572,6 +614,12 @@ export type Database = {
         Row: SundayLeagueTeam;
         Insert: SundayLeagueTeamInsert;
         Update: SundayLeagueTeamUpdate;
+        Relationships: [];
+      };
+      sunday_league_leaderboard: {
+        Row: SundayLeagueLeaderboard;
+        Insert: SundayLeagueLeaderboardInsert;
+        Update: SundayLeagueLeaderboardUpdate;
         Relationships: [];
       };
       sports: {
