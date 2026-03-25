@@ -7,16 +7,18 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { RegistrationModal } from "@/components/registration-modal";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
+import { TeamLogoImage } from "@/components/team-logo-image";
 import { createId } from "@/lib/create-id";
 import { isWaitlistEvent } from "@/lib/event-signups";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
-import type { Event, Friend, JsonValue, Profile, TeamMembership } from "@/lib/supabase/types";
+import type { Event, Friend, JsonValue, Profile, SundayLeagueTeam } from "@/lib/supabase/types";
 
 type ProfileData = Profile & {
-  team_memberships: TeamMembership[];
   friends: Friend[];
 };
+
+type AccountSundayLeagueTeam = Pick<SundayLeagueTeam, "id" | "team_name" | "team_logo_url">;
 
 type FriendRequest = {
   id: string;
@@ -47,7 +49,6 @@ const fallbackProfile: ProfileData = {
     "Community player focused on team play and sportsmanship. Loves weekend tournaments and pickup games.",
   height_cm: null,
   weight_lbs: null,
-  team_memberships: [],
   friends: [],
 };
 
@@ -143,7 +144,7 @@ export default function AccountPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // Teams
-  const [teams, setTeams] = useState<TeamMembership[]>([]);
+  const [teams, setTeams] = useState<AccountSundayLeagueTeam[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [registeredEvents, setRegisteredEvents] = useState<RegisteredEventItem[] | null>(null);
   const [eventsStatus, setEventsStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -342,7 +343,6 @@ export default function AccountPage() {
 
       setProfile({
         ...(data as Profile),
-        team_memberships: [],
         friends: [],
       });
       setStatus("ready");
@@ -362,12 +362,12 @@ export default function AccountPage() {
     const loadTeams = async () => {
       setLoadingTeams(true);
       const { data, error } = await client
-        .from("team_memberships")
-        .select("*")
+        .from("sunday_league_teams")
+        .select("id,team_name,team_logo_url")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
       if (!error && data) {
-        setTeams(data as TeamMembership[]);
+        setTeams(data as AccountSundayLeagueTeam[]);
       }
       setLoadingTeams(false);
     };
@@ -927,8 +927,8 @@ export default function AccountPage() {
           <section className="account-card">
             <div className="account-card__header">
               <div>
-                <h2>My Team</h2>
-                <p className="muted">Manage your teams and roster.</p>
+                <h2>Your Sunday League Team</h2>
+                <p className="muted">Manage your Sunday League team and roster.</p>
               </div>
             </div>
             {loadingTeams ? (
@@ -938,14 +938,14 @@ export default function AccountPage() {
                 {teams.map((team) => (
                   <li key={team.id} className="team-card">
                     <div className="team-card__logo">
-                      <img src={team.logo_url ?? "/team-placeholder.svg"} alt="" />
+                      <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="80px" />
                     </div>
                     <div className="team-card__info">
                       <p className="list__title">{team.team_name}</p>
-                      <p className="muted">{team.role ?? "Player"}</p>
+                      <p className="muted">Sunday League team</p>
                     </div>
-                    <Link className="button ghost" href="/sports">
-                      View Schedule
+                    <Link className="button ghost" href={`/leagues/sunday-league/team/${team.id}`}>
+                      Team Portal
                     </Link>
                   </li>
                 ))}

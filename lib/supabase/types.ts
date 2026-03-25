@@ -49,27 +49,6 @@ export type ProfileUpdate = {
   weight_lbs?: number | null;
 };
 
-export type TeamMembership = {
-  id: string;
-  team_name: string;
-  role: string | null;
-  logo_url?: string | null;
-};
-
-export type TeamMembershipInsert = {
-  id?: string;
-  team_name: string;
-  role?: string | null;
-  logo_url?: string | null;
-};
-
-export type TeamMembershipUpdate = {
-  id?: string;
-  team_name?: string;
-  role?: string | null;
-  logo_url?: string | null;
-};
-
 export type Friend = {
   id: string;
   name: string;
@@ -228,6 +207,72 @@ export type EventSubmissionUpdate = {
   attachments?: string[] | null;
   waiver_accepted?: boolean | null;
   waiver_accepted_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueTeam = {
+  id: string;
+  user_id: string;
+  division: 1 | 2;
+  slot_number: number;
+  captain_name: string;
+  captain_phone: string;
+  captain_email: string;
+  captain_is_playing: boolean;
+  team_name: string;
+  preferred_jersey_colors?: JsonValue | null;
+  preferred_jersey_design?: string | null;
+  team_logo_url?: string | null;
+  logo_description?: string | null;
+  jersey_numbers?: string[] | null;
+  agreements?: JsonValue | null;
+  deposit_status?: "pending" | "paid" | null;
+  team_status?: "pending" | "approved" | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueTeamInsert = {
+  id?: string;
+  user_id: string;
+  division: 1 | 2;
+  slot_number: number;
+  captain_name: string;
+  captain_phone: string;
+  captain_email: string;
+  captain_is_playing?: boolean;
+  team_name: string;
+  preferred_jersey_colors?: JsonValue | null;
+  preferred_jersey_design?: string | null;
+  team_logo_url?: string | null;
+  logo_description?: string | null;
+  jersey_numbers?: string[] | null;
+  agreements?: JsonValue | null;
+  deposit_status?: "pending" | "paid" | null;
+  team_status?: "pending" | "approved" | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueTeamUpdate = {
+  id?: string;
+  user_id?: string;
+  division?: 1 | 2;
+  slot_number?: number;
+  captain_name?: string;
+  captain_phone?: string;
+  captain_email?: string;
+  captain_is_playing?: boolean;
+  team_name?: string;
+  preferred_jersey_colors?: JsonValue | null;
+  preferred_jersey_design?: string | null;
+  team_logo_url?: string | null;
+  logo_description?: string | null;
+  jersey_numbers?: string[] | null;
+  agreements?: JsonValue | null;
+  deposit_status?: "pending" | "paid" | null;
+  team_status?: "pending" | "approved" | null;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -496,12 +541,6 @@ export type Database = {
         Update: ProfileUpdate;
         Relationships: [];
       };
-      team_memberships: {
-        Row: TeamMembership;
-        Insert: TeamMembershipInsert;
-        Update: TeamMembershipUpdate;
-        Relationships: [];
-      };
       friends: {
         Row: Friend;
         Insert: FriendInsert;
@@ -524,6 +563,12 @@ export type Database = {
         Row: EventSubmission;
         Insert: EventSubmissionInsert;
         Update: EventSubmissionUpdate;
+        Relationships: [];
+      };
+      sunday_league_teams: {
+        Row: SundayLeagueTeam;
+        Insert: SundayLeagueTeamInsert;
+        Update: SundayLeagueTeamUpdate;
         Relationships: [];
       };
       sports: {

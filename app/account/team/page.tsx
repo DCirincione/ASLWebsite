@@ -1,29 +1,24 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { AccountNav } from "@/components/account-nav";
+import { TeamLogoImage } from "@/components/team-logo-image";
 import { supabase } from "@/lib/supabase/client";
-import type { TeamMembership } from "@/lib/supabase/types";
+import type { SundayLeagueTeam } from "@/lib/supabase/types";
 
-const fallbackTeams: TeamMembership[] = [
-  { id: "t1", team_name: "Downtown Warriors", role: "Captain", logo_url: null },
-  { id: "t2", team_name: "City League All-Stars", role: "Player", logo_url: null },
-];
-
-const logoSrc = (logo?: string | null) => logo ?? "/team-placeholder.svg";
+type AccountSundayLeagueTeam = Pick<SundayLeagueTeam, "id" | "team_name" | "team_logo_url">;
 
 export default function AccountTeamPage() {
-  const [teams, setTeams] = useState<TeamMembership[] | null>(null);
+  const [teams, setTeams] = useState<AccountSundayLeagueTeam[] | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
 
   useEffect(() => {
     const loadTeams = async () => {
       if (!supabase) {
-        setTeams(fallbackTeams);
+        setTeams([]);
         setStatus("ready");
         return;
       }
@@ -37,18 +32,18 @@ export default function AccountTeamPage() {
       }
 
       const { data, error } = await supabase
-        .from("team_memberships")
-        .select("*")
+        .from("sunday_league_teams")
+        .select("id,team_name,team_logo_url")
         .eq("user_id", userId)
         .order("created_at", { ascending: false });
 
       if (error) {
-        setTeams(fallbackTeams);
+        setTeams([]);
         setStatus("ready");
         return;
       }
 
-      setTeams((data ?? []) as TeamMembership[]);
+      setTeams((data ?? []) as AccountSundayLeagueTeam[]);
       setStatus("ready");
     };
 
@@ -65,11 +60,11 @@ export default function AccountTeamPage() {
         <header className="account-header">
           <div>
             <p className="eyebrow">Account</p>
-            <h1>My Team</h1>
-            <p className="muted">Manage your teams and roster.</p>
+            <h1>Your Sunday League Team</h1>
+            <p className="muted">Manage your Sunday League team and roster.</p>
           </div>
-          <Link className="button primary" href="/register">
-            Create / Join
+          <Link className="button primary" href="/leagues/sunday-league">
+            Sunday League Hub
           </Link>
         </header>
 
@@ -85,14 +80,14 @@ export default function AccountTeamPage() {
               {list.map((team) => (
                 <li key={team.id} className="team-card">
                   <div className="team-card__logo">
-                    <Image src={logoSrc(team.logo_url)} alt="" fill sizes="80px" />
+                    <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="80px" />
                   </div>
                   <div className="team-card__info">
                     <p className="list__title">{team.team_name}</p>
-                    <p className="muted">{team.role ?? "Player"}</p>
+                    <p className="muted">Sunday League team</p>
                   </div>
-                  <Link className="button ghost" href="/sports">
-                    View Schedule
+                  <Link className="button ghost" href={`/leagues/sunday-league/team/${team.id}`}>
+                    Team Portal
                   </Link>
                 </li>
               ))}

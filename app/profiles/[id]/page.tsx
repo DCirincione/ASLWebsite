@@ -6,9 +6,10 @@ import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { TeamLogoImage } from "@/components/team-logo-image";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
-import type { Profile, TeamMembership } from "@/lib/supabase/types";
+import type { Profile, SundayLeagueTeam } from "@/lib/supabase/types";
 
 type ProfileWithAvatar = Profile & { avatar_url?: string | null };
 type FriendRequest = {
@@ -18,6 +19,7 @@ type FriendRequest = {
   status: "pending" | "accepted" | "declined";
 };
 type FriendSummary = { id: string; name: string; avatar_url?: string | null };
+type PublicSundayLeagueTeam = Pick<SundayLeagueTeam, "id" | "team_name" | "team_logo_url">;
 
 const fallbackProfile: ProfileWithAvatar = {
   id: "demo",
@@ -38,7 +40,7 @@ export default function PublicProfilePage() {
 
   const [profile, setProfile] = useState<ProfileWithAvatar | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
-  const [teams, setTeams] = useState<TeamMembership[]>([]);
+  const [teams, setTeams] = useState<PublicSundayLeagueTeam[]>([]);
   const [friends, setFriends] = useState<FriendSummary[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(false);
@@ -77,12 +79,12 @@ export default function PublicProfilePage() {
     const loadTeams = async () => {
       setLoadingTeams(true);
       const { data, error } = await client
-        .from("team_memberships")
-        .select("*")
+        .from("sunday_league_teams")
+        .select("id,team_name,team_logo_url")
         .eq("user_id", profileId)
         .order("created_at", { ascending: false });
       if (!error && data) {
-        setTeams(data as TeamMembership[]);
+        setTeams(data as PublicSundayLeagueTeam[]);
       }
       setLoadingTeams(false);
     };
@@ -192,8 +194,8 @@ export default function PublicProfilePage() {
           <section className="account-card">
             <div className="account-card__header">
               <div>
-                <h3>Teams</h3>
-                <p className="muted">Teams this player belongs to.</p>
+                <h3>Sunday League Team</h3>
+                <p className="muted">Sunday League team for this player.</p>
               </div>
             </div>
             {loadingTeams ? (
@@ -203,12 +205,14 @@ export default function PublicProfilePage() {
                 {teams.map((team) => (
                   <li key={team.id} className="team-card">
                     <div className="team-card__logo">
-                      <img src={team.logo_url ?? "/team-placeholder.svg"} alt="" />
+                      <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="80px" />
                     </div>
                     <div className="team-card__info">
                       <p className="list__title">{team.team_name}</p>
-                      <p className="muted">{team.role ?? "Player"}</p>
                     </div>
+                    <Link className="button ghost" href={`/leagues/sunday-league/teams/${team.id}`}>
+                      View Team
+                    </Link>
                   </li>
                 ))}
               </ul>

@@ -1,8 +1,19 @@
-import type { Event } from "@/lib/supabase/types";
+import type { Event, JsonValue, SundayLeagueTeam } from "@/lib/supabase/types";
 
 type SundayLeagueEventLike = Pick<Event, "title" | "description" | "registration_program_slug" | "sport_slug">;
+export type SundayLeagueDivision = 1 | 2;
+export type SundayLeagueSlot = {
+  slotNumber: number;
+  division: SundayLeagueDivision;
+  team: SundayLeagueTeam | null;
+};
 
 export const SUNDAY_LEAGUE_HREF = "/leagues/sunday-league";
+export const SUNDAY_LEAGUE_SLOT_COUNT = 8;
+export const SUNDAY_LEAGUE_DIVISIONS: Array<{ value: SundayLeagueDivision; label: string }> = [
+  { value: 1, label: "Division 1" },
+  { value: 2, label: "Division 2" },
+];
 
 const normalizeValue = (value?: string | null) => value?.trim().toLowerCase() ?? "";
 
@@ -33,3 +44,45 @@ export const isRegularAslSundayLeagueEvent = (event?: SundayLeagueEventLike | nu
 
   return mentionsSundayLeague && isSoccerLeagueContext && !isJuniorVariant;
 };
+
+const isRecord = (value: JsonValue | null | undefined): value is Record<string, JsonValue | undefined> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+export const getSundayLeagueColor = (value: JsonValue | null | undefined, key: string) => {
+  if (!isRecord(value)) return "";
+  const colorValue = value[key];
+  return typeof colorValue === "string" ? colorValue : "";
+};
+
+export const getSundayLeagueAgreement = (value: JsonValue | null | undefined, key: string) => {
+  if (!isRecord(value)) return false;
+  return Boolean(value[key]);
+};
+
+export const buildSundayLeagueSlots = (
+  teams: SundayLeagueTeam[],
+  division: SundayLeagueDivision,
+  slotCount: number = SUNDAY_LEAGUE_SLOT_COUNT,
+): SundayLeagueSlot[] => {
+  const teamsBySlot = new Map<number, SundayLeagueTeam>();
+  for (const team of teams) {
+    if (team.division === division) {
+      teamsBySlot.set(team.slot_number, team);
+    }
+  }
+
+  return Array.from({ length: slotCount }, (_, index) => {
+    const slotNumber = index + 1;
+    return {
+      slotNumber,
+      division,
+      team: teamsBySlot.get(slotNumber) ?? null,
+    };
+  });
+};
+
+export const getNextOpenSundayLeagueSlot = (
+  teams: SundayLeagueTeam[],
+  division: SundayLeagueDivision,
+  slotCount: number = SUNDAY_LEAGUE_SLOT_COUNT,
+) => buildSundayLeagueSlots(teams, division, slotCount).find((slot) => !slot.team)?.slotNumber ?? null;
