@@ -969,10 +969,6 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
     font-size: 15px;
   }
 
-  .hero--with-banner {
-    padding-top: 230px;
-  }
-
   .user-directory__header {
     display: none;
   }
@@ -1007,6 +1003,10 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 
   .hero--image {
     padding: 40px 18px 60px;
+  }
+
+  .hero--image.hero--with-banner {
+    padding-top: 230px;
   }
 
   .hero__panel {
