@@ -1077,14 +1077,17 @@ export default function AdminPage() {
   };
 
   const addRegistrationField = (target: "create" | "edit") => {
+    const nextField = { ...createEmptyRegistrationField(), expanded: true };
     const apply = (prev: EventFormState) => ({
       ...prev,
-      registration_fields: [...prev.registration_fields, createEmptyRegistrationField()],
+      registration_fields: [...prev.registration_fields, nextField],
     });
     if (target === "create") {
+      setCreateRegistrationFieldsVisible(true);
       setForm(apply);
       return;
     }
+    setEditRegistrationFieldsVisible(true);
     setEditForm(apply);
   };
 
@@ -1183,11 +1186,9 @@ export default function AdminPage() {
           <button className="button ghost" type="button" onClick={() => setFieldsVisible(!fieldsVisible)}>
             {fieldsVisible ? "Collapse all" : "Expand all"}
           </button>
-          {fieldsVisible ? (
-            <button className="button ghost" type="button" onClick={() => addRegistrationField(target)}>
-              Add field
-            </button>
-          ) : null}
+          <button className="button ghost" type="button" onClick={() => addRegistrationField(target)}>
+            Add field
+          </button>
         </div>
 
         {!fieldsVisible ? (
@@ -1310,20 +1311,22 @@ export default function AdminPage() {
         )}
       </div>
 
-      <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
-            checked={state.require_waiver}
-            onChange={(e) =>
-              target === "create"
-                ? update("require_waiver", e.target.checked)
-                : updateEdit("require_waiver", e.target.checked)
-            }
-          />
-          <span>Require waiver acceptance in the form</span>
-        </label>
-      </div>
+      {state.signup_mode === "waitlist" ? null : (
+        <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={state.require_waiver}
+              onChange={(e) =>
+                target === "create"
+                  ? update("require_waiver", e.target.checked)
+                  : updateEdit("require_waiver", e.target.checked)
+              }
+            />
+            <span>Require waiver acceptance in the form</span>
+          </label>
+        </div>
+      )}
     </div>
     );
   };
@@ -1342,7 +1345,10 @@ export default function AdminPage() {
 
     setFormStatus({ type: "loading" });
     const isWaitlist = form.signup_mode === "waitlist";
-    const registrationSchema = isWaitlist ? null : buildRegistrationSchema(form);
+    const registrationSchema = buildRegistrationSchema({
+      ...form,
+      require_waiver: isWaitlist ? false : form.require_waiver,
+    });
     const payload = {
       title: form.title.trim(),
       start_date: form.start_date || null,
@@ -1441,7 +1447,10 @@ export default function AdminPage() {
 
     setSavingEditId(eventId);
     const isWaitlist = editForm.signup_mode === "waitlist";
-    const registrationSchema = isWaitlist ? null : buildRegistrationSchema(editForm);
+    const registrationSchema = buildRegistrationSchema({
+      ...editForm,
+      require_waiver: isWaitlist ? false : editForm.require_waiver,
+    });
     const payload = {
       title: editForm.title.trim(),
       start_date: editForm.start_date || null,
@@ -3039,10 +3048,9 @@ export default function AdminPage() {
                     </label>
                   </div>
                   {form.signup_mode === "waitlist" ? (
-                    <p className="muted">Waitlist events only collect name, email, and phone. Custom fields, waivers, and limits are disabled.</p>
-                  ) : (
-                    renderRegistrationBuilder("create", form)
-                  )}
+                    <p className="muted">Waitlist events can still collect custom questions. Waivers and registration limits stay disabled.</p>
+                  ) : null}
+                  {renderRegistrationBuilder("create", form)}
                   <div className="cta-row">
                     <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
                       {formStatus.type === "loading" ? "Saving..." : "Create Event"}
@@ -3244,10 +3252,9 @@ export default function AdminPage() {
                             </label>
                           </div>
                           {editForm.signup_mode === "waitlist" ? (
-                            <p className="muted">Waitlist events only collect name, email, and phone. Custom fields, waivers, and limits are disabled.</p>
-                          ) : (
-                            renderRegistrationBuilder("edit", editForm)
-                          )}
+                            <p className="muted">Waitlist events can still collect custom questions. Waivers and registration limits stay disabled.</p>
+                          ) : null}
+                          {renderRegistrationBuilder("edit", editForm)}
                           <div className="cta-row">
                             <button
                               className="button primary"

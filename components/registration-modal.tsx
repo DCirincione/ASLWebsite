@@ -207,7 +207,7 @@ export function RegistrationModal({
         return;
       }
 
-      const normalized = isWaitlistEvent(eventRow as EventRegistration) ? [] : parseSchemaFields(eventRow.registration_schema ?? null);
+      const normalized = parseSchemaFields(eventRow.registration_schema ?? null);
       setEventConfig(eventRow as EventRegistration);
       setFields(normalized);
       setValues((prev) => {
