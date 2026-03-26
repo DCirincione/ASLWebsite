@@ -274,7 +274,7 @@ export default function EventsPage() {
                       return;
                     }
                     if (!userId) {
-                      router.push("/account");
+                      router.push("/account/create");
                       return;
                     }
                     setModalEventId(event.id);
@@ -407,7 +407,7 @@ export default function EventsPage() {
             return;
           }
           if (!userId) {
-            router.push("/account");
+            router.push("/account/create");
             return;
           }
           setDetailEvent(null);

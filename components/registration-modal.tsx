@@ -144,7 +144,7 @@ export function RegistrationModal({
         email: prev.email || session?.user.email || "",
       }));
       if (!uid) {
-        router.push("/account");
+        router.push("/account/create");
       }
     });
     const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
@@ -155,7 +155,7 @@ export function RegistrationModal({
         email: prev.email || session?.user.email || "",
       }));
       if (!uid) {
-        router.push("/account");
+        router.push("/account/create");
       }
     });
     return () => sub?.subscription.unsubscribe();
@@ -267,7 +267,7 @@ export function RegistrationModal({
       return;
     }
     if (!userId) {
-      router.push("/account");
+      router.push("/account/create");
       return;
     }
     if (!eventConfig) return;

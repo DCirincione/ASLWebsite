@@ -534,7 +534,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     }
 
     if (!userId) {
-      router.push("/account");
+      router.push("/account/create");
       return;
     }
 
@@ -641,7 +641,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     }
 
     if (!userId) {
-      router.push("/account/team");
+      router.push("/account/create");
       return;
     }
 
@@ -747,13 +747,23 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
       case "teams":
         return (
           <div className="sunday-league-team-section">
-            <div className="sunday-league-team-header sunday-league-team-header--spread">
-              <div className="sunday-league-stack">
-                <h2>Teams</h2>
-                <p className="muted">Select a division to see which slots are already reserved and which are still open.</p>
-              </div>
+              <div className="sunday-league-team-header sunday-league-team-header--spread">
+                <div className="sunday-league-stack">
+                  <h2>Teams</h2>
+                  <p className="muted">Select a division to see which slots are already reserved and which are still open.</p>
+                </div>
               {!myTeam ? (
-                <button className="button primary" type="button" onClick={() => setCreateTeamOpen(true)}>
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => {
+                    if (!userId) {
+                      router.push("/account/create");
+                      return;
+                    }
+                    setCreateTeamOpen(true);
+                  }}
+                >
                   Create Team
                 </button>
               ) : null}
@@ -807,7 +817,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                         label = "Already on a Team";
                         disabled = true;
                       } else if (!userId) {
-                        onClick = () => router.push("/account/team");
+                        onClick = () => router.push("/account/create");
                       } else if (membership?.status === "declined") {
                         label = "Request Again";
                       }
@@ -995,16 +1005,46 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                 </>
               ) : (
                 <>
-                  <button className="button primary" type="button" onClick={() => setActiveSection("teams")}>
+                  <button
+                    className="button primary"
+                    type="button"
+                    onClick={() => {
+                      if (!userId) {
+                        router.push("/account/create");
+                        return;
+                      }
+                      setActiveSection("teams");
+                    }}
+                  >
                     Join a Team
                   </button>
-                  <button className="button ghost" type="button" onClick={() => setCreateTeamOpen(true)}>
+                  <button
+                    className="button ghost"
+                    type="button"
+                    onClick={() => {
+                      if (!userId) {
+                        router.push("/account/create");
+                        return;
+                      }
+                      setCreateTeamOpen(true);
+                    }}
+                  >
                     Create a Team
                   </button>
                 </>
               )}
               {!myTeam && !joinedTeam ? (
-                <button className="button ghost" type="button" onClick={() => setActiveSection("inquiries")}>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => {
+                    if (!userId) {
+                      router.push("/account/create");
+                      return;
+                    }
+                    setActiveSection("inquiries");
+                  }}
+                >
                   Free Agent
                 </button>
               ) : null}
@@ -1053,6 +1093,19 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                   <div className="sunday-league-inline-actions">
                     <button className="button primary" type="button" onClick={() => router.push(`/leagues/sunday-league/team/${myTeam.id}`)}>
                       Your Sunday League Team
+                    </button>
+                  </div>
+                </div>
+              ) : !userId ? (
+                <div className="sunday-league-panel-box sunday-league-panel-box--compact">
+                  <h3>Account Required</h3>
+                  <p>Create an account or sign in before creating a Sunday League team.</p>
+                  <div className="sunday-league-inline-actions">
+                    <button className="button primary" type="button" onClick={() => router.push("/account/create")}>
+                      Create Account
+                    </button>
+                    <button className="button ghost" type="button" onClick={() => router.push("/account/create")}>
+                      Sign Up
                     </button>
                   </div>
                 </div>

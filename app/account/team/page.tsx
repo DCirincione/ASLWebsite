@@ -27,7 +27,6 @@ export default function AccountTeamPage() {
   const [pendingInvites, setPendingInvites] = useState<TeamInvite[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [inviteStates, setInviteStates] = useState<Record<string, ActionState>>({});
-  const [leaveStates, setLeaveStates] = useState<Record<string, ActionState>>({});
 
   const loadTeams = useCallback(async () => {
     if (!supabase) {
@@ -221,48 +220,6 @@ export default function AccountTeamPage() {
     }));
   };
 
-  const handleLeaveTeam = async (entry: TeamMembershipEntry) => {
-    if (!supabase || !userId || !entry.membership || entry.isCaptain) return;
-    const confirmMessage = entry.isCoCaptain
-      ? `Leave ${entry.team.team_name} and remove your co-captain access?`
-      : `Leave ${entry.team.team_name}?`;
-
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-
-    setLeaveStates((prev) => ({
-      ...prev,
-      [entry.team.id]: { type: "loading" },
-    }));
-
-    const { error } = await supabase
-      .from("sunday_league_team_members")
-      .update({
-        role: "player",
-        status: "declined",
-      })
-      .eq("id", entry.membership.id)
-      .eq("player_user_id", userId);
-
-    if (error) {
-      setLeaveStates((prev) => ({
-        ...prev,
-        [entry.team.id]: { type: "error", message: error.message },
-      }));
-      return;
-    }
-
-    await loadTeams();
-    setLeaveStates((prev) => ({
-      ...prev,
-      [entry.team.id]: {
-        type: "success",
-        message: entry.isCoCaptain ? "You left the team and no longer have co-captain access." : "You left the team.",
-      },
-    }));
-  };
-
   const hasAnyTeams = managedTeams.length > 0 || joinedTeams.length > 0 || pendingInvites.length > 0;
 
   return (
@@ -354,34 +311,11 @@ export default function AccountTeamPage() {
                     <div className="team-card__info">
                       <p className="list__title">{entry.team.team_name}</p>
                       <p className="muted">{entry.isCaptain ? "Team captain" : "Co-captain access"}</p>
-                      {leaveStates[entry.team.id]?.message ? (
-                        <p
-                          className={`form-help ${
-                            leaveStates[entry.team.id]?.type === "error"
-                              ? "error"
-                              : leaveStates[entry.team.id]?.type === "success"
-                                ? "success"
-                                : ""
-                          }`}
-                        >
-                          {leaveStates[entry.team.id]?.message}
-                        </p>
-                      ) : null}
                     </div>
                     <div className="sunday-league-team-card__actions">
                       <Link className="button ghost" href={`/leagues/sunday-league/team/${entry.team.id}`}>
                         Team Portal
                       </Link>
-                      {!entry.isCaptain ? (
-                        <button
-                          className="button ghost"
-                          type="button"
-                          onClick={() => void handleLeaveTeam(entry)}
-                          disabled={leaveStates[entry.team.id]?.type === "loading"}
-                        >
-                          {leaveStates[entry.team.id]?.type === "loading" ? "Leaving..." : "Leave Team"}
-                        </button>
-                      ) : null}
                     </div>
                   </li>
                 ))}
@@ -404,33 +338,10 @@ export default function AccountTeamPage() {
                     <div className="team-card__info">
                       <p className="list__title">{entry.team.team_name}</p>
                       <p className="muted">Accepted roster spot</p>
-                      {leaveStates[entry.team.id]?.message ? (
-                        <p
-                          className={`form-help ${
-                            leaveStates[entry.team.id]?.type === "error"
-                              ? "error"
-                              : leaveStates[entry.team.id]?.type === "success"
-                                ? "success"
-                                : ""
-                          }`}
-                        >
-                          {leaveStates[entry.team.id]?.message}
-                        </p>
-                      ) : null}
                     </div>
-                    <div className="sunday-league-team-card__actions">
-                      <Link className="button ghost" href={`/leagues/sunday-league/teams/${entry.team.id}`}>
-                        View Team
-                      </Link>
-                      <button
-                        className="button ghost"
-                        type="button"
-                        onClick={() => void handleLeaveTeam(entry)}
-                        disabled={leaveStates[entry.team.id]?.type === "loading"}
-                      >
-                        {leaveStates[entry.team.id]?.type === "loading" ? "Leaving..." : "Leave Team"}
-                      </button>
-                    </div>
+                    <Link className="button ghost" href={`/leagues/sunday-league/teams/${entry.team.id}`}>
+                      View Team
+                    </Link>
                   </li>
                 ))}
               </ul>

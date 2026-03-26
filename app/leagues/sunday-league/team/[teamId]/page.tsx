@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { HistoryBackButton } from "@/components/history-back-button";
@@ -69,6 +69,7 @@ type TeamMemberRecord = SundayLeagueTeamMember & {
   displayName: string;
   position: string | null;
 };
+type ActionState = { type: "idle" | "loading" | "success" | "error"; message?: string };
 
 const createTeamPortalFormState = (team: SundayLeagueTeam): TeamPortalFormState => ({
   captain_name: team.captain_name ?? "",
@@ -134,9 +135,11 @@ const countryCodeToFlag = (value?: string | null) => {
 
 export default function SundayLeagueTeamPortalPage() {
   const params = useParams<{ teamId: string }>();
+  const router = useRouter();
   const teamId = params.teamId;
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [viewerMembership, setViewerMembership] = useState<SundayLeagueTeamMember | null>(null);
   const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
   const [rosterPlayers, setRosterPlayers] = useState<TeamRosterPlayer[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberRecord[]>([]);
@@ -151,6 +154,7 @@ export default function SundayLeagueTeamPortalPage() {
   const [inviteState, setInviteState] = useState<{ type: "idle" | "loading" | "success" | "error"; message?: string }>({ type: "idle" });
   const [memberActionStates, setMemberActionStates] = useState<Record<string, { type: "idle" | "loading" | "success" | "error"; message?: string }>>({});
   const [leadershipStates, setLeadershipStates] = useState<Record<string, { type: "idle" | "loading" | "success" | "error"; message?: string }>>({});
+  const [leaveState, setLeaveState] = useState<ActionState>({ type: "idle" });
   const [form, setForm] = useState<TeamPortalFormState | null>(null);
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
 
@@ -259,17 +263,21 @@ export default function SundayLeagueTeamPortalPage() {
       if (nextTeam.user_id !== userId) {
         const { data: roleData } = await supabase
           .from("sunday_league_team_members")
-          .select("id")
+          .select("*")
           .eq("team_id", nextTeam.id)
           .eq("player_user_id", userId)
           .eq("status", "accepted")
           .eq("role", "co_captain")
-          .limit(1);
+          .maybeSingle();
 
-        if ((roleData ?? []).length === 0) {
+        if (!roleData) {
           setStatus("error");
           return;
         }
+
+        setViewerMembership(roleData as SundayLeagueTeamMember);
+      } else {
+        setViewerMembership(null);
       }
 
       setTeam(nextTeam);
@@ -329,6 +337,10 @@ export default function SundayLeagueTeamPortalPage() {
   const viewerIsCaptain = useMemo(
     () => Boolean(team && currentUserId && team.user_id === currentUserId),
     [currentUserId, team],
+  );
+  const canLeaveTeam = useMemo(
+    () => Boolean(team && currentUserId && viewerMembership && !viewerIsCaptain),
+    [currentUserId, team, viewerIsCaptain, viewerMembership],
   );
   const inviteablePlayerIds = useMemo(() => {
     const blockedIds = new Set<string>();
@@ -483,6 +495,39 @@ export default function SundayLeagueTeamPortalPage() {
         message: member ? `${member.displayName} is now the co-captain.` : "Co-captain removed.",
       },
     }));
+  };
+
+  const handleLeaveTeam = async () => {
+    if (!supabase || !team || !currentUserId || !viewerMembership || viewerIsCaptain) return;
+
+    const confirmMessage =
+      viewerMembership.role === "co_captain"
+        ? `Leave ${team.team_name} and remove your co-captain access?`
+        : `Leave ${team.team_name}?`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setLeaveState({ type: "loading" });
+
+    const { error } = await supabase
+      .from("sunday_league_team_members")
+      .delete()
+      .eq("id", viewerMembership.id)
+      .eq("player_user_id", currentUserId);
+
+    if (error) {
+      setLeaveState({ type: "error", message: error.message });
+      return;
+    }
+
+    setLeaveState({
+      type: "success",
+      message: viewerMembership.role === "co_captain" ? "You left the team and no longer have co-captain access." : "You left the team.",
+    });
+    router.push(`/leagues/sunday-league/teams/${team.id}`);
+    router.refresh();
   };
 
   const handleSave = async () => {
@@ -742,6 +787,18 @@ export default function SundayLeagueTeamPortalPage() {
                     </div>
                     <p className="sunday-league-team-board__captain">Captain: {team.captain_name}</p>
                     {currentCoCaptain ? <p className="sunday-league-team-board__captain">Co-Captain: {currentCoCaptain.displayName}</p> : null}
+                    {canLeaveTeam ? (
+                      <div className="sunday-league-team-board__identity-actions">
+                        <button className="button ghost" type="button" onClick={() => void handleLeaveTeam()} disabled={leaveState.type === "loading"}>
+                          {leaveState.type === "loading" ? "Leaving..." : "Leave Team"}
+                        </button>
+                        {leaveState.message ? (
+                          <p className={`form-help ${leaveState.type === "error" ? "error" : leaveState.type === "success" ? "success" : ""}`}>
+                            {leaveState.message}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="sunday-league-team-board__logo">
                     <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="220px" />
@@ -896,9 +953,8 @@ export default function SundayLeagueTeamPortalPage() {
                             </div>
                           </div>
                           <div className="sunday-league-team-board__player-panel">
-                            <p className="sunday-league-team-board__player-name">
-                              {player.name} - {player.position ?? "Player"}
-                            </p>
+                            <p className="sunday-league-team-board__player-name">{player.name}</p>
+                            <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
                             <div className="sunday-league-team-board__player-row">
                               {countryCodeToFlag(player.countryCode) ? (
                                 <p className="sunday-league-team-board__player-flag" aria-label={normalizeCountryCode(player.countryCode) ?? undefined}>

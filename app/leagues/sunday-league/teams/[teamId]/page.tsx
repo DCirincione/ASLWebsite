@@ -27,6 +27,7 @@ type TeamMemberProfile = {
   country_code: string | null;
   positions: string[] | null;
 };
+type ActionState = { type: "idle" | "loading" | "success" | "error"; message?: string };
 
 const buildTeamHistory = (team: SundayLeagueTeam | null) => {
   if (!team) return [];
@@ -73,11 +74,14 @@ export default function SundayLeaguePublicTeamPage() {
   const params = useParams<{ teamId: string }>();
   const teamId = params.teamId;
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [viewerMembership, setViewerMembership] = useState<SundayLeagueTeamMember | null>(null);
   const [coCaptainName, setCoCaptainName] = useState<string | null>(null);
   const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
   const [rosterPlayers, setRosterPlayers] = useState<TeamRosterPlayer[]>([]);
   const [record, setRecord] = useState<Pick<SundayLeagueLeaderboard, "wins" | "draws" | "losses">>({ wins: 0, draws: 0, losses: 0 });
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
+  const [leaveState, setLeaveState] = useState<ActionState>({ type: "idle" });
 
   useEffect(() => {
     const loadTeam = async () => {
@@ -99,6 +103,25 @@ export default function SundayLeaguePublicTeamPage() {
 
       const nextTeam = data as SundayLeagueTeam;
       setTeam(nextTeam);
+      setLeaveState({ type: "idle" });
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      const nextUserId = sessionData.session?.user.id ?? null;
+      setCurrentUserId(nextUserId);
+
+      if (nextUserId && nextUserId !== nextTeam.user_id) {
+        const { data: membershipData } = await supabase
+          .from("sunday_league_team_members")
+          .select("*")
+          .eq("team_id", nextTeam.id)
+          .eq("player_user_id", nextUserId)
+          .eq("status", "accepted")
+          .maybeSingle();
+
+        setViewerMembership((membershipData as SundayLeagueTeamMember | null) ?? null);
+      } else {
+        setViewerMembership(null);
+      }
 
       const [leaderboardResponse, memberResponse] = await Promise.all([
         supabase
@@ -199,6 +222,46 @@ export default function SundayLeaguePublicTeamPage() {
 
   const historyRows = useMemo(() => buildTeamHistory(team), [team]);
   const establishedLabel = useMemo(() => getEstablishedLabel(team), [team]);
+  const canLeaveTeam = useMemo(
+    () => Boolean(team && currentUserId && viewerMembership && currentUserId !== team.user_id),
+    [currentUserId, team, viewerMembership],
+  );
+
+  const handleLeaveTeam = async () => {
+    if (!supabase || !team || !currentUserId || !viewerMembership) return;
+
+    const confirmMessage =
+      viewerMembership.role === "co_captain"
+        ? `Leave ${team.team_name} and remove your co-captain access?`
+        : `Leave ${team.team_name}?`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setLeaveState({ type: "loading" });
+
+    const { error } = await supabase
+      .from("sunday_league_team_members")
+      .delete()
+      .eq("id", viewerMembership.id)
+      .eq("player_user_id", currentUserId);
+
+    if (error) {
+      setLeaveState({ type: "error", message: error.message });
+      return;
+    }
+
+    setViewerMembership(null);
+    setRosterPlayers((prev) => prev.filter((player) => player.id !== viewerMembership.id));
+    if (viewerMembership.role === "co_captain") {
+      setCoCaptainName(null);
+    }
+    setLeaveState({
+      type: "success",
+      message: viewerMembership.role === "co_captain" ? "You left the team and no longer have co-captain access." : "You left the team.",
+    });
+  };
 
   return (
     <PageShell>
@@ -225,6 +288,18 @@ export default function SundayLeaguePublicTeamPage() {
                     </div>
                     <p className="sunday-league-team-board__captain">Captain: {team.captain_name}</p>
                     {coCaptainName ? <p className="sunday-league-team-board__captain">Co-Captain: {coCaptainName}</p> : null}
+                    {canLeaveTeam ? (
+                      <div className="sunday-league-team-board__identity-actions">
+                        <button className="button ghost" type="button" onClick={() => void handleLeaveTeam()} disabled={leaveState.type === "loading"}>
+                          {leaveState.type === "loading" ? "Leaving..." : "Leave Team"}
+                        </button>
+                        {leaveState.message ? (
+                          <p className={`form-help ${leaveState.type === "error" ? "error" : leaveState.type === "success" ? "success" : ""}`}>
+                            {leaveState.message}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
                   <div className="sunday-league-team-board__logo">
                     <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="220px" />
@@ -257,9 +332,8 @@ export default function SundayLeaguePublicTeamPage() {
                             </div>
                           </div>
                           <div className="sunday-league-team-board__player-panel">
-                            <p className="sunday-league-team-board__player-name">
-                              {player.name} - {player.position ?? "Player"}
-                            </p>
+                            <p className="sunday-league-team-board__player-name">{player.name}</p>
+                            <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
                             <div className="sunday-league-team-board__player-row">
                               {countryCodeToFlag(player.countryCode) ? (
                                 <p className="sunday-league-team-board__player-flag" aria-label={normalizeCountryCode(player.countryCode) ?? undefined}>

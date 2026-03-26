@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -204,7 +203,7 @@ export function HomeUpcomingEvents() {
                               return;
                             }
                             if (!userId) {
-                              router.push("/account");
+                              router.push("/account/create");
                               return;
                             }
                             setModalEventId(event.id);
@@ -246,7 +245,7 @@ export function HomeUpcomingEvents() {
             return;
           }
           if (!userId) {
-            router.push("/account");
+            router.push("/account/create");
             return;
           }
           setDetailEvent(null);

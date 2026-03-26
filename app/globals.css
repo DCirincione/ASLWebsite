@@ -1712,6 +1712,12 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   gap: 12px;
 }
 
+.sunday-league-team-board__identity-actions {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
 .sunday-league-team-board__title-row {
   display: flex;
   align-items: center;
@@ -1891,6 +1897,7 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 .sunday-league-team-board__player-panel {
   display: grid;
   gap: 12px;
+  align-content: start;
   padding: 14px;
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.06);
@@ -1898,6 +1905,7 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 }
 
 .sunday-league-team-board__player-name,
+.sunday-league-team-board__player-position,
 .sunday-league-team-board__player-number {
   margin: 0;
   font-size: 0.9rem;
@@ -1911,6 +1919,15 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   line-height: 1.0;
   letter-spacing: -0.02em;
   text-align: center;
+}
+
+.sunday-league-team-board__player-position {
+  min-height: 1.1rem;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  text-align: center;
+  align-self: center;
+  opacity: 0.88;
 }
 
 .sunday-league-team-board__player-row {
