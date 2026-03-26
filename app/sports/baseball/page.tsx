@@ -188,7 +188,7 @@ export default function BaseballPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/ASLLogo.png" alt="Aldrich Baseball and Softball" fill priority />
+            <Image src="/ASLLogo.png" alt="Aldrich Baseball and Softball" fill sizes="140px" priority />
           </div>
         </div>
       </Section>

@@ -149,7 +149,7 @@ export default function GolfPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/ASLLogo.png" alt="ASL Logo" fill priority />
+            <Image src="/ASLLogo.png" alt="ASL Logo" fill sizes="140px" priority />
           </div>
         </div>
       </Section>

@@ -138,7 +138,9 @@ export function SiteHeader() {
       <header className="site-header">
         <div className="shell site-header__inner">
           <Link href="/" className="logo">
-            <Image src="/ASLLogo.png" alt="ASL Logo" width={75} height={75} />
+            <div className="logo__image logo__image--header" aria-hidden>
+              <Image src="/ASLLogo.png" alt="ASL Logo" fill sizes="(max-width: 720px) 68px, 75px" priority />
+            </div>
           </Link>
           <button
             className="mobile-nav-toggle"

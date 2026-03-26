@@ -201,7 +201,7 @@ export default function RunClubPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/ASLLogo.png" alt="Aldrich Run Club" fill priority />
+            <Image src="/ASLLogo.png" alt="Aldrich Run Club" fill sizes="140px" priority />
           </div>
         </div>
       </Section>

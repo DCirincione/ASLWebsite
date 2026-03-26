@@ -18,6 +18,7 @@ type TeamRosterPlayer = {
   avatarUrl: string | null;
   countryCode: string | null;
   jerseyNumber: string | null;
+  role: "player" | "captain" | "co_captain";
 };
 
 type TeamMemberProfile = {
@@ -177,6 +178,7 @@ export default function SundayLeaguePublicTeamPage() {
           avatarUrl: captainProfile?.avatar_url ?? null,
           countryCode: captainProfile?.country_code?.trim()?.toUpperCase() ?? null,
           jerseyNumber: nextTeam.jersey_numbers?.[0]?.trim() || null,
+          role: "captain",
         });
       }
 
@@ -191,6 +193,7 @@ export default function SundayLeaguePublicTeamPage() {
             avatarUrl: profile?.avatar_url ?? null,
             countryCode: profile?.country_code?.trim()?.toUpperCase() ?? null,
             jerseyNumber: nextTeam.jersey_numbers?.[index + (nextTeam.captain_is_playing ? 1 : 0)]?.trim() || null,
+            role: member.role === "co_captain" ? "co_captain" : "player",
           });
         });
 
@@ -315,18 +318,19 @@ export default function SundayLeaguePublicTeamPage() {
                       </div>
                     ) : null}
                   </div>
+                  <div className="sunday-league-team-board__meta">
+                    <p className="sunday-league-team-board__established">Established {establishedLabel}</p>
+                    <div className="sunday-league-team-board__record">
+                      <span>{record.wins}</span>
+                      <span>-</span>
+                      <span>{record.draws}</span>
+                      <span>-</span>
+                      <span>{record.losses}</span>
+                    </div>
+                  </div>
                   <div className="sunday-league-team-board__logo">
                     <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="220px" />
                   </div>
-                </div>
-
-                <p className="sunday-league-team-board__established">Established {establishedLabel}</p>
-                <div className="sunday-league-team-board__record">
-                  <span>{record.wins}</span>
-                  <span>-</span>
-                  <span>{record.draws}</span>
-                  <span>-</span>
-                  <span>{record.losses}</span>
                 </div>
 
                 <section className="sunday-league-team-board__section">
@@ -335,6 +339,15 @@ export default function SundayLeaguePublicTeamPage() {
                     <div className="sunday-league-team-board__roster">
                       {rosterPlayers.map((player) => (
                         <article key={player.id} className="sunday-league-team-board__player-card">
+                          {player.role !== "player" ? (
+                            <span
+                              className="sunday-league-team-board__player-crown"
+                              role="img"
+                              aria-label={player.role === "captain" ? "Captain" : "Co-Captain"}
+                            >
+                              <Image src="/fifa-card/crown.png" alt="" width={56} height={56} />
+                            </span>
+                          ) : null}
                           <div className="sunday-league-team-board__player-avatar-wrap">
                             <div className="sunday-league-team-board__player-avatar">
                               <Image

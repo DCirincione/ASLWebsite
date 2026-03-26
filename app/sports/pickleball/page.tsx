@@ -171,7 +171,7 @@ export default function PickleballPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/ASLLogo.png" alt="Aldrich Pickleball" fill priority />
+            <Image src="/ASLLogo.png" alt="Aldrich Pickleball" fill sizes="140px" priority />
           </div>
         </div>
       </Section>

@@ -208,7 +208,7 @@ export default function SoccerPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src="/sports_images/soccer/soccerLogoTest.png" alt="Aldrich Soccer" fill priority />
+            <Image src="/sports_images/soccer/soccerLogoTest.png" alt="Aldrich Soccer" fill sizes="140px" priority />
           </div>
         </div>
       </Section>

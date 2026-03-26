@@ -323,7 +323,7 @@ export default function DynamicSportPage() {
             </div>
           </div>
           <div className="soccer-hero__logo">
-            <Image src={heroImage} alt={heroAlt} fill priority />
+            <Image src={heroImage} alt={heroAlt} fill sizes="140px" priority />
           </div>
         </div>
       </Section>
