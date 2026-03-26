@@ -6,6 +6,7 @@ import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
+import { parseAldrichCommunicationsPreferenceFromMessage } from "@/lib/aldrich-communications";
 import { createId } from "@/lib/create-id";
 import type { SignupMode } from "@/lib/event-signups";
 import { parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
@@ -104,6 +105,7 @@ type ContactMessage = {
   name: string;
   email: string;
   message: string;
+  communications_opt_in?: boolean | null;
   is_read?: boolean | null;
   read_at?: string | null;
   created_at?: string | null;
@@ -228,6 +230,15 @@ const createEmptySportForm = (): SportFormState => ({
   section_headers: "",
   image_url: "",
 });
+
+const normalizeContactMessage = (message: ContactMessage): ContactMessage => {
+  const parsed = parseAldrichCommunicationsPreferenceFromMessage(message.message);
+  return {
+    ...message,
+    message: parsed.message,
+    communications_opt_in: parsed.optedIn,
+  };
+};
 
 const createEmptySundayLeagueScheduleForm = (): SundayLeagueScheduleFormState => ({
   blackSheepField: "",
@@ -631,13 +642,13 @@ export default function AdminPage() {
         setContactMessages([]);
         setContactMessagesError(legacyQuery.error.message ?? "Could not load contact messages.");
       } else {
-        setContactMessages((legacyQuery.data ?? []) as ContactMessage[]);
+        setContactMessages(((legacyQuery.data ?? []) as ContactMessage[]).map(normalizeContactMessage));
       }
     } else if (fullQuery.error) {
       setContactMessages([]);
       setContactMessagesError(fullQuery.error.message ?? "Could not load contact messages.");
     } else {
-      setContactMessages((fullQuery.data ?? []) as ContactMessage[]);
+      setContactMessages(((fullQuery.data ?? []) as ContactMessage[]).map(normalizeContactMessage));
     }
 
     setLoadingContactMessages(false);
@@ -4435,6 +4446,9 @@ export default function AdminPage() {
                           </div>
                           <div className="event-card__meta">
                             <p className="muted">Email: {message.email}</p>
+                            {message.communications_opt_in !== null && message.communications_opt_in !== undefined ? (
+                              <p className="muted">Communications: {message.communications_opt_in ? "Opted in" : "Opted out"}</p>
+                            ) : null}
                             <p className="muted">Received: {formatMessageDate(message.created_at)}</p>
                             {message.read_at ? <p className="muted">Read: {formatMessageDate(message.read_at)}</p> : null}
                           </div>

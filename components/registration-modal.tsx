@@ -4,6 +4,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  ALDRICH_COMMUNICATIONS_KEY,
+  ALDRICH_COMMUNICATIONS_LABEL,
+  getAldrichCommunicationsPreferenceFromAnswers,
+  syncAldrichCommunicationsPreference,
+} from "@/lib/aldrich-communications";
 import { createId } from "@/lib/create-id";
 import {
   getSignupDuplicateMessage,
@@ -32,6 +38,9 @@ type RegistrationSchema = {
   fields?: unknown;
   require_waiver?: boolean;
 };
+
+type RegistrationFormValue = JsonValue | undefined;
+type RegistrationFormValues = Record<string, RegistrationFormValue>;
 
 type EventRegistration = {
   id: string;
@@ -69,6 +78,7 @@ const DEFAULT_VALUES = {
   name: "",
   email: "",
   phone: "",
+  communications_opt_in: true,
   waiver_accepted: false,
 };
 
@@ -112,6 +122,12 @@ const schemaRequiresWaiver = (schema: JsonValue | null | undefined) => {
   return Boolean((schema as RegistrationSchema).require_waiver);
 };
 
+const asTrimmedString = (value: RegistrationFormValue) =>
+  typeof value === "string" ? value.trim() : typeof value === "number" ? String(value).trim() : "";
+
+const asInputValue = (value: RegistrationFormValue) =>
+  typeof value === "string" || typeof value === "number" ? value : "";
+
 export function RegistrationModal({
   open,
   eventId,
@@ -126,7 +142,7 @@ export function RegistrationModal({
   const [userId, setUserId] = useState<string | null>(null);
   const [eventConfig, setEventConfig] = useState<EventRegistration | null>(null);
   const [fields, setFields] = useState<Field[]>([]);
-  const [values, setValues] = useState<Record<string, any>>(DEFAULT_VALUES);
+  const [values, setValues] = useState<RegistrationFormValues>(DEFAULT_VALUES);
   const [files, setFiles] = useState<Record<string, File[]>>({});
   const [status, setStatus] = useState<Status>({ type: "idle" });
   const [loadingEvent, setLoadingEvent] = useState(false);
@@ -195,17 +211,23 @@ export function RegistrationModal({
       setEventConfig(eventRow as EventRegistration);
       setFields(normalized);
       setValues((prev) => {
-        const nextValues: Record<string, any> = {
+        const nextValues: RegistrationFormValues = {
           ...DEFAULT_VALUES,
           email: initialSubmission?.email ?? (prev.email || ""),
           name: initialSubmission?.name ?? (prev.name || ""),
           phone: initialSubmission?.phone ?? (prev.phone || ""),
+          communications_opt_in: getAldrichCommunicationsPreferenceFromAnswers(initialSubmission?.answers ?? null, true),
           waiver_accepted: Boolean(initialSubmission?.waiver_accepted),
         };
         for (const field of normalized) {
           const savedValue = initialSubmission?.answers?.[field.name];
           if (savedValue !== undefined) {
-            nextValues[field.name] = field.type === "checkbox" ? Boolean(savedValue) : savedValue;
+            nextValues[field.name] =
+              field.type === "checkbox"
+                ? Boolean(savedValue)
+                : Array.isArray(savedValue) || typeof savedValue === "string" || typeof savedValue === "number" || savedValue == null
+                  ? savedValue
+                  : JSON.stringify(savedValue);
           } else {
             nextValues[field.name] = field.type === "checkbox" ? false : "";
           }
@@ -217,7 +239,7 @@ export function RegistrationModal({
     void load();
   }, [open, eventId, initialSubmission]);
 
-  const updateValue = (name: string, value: any) => {
+  const updateValue = (name: string, value: RegistrationFormValue) => {
     setValues((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -231,9 +253,9 @@ export function RegistrationModal({
 
   const validate = useMemo(() => {
     return () => {
-      if (!values.name?.trim()) return "Name is required.";
-      if (!values.email?.trim()) return "Email is required.";
-      if (waitlistMode && !values.phone?.trim()) return "Phone is required.";
+      if (!asTrimmedString(values.name)) return "Full Name is required.";
+      if (!asTrimmedString(values.email)) return "Email is required.";
+      if (!asTrimmedString(values.phone)) return "Phone Number is required.";
       for (const field of fields) {
         if (!field.required) continue;
         if (field.type === "file") {
@@ -327,6 +349,7 @@ export function RegistrationModal({
       }
       answers[field.name] = (values[field.name] ?? "") as JsonValue;
     }
+    answers[ALDRICH_COMMUNICATIONS_KEY] = Boolean(values.communications_opt_in);
 
     for (const [fieldName, fileList] of Object.entries(files)) {
       if (!fileList?.length) continue;
@@ -361,9 +384,9 @@ export function RegistrationModal({
     const payload = {
       event_id: eventConfig.id,
       user_id: userId,
-      name: values.name.trim(),
-      email: values.email.trim(),
-      phone: values.phone?.trim() || null,
+      name: asTrimmedString(values.name),
+      email: asTrimmedString(values.email),
+      phone: asTrimmedString(values.phone),
       answers,
       attachments,
       waiver_accepted: Boolean(values.waiver_accepted),
@@ -380,6 +403,7 @@ export function RegistrationModal({
       return;
     }
 
+    void syncAldrichCommunicationsPreference(client, Boolean(values.communications_opt_in));
     setStatus({ type: "success", message: getSignupSuccessMessage(eventConfig, mode) });
     onSubmitted?.();
     onClose();
@@ -419,7 +443,7 @@ export function RegistrationModal({
               <div className="form-control">
                 <label htmlFor="field-name">
                   <span className="register-field-label">
-                    Name
+                    Full Name
                     <span className="register-required">*</span>
                   </span>
                 </label>
@@ -427,7 +451,7 @@ export function RegistrationModal({
                   id="field-name"
                   name="name"
                   required
-                  value={values.name || ""}
+                  value={asInputValue(values.name)}
                   onChange={(e) => updateValue("name", e.target.value)}
                 />
               </div>
@@ -443,29 +467,29 @@ export function RegistrationModal({
                   name="email"
                   type="email"
                   required
-                  value={values.email || ""}
+                  value={asInputValue(values.email)}
                   onChange={(e) => updateValue("email", e.target.value)}
                 />
               </div>
               <div className="form-control">
                 <label htmlFor="field-phone">
                   <span className="register-field-label">
-                    Phone
-                    {waitlistMode ? <span className="register-required">*</span> : null}
+                    Phone Number
+                    <span className="register-required">*</span>
                   </span>
                 </label>
                 <input
                   id="field-phone"
                   name="phone"
                   type="tel"
-                  required={waitlistMode}
-                  value={values.phone || ""}
+                  required
+                  value={asInputValue(values.phone)}
                   onChange={(e) => updateValue("phone", e.target.value)}
                 />
               </div>
 
               {orderedFields.map((field) => {
-                const value = values[field.name] ?? (field.type === "checkbox" ? false : "");
+                const value = values[field.name];
                 const id = `field-${field.id}`;
                 const label = (
                   <span className="register-field-label">
@@ -482,7 +506,7 @@ export function RegistrationModal({
                         id={id}
                         name={field.name}
                         required={field.required}
-                        value={value || ""}
+                        value={asInputValue(value)}
                         onChange={(e) => updateValue(field.name, e.target.value)}
                       >
                         <option value="">Select</option>
@@ -505,7 +529,7 @@ export function RegistrationModal({
                         id={id}
                         name={field.name}
                         required={field.required}
-                        value={value || ""}
+                        value={asInputValue(value)}
                         placeholder={field.placeholder ?? undefined}
                         onChange={(e) => updateValue(field.name, e.target.value)}
                         rows={3}
@@ -551,14 +575,14 @@ export function RegistrationModal({
                       />
                       {values[field.name] ? (
                         <p className="form-help muted">
-                          Current file{Array.isArray(values[field.name]) && values[field.name].length !== 1 ? "s" : ""}:{" "}
-                          {Array.isArray(values[field.name])
-                            ? values[field.name]
+                          Current file{Array.isArray(value) && value.length !== 1 ? "s" : ""}:{" "}
+                          {Array.isArray(value)
+                            ? value
                                 .filter((entry: unknown): entry is string => typeof entry === "string")
                                 .map((entry: string) => entry.split("/").pop() || entry)
                                 .join(", ")
-                            : typeof values[field.name] === "string"
-                              ? values[field.name].split("/").pop() || values[field.name]
+                            : typeof value === "string"
+                              ? value.split("/").pop() || value
                               : ""}
                         </p>
                       ) : null}
@@ -575,7 +599,7 @@ export function RegistrationModal({
                       name={field.name}
                       type={field.type}
                       required={field.required}
-                      value={value || ""}
+                      value={asInputValue(value)}
                       placeholder={field.placeholder ?? undefined}
                       onChange={(e) => updateValue(field.name, e.target.value)}
                     />
@@ -601,6 +625,18 @@ export function RegistrationModal({
                   </label>
                 </div>
               ) : null}
+              <div className="form-control checkbox-control register-form-control--end">
+                <label className="checkbox-label">
+                  <input
+                    id="field-communications-opt-in"
+                    name="communications_opt_in"
+                    type="checkbox"
+                    checked={Boolean(values.communications_opt_in)}
+                    onChange={(e) => updateValue("communications_opt_in", e.target.checked)}
+                  />
+                  <span>{ALDRICH_COMMUNICATIONS_LABEL}</span>
+                </label>
+              </div>
             </div>
             <div className="register-modal__footer">
               <div className="register-footer__left">

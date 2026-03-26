@@ -5,6 +5,7 @@ import { useState, type FormEvent } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
+import { ALDRICH_COMMUNICATIONS_LABEL } from "@/lib/aldrich-communications";
 
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
 
@@ -14,9 +15,10 @@ export default function ContactPage() {
     name: "",
     email: "",
     message: "",
+    communications_opt_in: true,
   });
 
-  const update = (key: keyof typeof form, value: string) => {
+  const update = <Key extends keyof typeof form>(key: Key, value: (typeof form)[Key]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -26,8 +28,9 @@ export default function ContactPage() {
       const name = form.name.trim();
       const email = form.email.trim();
       const message = form.message.trim();
+      const communicationsOptIn = form.communications_opt_in;
       if (!name || !email || !message) {
-        setStatus({ type: "error", message: "Name, email, and message are required." });
+        setStatus({ type: "error", message: "Full Name, email, and message are required." });
         return;
       }
 
@@ -41,6 +44,7 @@ export default function ContactPage() {
           name,
           email,
           message,
+          communicationsOptIn,
         }),
       });
 
@@ -60,7 +64,7 @@ export default function ContactPage() {
       }
 
       setStatus({ type: "success", message: json.message ?? "Message sent. We will get back to you soon." });
-      setForm({ name: "", email: "", message: "" });
+      setForm({ name: "", email: "", message: "", communications_opt_in: true });
     } catch {
       setStatus({ type: "error", message: "Could not send message." });
     }
@@ -80,11 +84,11 @@ export default function ContactPage() {
             <h3>Send us a Message</h3>
             <form className="contact-form" onSubmit={handleSubmit}>
               <label className="form-control">
-                <span>Name</span>
+                <span>Full Name</span>
                 <input
                   type="text"
                   name="name"
-                  placeholder="Your name"
+                  placeholder="Your full name"
                   value={form.name}
                   onChange={(e) => update("name", e.target.value)}
                   required
@@ -112,6 +116,16 @@ export default function ContactPage() {
                   required
                 />
               </label>
+              <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={form.communications_opt_in}
+                    onChange={(e) => update("communications_opt_in", e.target.checked)}
+                  />
+                  <span>{ALDRICH_COMMUNICATIONS_LABEL}</span>
+                </label>
+              </div>
               <button className="button primary" type="submit" disabled={status.type === "loading"}>
                 {status.type === "loading" ? "Sending..." : "Send Message"}
               </button>

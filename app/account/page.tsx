@@ -757,7 +757,7 @@ export default function AccountPage() {
             >
               <div className="form-grid">
                 <div className="form-control">
-                  <label htmlFor="profile-name">Name</label>
+                  <label htmlFor="profile-name">Full Name</label>
                   <input
                     id="profile-name"
                     value={profileForm.name}

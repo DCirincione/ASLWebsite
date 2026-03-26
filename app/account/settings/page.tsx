@@ -4,6 +4,10 @@ import { useEffect, useState } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
+import {
+  ALDRICH_COMMUNICATIONS_LABEL,
+  getAldrichCommunicationsPreferenceFromMetadata,
+} from "@/lib/aldrich-communications";
 import { supabase } from "@/lib/supabase/client";
 
 const PASSWORD_RESET_REDIRECT = "https://aldrichsports.com/reset-password";
@@ -33,7 +37,7 @@ const emptySettingsForm: SettingsFormState = {
   friend_request_access: "everyone",
   email_event_updates: true,
   email_friend_requests: true,
-  email_community_updates: false,
+  email_community_updates: true,
 };
 
 export default function AccountSettingsPage() {
@@ -94,9 +98,7 @@ export default function AccountSettingsPage() {
             ? rawSettings.email_friend_requests
             : emptySettingsForm.email_friend_requests,
         email_community_updates:
-          typeof rawSettings?.email_community_updates === "boolean"
-            ? rawSettings.email_community_updates
-            : emptySettingsForm.email_community_updates,
+          getAldrichCommunicationsPreferenceFromMetadata({ settings: rawSettings }, emptySettingsForm.email_community_updates),
       };
 
       setCurrentEmail(user.email ?? "");
@@ -409,7 +411,7 @@ export default function AccountSettingsPage() {
                       checked={settingsForm.email_community_updates}
                       onChange={(event) => updateSettingsForm("email_community_updates", event.target.checked)}
                     />
-                    <span>Community updates and announcements</span>
+                    <span>{ALDRICH_COMMUNICATIONS_LABEL}</span>
                   </label>
                 </div>
               </div>

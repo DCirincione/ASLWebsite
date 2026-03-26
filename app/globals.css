@@ -880,6 +880,14 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .register-form-grid > .form-control:not(.register-form-control--end) {
+    grid-template-rows: auto auto;
+  }
+
+  .register-form-grid > .form-control:not(.register-form-control--end) > label {
+    min-height: 0;
+  }
+
   .hero--image {
     padding: 40px 18px 60px;
   }
@@ -3767,6 +3775,19 @@ html[data-theme="dark"] .event-detail__media-empty {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  align-items: start;
+}
+
+.register-form-grid > .form-control:not(.register-form-control--end) {
+  display: grid;
+  grid-template-rows: minmax(3.85rem, auto) auto;
+  align-content: start;
+}
+
+.register-form-grid > .form-control:not(.register-form-control--end) > label {
+  display: flex;
+  align-items: flex-end;
+  min-height: 3.85rem;
 }
 
 .register-form-control--end {
@@ -3800,13 +3821,18 @@ html[data-theme="dark"] .event-detail__media-empty {
 .checkbox-control {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
+  width: 100%;
 }
 
 .checkbox-label {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
   font-weight: 600;
+  text-align: left;
+  width: 100%;
 }
 
 .checkbox-label input {
@@ -3815,12 +3841,12 @@ html[data-theme="dark"] .event-detail__media-empty {
 }
 
 .register-field-label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  display: block;
+  line-height: 1.35;
 }
 
 .register-required {
+  margin-left: 6px;
   color: #e95d2a;
   font-weight: 700;
 }
@@ -4967,6 +4993,21 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
   }
 
   .community-sponsors-carousel__cue {
+    display: none;
+  }
+
+  .community-sponsors-carousel__track {
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+    scroll-snap-type: none;
+  }
+
+  .community-sponsor-card--carousel {
+    min-height: 0;
+  }
+
+  .community-sponsors-carousel__track::after {
     display: none;
   }
 

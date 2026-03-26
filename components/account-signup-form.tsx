@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { ALDRICH_COMMUNICATIONS_LABEL } from "@/lib/aldrich-communications";
 import { supabase } from "@/lib/supabase/client";
 
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -23,9 +24,10 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
     sports: "",
     skill_level: "",
     about: "",
+    communications_opt_in: true,
   });
 
-  const update = (key: keyof typeof form, value: string) => {
+  const update = <Key extends keyof typeof form>(key: Key, value: (typeof form)[Key]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -47,7 +49,7 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
 
     setStatus({ type: "loading" });
 
-    const { email, password, name, about } = form;
+    const { email, password, name, about, communications_opt_in } = form;
     const age = form.age.trim() || null;
     const skill_level = Number.isNaN(Number(form.skill_level)) ? null : Number(form.skill_level);
     const positions = parseArray(form.positions);
@@ -57,7 +59,12 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
       email,
       password,
       options: {
-        data: { name },
+        data: {
+          name,
+          settings: {
+            email_community_updates: communications_opt_in,
+          },
+        },
       },
     });
 
@@ -98,7 +105,7 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
     <form className="account-form" onSubmit={handleSubmit}>
       <div className="form-grid">
         <div className="form-control">
-          <label htmlFor="name">Name</label>
+          <label htmlFor="name">Full Name</label>
           <input
             id="name"
             name="name"
@@ -179,6 +186,16 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
           onChange={(e) => update("about", e.target.value)}
           rows={3}
         />
+      </div>
+      <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={form.communications_opt_in}
+            onChange={(e) => update("communications_opt_in", e.target.checked)}
+          />
+          <span>{ALDRICH_COMMUNICATIONS_LABEL}</span>
+        </label>
       </div>
       {status.type === "error" ? <p className="form-help error">{status.message}</p> : null}
       {status.type === "success" ? <p className="form-help success">{status.message}</p> : null}

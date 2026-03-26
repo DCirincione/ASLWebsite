@@ -8,6 +8,11 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import {
+  ALDRICH_COMMUNICATIONS_KEY,
+  ALDRICH_COMMUNICATIONS_LABEL,
+  syncAldrichCommunicationsPreference,
+} from "@/lib/aldrich-communications";
+import {
   SUNDAY_LEAGUE_DIVISIONS,
   SUNDAY_LEAGUE_SLOT_COUNT,
   getNextOpenSundayLeagueSlot,
@@ -39,6 +44,7 @@ type TeamFormState = {
   preferred_jersey_design: string;
   logo_description: string;
   jersey_numbers: string[];
+  communications_opt_in: boolean;
   agreements: Record<AgreementKey, boolean>;
 };
 type LeaderboardTableRow = {
@@ -188,6 +194,7 @@ const createEmptyTeamForm = (): TeamFormState => ({
   preferred_jersey_design: "",
   logo_description: "",
   jersey_numbers: Array.from({ length: 10 }, () => ""),
+  communications_opt_in: true,
   agreements: {
     captain_confirmed: false,
     deposit_required: false,
@@ -224,6 +231,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     name: "",
     email: "",
     message: "",
+    communications_opt_in: true,
   });
 
   useEffect(() => {
@@ -450,7 +458,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     </div>
   );
 
-  const updateInquiryForm = (key: keyof typeof inquiryForm, value: string) => {
+  const updateInquiryForm = <Key extends keyof typeof inquiryForm>(key: Key, value: (typeof inquiryForm)[Key]) => {
     setInquiryForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -482,9 +490,10 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
       const name = inquiryForm.name.trim();
       const email = inquiryForm.email.trim();
       const message = inquiryForm.message.trim();
+      const communicationsOptIn = inquiryForm.communications_opt_in;
 
       if (!name || !email || !message) {
-        setStatus({ type: "error", message: "Name, email, and message are required." });
+        setStatus({ type: "error", message: "Full Name, email, and message are required." });
         return;
       }
 
@@ -499,6 +508,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
           name,
           email,
           message,
+          communicationsOptIn,
         }),
       });
 
@@ -518,7 +528,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
       }
 
       setStatus({ type: "success", message: json.message ?? "Message sent. We will get back to you soon." });
-      setInquiryForm({ name: "", email: "", message: "" });
+      setInquiryForm({ name: "", email: "", message: "", communications_opt_in: true });
     } catch {
       setStatus({ type: "error", message: "Could not send message." });
     }
@@ -611,7 +621,10 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
       team_logo_url: teamLogoUrl,
       logo_description: teamForm.logo_description.trim() || null,
       jersey_numbers: teamForm.jersey_numbers.map((value) => value.trim()),
-      agreements: teamForm.agreements,
+      agreements: {
+        ...teamForm.agreements,
+        [ALDRICH_COMMUNICATIONS_KEY]: teamForm.communications_opt_in,
+      },
       deposit_status: "pending" as const,
       team_status: "pending" as const,
     };
@@ -624,6 +637,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     }
 
     const nextTeam = data as SundayLeagueTeam;
+    void syncAldrichCommunicationsPreference(client, teamForm.communications_opt_in);
     setTeams((prev) => [...prev, nextTeam].sort((a, b) => (a.division - b.division) || (a.slot_number - b.slot_number)));
     setTeamStatus({ type: "success", message: "Team created. Opening your team portal." });
     setTeamForm(createEmptyTeamForm());
@@ -936,11 +950,11 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
             <p className="sunday-league-inquiries__prompt">Sunday League Questions?</p>
             <form className="sunday-league-inquiries__form" onSubmit={handleInquirySubmit}>
               <label className="form-control">
-                <span>Name</span>
+                <span>Full Name</span>
                 <input
                   type="text"
                   name="name"
-                  placeholder="Your name"
+                  placeholder="Your full name"
                   value={inquiryForm.name}
                   onChange={(event) => updateInquiryForm("name", event.target.value)}
                   required
@@ -968,6 +982,16 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                   required
                 />
               </label>
+              <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={inquiryForm.communications_opt_in}
+                    onChange={(event) => updateInquiryForm("communications_opt_in", event.target.checked)}
+                  />
+                  <span>{ALDRICH_COMMUNICATIONS_LABEL}</span>
+                </label>
+              </div>
               <div className="sunday-league-inquiries__actions">
                 <button className="button primary" type="submit" disabled={status.type === "loading"}>
                   {status.type === "loading" ? "Sending..." : "Submit"}
@@ -1219,8 +1243,19 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                           />
                           <span>{agreement.label}</span>
                         </label>
-                      ))}
+                        ))}
                     </div>
+                  </div>
+
+                  <div className="sunday-league-panel-box sunday-league-panel-box--compact">
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={teamForm.communications_opt_in}
+                        onChange={(event) => updateTeamForm("communications_opt_in", event.target.checked)}
+                      />
+                      <span>{ALDRICH_COMMUNICATIONS_LABEL}</span>
+                    </label>
                   </div>
 
                   <div className="sunday-league-form-actions">

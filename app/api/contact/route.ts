@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
+import {
+  appendAldrichCommunicationsPreferenceToMessage,
+  ALDRICH_COMMUNICATIONS_LABEL,
+} from "@/lib/aldrich-communications";
+
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
@@ -32,23 +37,27 @@ const escapeHtml = (value: string) =>
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 
-const sendContactEmail = async (payload: { name: string; email: string; message: string }) => {
+const sendContactEmail = async (payload: { name: string; email: string; message: string; communicationsOptIn: boolean }) => {
   if (!resendApiKey || !contactToEmail || !contactFromEmail) {
     return { sent: false, skipped: true as const };
   }
 
   const html = `
     <h2>ASL Inquiry</h2>
-    <p><strong>Name:</strong> ${escapeHtml(payload.name)}</p>
+    <p><strong>Full Name:</strong> ${escapeHtml(payload.name)}</p>
     <p><strong>Email:</strong> ${escapeHtml(payload.email)}</p>
+    <p><strong>Communications Opt-In:</strong> ${payload.communicationsOptIn ? "Yes" : "No"}</p>
+    <p><strong>Preference:</strong> ${escapeHtml(ALDRICH_COMMUNICATIONS_LABEL)}</p>
     <p><strong>Message:</strong></p>
     <p>${escapeHtml(payload.message).replaceAll("\n", "<br />")}</p>
   `;
 
   const text = `ASL Inquiry
 
-Name: ${payload.name}
+Full Name: ${payload.name}
 Email: ${payload.email}
+Communications Opt-In: ${payload.communicationsOptIn ? "Yes" : "No"}
+Preference: ${ALDRICH_COMMUNICATIONS_LABEL}
 
 Message:
 ${payload.message}`;
@@ -83,14 +92,16 @@ export async function POST(req: NextRequest) {
       name: string;
       email: string;
       message: string;
+      communicationsOptIn: boolean;
     }>;
 
     const name = body.name?.trim() || "";
     const email = body.email?.trim() || "";
     const message = body.message?.trim() || "";
+    const communicationsOptIn = body.communicationsOptIn !== false;
 
     if (!name || !email || !message) {
-      return NextResponse.json({ error: "Name, email, and message are required." }, { status: 400 });
+      return NextResponse.json({ error: "Full Name, email, and message are required." }, { status: 400 });
     }
 
     const supabase = getSupabase();
@@ -101,7 +112,7 @@ export async function POST(req: NextRequest) {
       const { error: insertError } = await supabase.from("contact_messages").insert({
         name,
         email,
-        message,
+        message: appendAldrichCommunicationsPreferenceToMessage(message, communicationsOptIn),
       });
 
       if (insertError) {
@@ -112,7 +123,7 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      const emailResult = await sendContactEmail({ name, email, message });
+      const emailResult = await sendContactEmail({ name, email, message, communicationsOptIn });
       if (emailResult.skipped) {
         return NextResponse.json({
           ok: !storageError,

@@ -8,6 +8,12 @@ import { useEffect, useMemo, useState } from "react";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
+import {
+  ALDRICH_COMMUNICATIONS_KEY,
+  ALDRICH_COMMUNICATIONS_LABEL,
+  getAldrichCommunicationsPreferenceFromJson,
+  syncAldrichCommunicationsPreference,
+} from "@/lib/aldrich-communications";
 import { createId } from "@/lib/create-id";
 import { getSundayLeagueColor, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
@@ -43,6 +49,7 @@ type TeamPortalFormState = {
   preferred_jersey_design: string;
   logo_description: string;
   jersey_numbers: string[];
+  communications_opt_in: boolean;
   agreements: Record<AgreementKey, boolean>;
 };
 
@@ -83,6 +90,7 @@ const createTeamPortalFormState = (team: SundayLeagueTeam): TeamPortalFormState 
   preferred_jersey_design: team.preferred_jersey_design ?? "",
   logo_description: team.logo_description ?? "",
   jersey_numbers: Array.from({ length: 10 }, (_, index) => team.jersey_numbers?.[index] ?? ""),
+  communications_opt_in: getAldrichCommunicationsPreferenceFromJson(team.agreements, true),
   agreements: {
     captain_confirmed: Boolean(team.agreements && typeof team.agreements === "object" && !Array.isArray(team.agreements) && team.agreements.captain_confirmed),
     deposit_required: Boolean(team.agreements && typeof team.agreements === "object" && !Array.isArray(team.agreements) && team.agreements.deposit_required),
@@ -589,7 +597,10 @@ export default function SundayLeagueTeamPortalPage() {
       team_logo_url: teamLogoUrl,
       logo_description: form.logo_description.trim() || null,
       jersey_numbers: form.jersey_numbers.map((value) => value.trim()),
-      agreements: form.agreements,
+      agreements: {
+        ...form.agreements,
+        [ALDRICH_COMMUNICATIONS_KEY]: form.communications_opt_in,
+      },
     };
 
     const { data, error } = await supabase
@@ -606,6 +617,7 @@ export default function SundayLeagueTeamPortalPage() {
     }
 
     const nextTeam = data as SundayLeagueTeam;
+    void syncAldrichCommunicationsPreference(supabase, form.communications_opt_in);
     setTeam(nextTeam);
     setForm(createTeamPortalFormState(nextTeam));
     setTeamLogoFile(null);
@@ -1025,8 +1037,8 @@ export default function SundayLeagueTeamPortalPage() {
                         <input type="email" value={form.captain_email} onChange={(event) => updateForm("captain_email", event.target.value)} />
                       </label>
                       <label className="form-control">
-                        <span>Captain phone</span>
-                        <input value={form.captain_phone} onChange={(event) => updateForm("captain_phone", event.target.value)} />
+                        <span>Phone Number</span>
+                        <input type="tel" value={form.captain_phone} onChange={(event) => updateForm("captain_phone", event.target.value)} required />
                       </label>
                       <label className="form-control">
                         <span>Primary jersey</span>
@@ -1099,6 +1111,16 @@ export default function SundayLeagueTeamPortalPage() {
                           </label>
                         ))}
                       </div>
+                    </div>
+                    <div className="sunday-league-panel-box sunday-league-panel-box--compact">
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={form.communications_opt_in}
+                          onChange={(event) => updateForm("communications_opt_in", event.target.checked)}
+                        />
+                        <span>{ALDRICH_COMMUNICATIONS_LABEL}</span>
+                      </label>
                     </div>
                     {saveState.message ? (
                       <p className={`form-help ${saveState.type === "error" ? "error" : saveState.type === "success" ? "success" : ""}`}>
