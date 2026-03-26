@@ -1,0 +1,39 @@
+[
+  {
+    "id": "81173425-061a-4449-91f3-ba236619f1c6",
+    "name": "test",
+    "description": "aaaa",
+    "image": "https://duyalmvvjswrtqvmeitx.supabase.co/storage/v1/object/public/event-creation-uploads/events/community-sponsors/f677084e-da6e-46fc-af8d-1c4315fa183c-MAGIC_FOUNTAIN_LOGO.png",
+    "placement": "standard"
+  },
+  {
+    "id": "b4dfef58-447e-4555-8bb8-e3fc9203616c",
+    "name": "aa",
+    "description": "aa",
+    "image": "https://duyalmvvjswrtqvmeitx.supabase.co/storage/v1/object/public/event-creation-uploads/community-sponsors/811dd325-9965-491d-8fc6-d15f1272ca28-BLACK_SHEEP_LOGO.png",
+    "placement": "standard"
+  },
+  {
+    "id": "4c76c243-2045-4e86-8e98-8066293734bb",
+    "name": "Magic Fountain",
+    "description": "Best icecream",
+    "image": "https://duyalmvvjswrtqvmeitx.supabase.co/storage/v1/object/public/event-creation-uploads/events/community-sponsors/f677084e-da6e-46fc-af8d-1c4315fa183c-MAGIC_FOUNTAIN_LOGO.png",
+    "placement": "top",
+    "websiteUrl": "https://www.magicfountainlongisland.com/",
+    "instagramUrl": "https://www.instagram.com/magic_fountain"
+  },
+  {
+    "id": "26f82e9d-1949-490e-8615-67c7e78b09b7",
+    "name": "Aldrich Dih League",
+    "description": "We own this shit",
+    "image": "https://duyalmvvjswrtqvmeitx.supabase.co/storage/v1/object/public/event-creation-uploads/community-sponsors/811dd325-9965-491d-8fc6-d15f1272ca28-BLACK_SHEEP_LOGO.png",
+    "placement": "standard"
+  },
+  {
+    "id": "f8ecba2d-0a5e-4f95-9ebd-f92f9c5bc20a",
+    "name": "Blacksheep Bagels",
+    "description": "Blacksheep bagel so yummy ummy!!",
+    "image": "https://duyalmvvjswrtqvmeitx.supabase.co/storage/v1/object/public/event-creation-uploads/community-sponsors/811dd325-9965-491d-8fc6-d15f1272ca28-BLACK_SHEEP_LOGO.png",
+    "placement": "top"
+  }
+]

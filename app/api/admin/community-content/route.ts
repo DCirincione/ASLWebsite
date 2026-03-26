@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { promises as fs } from "fs";
 import path from "path";
+
+import { isAdminOrOwner } from "@/lib/admin-route-auth";
 
 type CommunityContent = {
   boardTitle: string;
@@ -9,35 +10,6 @@ type CommunityContent = {
 };
 
 const contentFilePath = path.join(process.cwd(), "data", "community-content.json");
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-const getSupabase = () => {
-  if (!supabaseUrl || !supabaseAnonKey) return null;
-  return createClient(supabaseUrl, supabaseAnonKey);
-};
-
-const isAdminOrOwner = async (req: NextRequest) => {
-  const authHeader = req.headers.get("authorization") || "";
-  const token = authHeader.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : null;
-  if (!token) return false;
-
-  const supabase = getSupabase();
-  if (!supabase) return false;
-
-  const { data: userData, error: userError } = await supabase.auth.getUser(token);
-  if (userError || !userData.user?.id) return false;
-
-  const { data: profile, error: profileError } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("id", userData.user.id)
-    .maybeSingle();
-
-  if (profileError) return false;
-  return profile?.role === "admin" || profile?.role === "owner";
-};
 
 const readContent = async (): Promise<CommunityContent> => {
   const content = await fs.readFile(contentFilePath, "utf8");

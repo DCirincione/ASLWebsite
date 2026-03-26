@@ -75,6 +75,16 @@ type CommunityArticle = {
   date?: string;
   image?: string;
 };
+type CommunitySponsorPlacement = "standard" | "top";
+type CommunitySponsor = {
+  id: string;
+  name: string;
+  description: string;
+  image: string;
+  placement: CommunitySponsorPlacement;
+  websiteUrl?: string;
+  instagramUrl?: string;
+};
 type RegistrationRecord = {
   id: string;
   submitted_at?: string | null;
@@ -118,6 +128,7 @@ type UserManageForm = {
 type ContactFilter = "all" | "unread" | "read";
 
 const FLYER_BUCKET = "flyers";
+const COMMUNITY_SPONSOR_PLACEMENT_OPTIONS: CommunitySponsorPlacement[] = ["standard", "top"];
 const SPORT_GENDER_OPTIONS: SportGender[] = ["open", "coed", "men", "women"];
 const FIELD_TYPE_OPTIONS: RegistrationFieldType[] = [
   "text",
@@ -249,16 +260,20 @@ export default function AdminPage() {
   const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
   const [uploadingCreateSportImage, setUploadingCreateSportImage] = useState(false);
   const [uploadingEditSportImageId, setUploadingEditSportImageId] = useState<string | null>(null);
+  const [uploadingCreateSponsorImage, setUploadingCreateSponsorImage] = useState(false);
+  const [uploadingEditSponsorImageId, setUploadingEditSponsorImageId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingSportId, setEditingSportId] = useState<string | null>(null);
   const [showCreateEventForm, setShowCreateEventForm] = useState(false);
   const [showCreateSportForm, setShowCreateSportForm] = useState(false);
   const [showCreateArticleForm, setShowCreateArticleForm] = useState(false);
+  const [showCreateSponsorForm, setShowCreateSponsorForm] = useState(false);
   const [showCommunityContentForm, setShowCommunityContentForm] = useState(false);
   const [formStatus, setFormStatus] = useState<FormStatus>({ type: "idle" });
   const [sportsStatus, setSportsStatus] = useState<FormStatus>({ type: "idle" });
   const [communityStatus, setCommunityStatus] = useState<FormStatus>({ type: "idle" });
   const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
+  const [communitySponsorsStatus, setCommunitySponsorsStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [sportsError, setSportsError] = useState<string | null>(null);
   const [flyers, setFlyers] = useState<Flyer[]>([]);
@@ -282,6 +297,9 @@ export default function AdminPage() {
   const [expandedFlyerPreviews, setExpandedFlyerPreviews] = useState<Record<string, boolean>>({});
   const [communityArticles, setCommunityArticles] = useState<CommunityArticle[]>([]);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
+  const [communitySponsors, setCommunitySponsors] = useState<CommunitySponsor[]>([]);
+  const [loadingCommunitySponsors, setLoadingCommunitySponsors] = useState(false);
+  const [expandedCommunitySponsorCards, setExpandedCommunitySponsorCards] = useState<Record<string, boolean>>({});
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
   const [registrationsError, setRegistrationsError] = useState<string | null>(null);
@@ -312,6 +330,7 @@ export default function AdminPage() {
   const [autoFillingCreateArticle, setAutoFillingCreateArticle] = useState(false);
   const [autoFillingEditArticleId, setAutoFillingEditArticleId] = useState<string | null>(null);
   const [editingArticleId, setEditingArticleId] = useState<string | null>(null);
+  const [editingSponsorId, setEditingSponsorId] = useState<string | null>(null);
   const [communityForm, setCommunityForm] = useState({
     title: "",
     blurb: "",
@@ -325,6 +344,22 @@ export default function AdminPage() {
     href: "",
     date: "",
     image: "",
+  });
+  const [communitySponsorForm, setCommunitySponsorForm] = useState({
+    name: "",
+    description: "",
+    image: "",
+    placement: "standard" as CommunitySponsorPlacement,
+    websiteUrl: "",
+    instagramUrl: "",
+  });
+  const [communitySponsorEditForm, setCommunitySponsorEditForm] = useState({
+    name: "",
+    description: "",
+    image: "",
+    placement: "standard" as CommunitySponsorPlacement,
+    websiteUrl: "",
+    instagramUrl: "",
   });
   const [communityContentForm, setCommunityContentForm] = useState({
     boardTitle: "",
@@ -387,7 +422,7 @@ export default function AdminPage() {
     {
       id: "community",
       title: "Community",
-      description: "Add featured community/news articles.",
+      description: "Manage community intro copy, sponsor shout-outs, and featured articles.",
       enabled: true,
     },
     {
@@ -553,6 +588,26 @@ export default function AdminPage() {
       });
     } catch {
       setCommunityContentStatus({ type: "error", message: "Could not load community intro." });
+    }
+  };
+
+  const loadCommunitySponsors = async () => {
+    setLoadingCommunitySponsors(true);
+    setCommunitySponsorsStatus({ type: "idle" });
+    try {
+      const response = await fetch("/api/admin/community-sponsors");
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunitySponsorsStatus({ type: "error", message: json?.error ?? "Could not load community sponsors." });
+        setCommunitySponsors([]);
+      } else {
+        setCommunitySponsors((json?.sponsors ?? []) as CommunitySponsor[]);
+      }
+    } catch {
+      setCommunitySponsorsStatus({ type: "error", message: "Could not load community sponsors." });
+      setCommunitySponsors([]);
+    } finally {
+      setLoadingCommunitySponsors(false);
     }
   };
 
@@ -1253,7 +1308,7 @@ export default function AdminPage() {
 
   const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
-  const uploadManagedImage = async (folder: "events" | "sports", file: File) => {
+  const uploadManagedImage = async (folder: "events" | "sports" | "events/community-sponsors", file: File) => {
     if (!supabase) {
       throw new Error("Supabase is not configured.");
     }
@@ -1762,6 +1817,7 @@ export default function AdminPage() {
     if (module === "community") {
       void loadCommunityArticles();
       void loadCommunityContent();
+      void loadCommunitySponsors();
     }
     if (module === "flyers") {
       void loadEvents();
@@ -1860,6 +1916,66 @@ export default function AdminPage() {
     setCommunityEditForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateCommunitySponsor = <K extends keyof typeof communitySponsorForm>(key: K, value: (typeof communitySponsorForm)[K]) => {
+    setCommunitySponsorForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const resetCommunitySponsorForm = () => {
+    setCommunitySponsorForm({
+      name: "",
+      description: "",
+      image: "",
+      placement: "standard",
+      websiteUrl: "",
+      instagramUrl: "",
+    });
+  };
+
+  const openCreateSponsorForm = () => {
+    resetCommunitySponsorForm();
+    setCommunitySponsorsStatus({ type: "idle" });
+    setShowCreateSponsorForm(true);
+  };
+
+  const closeCreateSponsorForm = () => {
+    resetCommunitySponsorForm();
+    setCommunitySponsorsStatus({ type: "idle" });
+    setShowCreateSponsorForm(false);
+  };
+
+  const updateCommunitySponsorEdit = <K extends keyof typeof communitySponsorEditForm>(key: K, value: (typeof communitySponsorEditForm)[K]) => {
+    setCommunitySponsorEditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const startEditingCommunitySponsor = (sponsor: CommunitySponsor) => {
+    setExpandedCommunitySponsorCards((prev) => ({ ...prev, [sponsor.id]: true }));
+    setEditingSponsorId(sponsor.id);
+    setCommunitySponsorEditForm({
+      name: sponsor.name ?? "",
+      description: sponsor.description ?? "",
+      image: sponsor.image ?? "",
+      placement: sponsor.placement ?? "standard",
+      websiteUrl: sponsor.websiteUrl ?? "",
+      instagramUrl: sponsor.instagramUrl ?? "",
+    });
+    setCommunitySponsorsStatus({ type: "idle" });
+  };
+
+  const cancelEditingCommunitySponsor = () => {
+    setEditingSponsorId(null);
+    setCommunitySponsorsStatus({ type: "idle" });
+  };
+
+  const toggleCommunitySponsorCard = (id: string) => {
+    setExpandedCommunitySponsorCards((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const countTopSponsors = (excludedId?: string) =>
+    communitySponsors.filter((sponsor) => sponsor.placement === "top" && sponsor.id !== excludedId).length;
+
+  const sponsorPlacementLabel = (placement: CommunitySponsorPlacement) =>
+    placement === "top" ? "Top Sponsors" : "Regular Sponsors";
+
   const updateCommunityContent = (key: keyof typeof communityContentForm, value: string) => {
     setCommunityContentForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -1879,6 +1995,257 @@ export default function AdminPage() {
     if (!supabase) return null;
     const { data: sessionData } = await supabase.auth.getSession();
     return sessionData.session?.access_token ?? null;
+  };
+
+  const handleCreateCommunitySponsor = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) {
+      setCommunitySponsorsStatus({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+
+    if (
+      !communitySponsorForm.name.trim() ||
+      !communitySponsorForm.description.trim() ||
+      !communitySponsorForm.image.trim()
+    ) {
+      setCommunitySponsorsStatus({ type: "error", message: "Business name, description, and image are required." });
+      return;
+    }
+    if (communitySponsorForm.placement === "top" && countTopSponsors() >= 2) {
+      setCommunitySponsorsStatus({ type: "error", message: "Top Sponsors can only contain two sponsors." });
+      return;
+    }
+
+    setCommunitySponsorsStatus({ type: "loading" });
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setCommunitySponsorsStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    const payload = {
+      name: communitySponsorForm.name.trim(),
+      description: communitySponsorForm.description.trim(),
+      image: communitySponsorForm.image.trim(),
+      placement: communitySponsorForm.placement,
+      websiteUrl: communitySponsorForm.websiteUrl.trim(),
+      instagramUrl: communitySponsorForm.instagramUrl.trim(),
+    };
+
+    try {
+      const response = await fetch("/api/admin/community-sponsors", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunitySponsorsStatus({ type: "error", message: json?.error ?? "Could not save sponsor." });
+        return;
+      }
+
+      setCommunitySponsorsStatus({ type: "success", message: "Community sponsor added." });
+      resetCommunitySponsorForm();
+      setShowCreateSponsorForm(false);
+      setCommunitySponsors((json?.sponsors ?? []) as CommunitySponsor[]);
+    } catch {
+      setCommunitySponsorsStatus({ type: "error", message: "Could not save sponsor." });
+    }
+  };
+
+  const handleSaveCommunitySponsor = async (id: string) => {
+    if (!supabase) return;
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setCommunitySponsorsStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    if (
+      !communitySponsorEditForm.name.trim() ||
+      !communitySponsorEditForm.description.trim() ||
+      !communitySponsorEditForm.image.trim()
+    ) {
+      setCommunitySponsorsStatus({ type: "error", message: "Business name, description, and image are required." });
+      return;
+    }
+    if (communitySponsorEditForm.placement === "top" && countTopSponsors(id) >= 2) {
+      setCommunitySponsorsStatus({ type: "error", message: "Top Sponsors can only contain two sponsors." });
+      return;
+    }
+
+    setCommunitySponsorsStatus({ type: "loading" });
+    const payload = {
+      id,
+      name: communitySponsorEditForm.name.trim(),
+      description: communitySponsorEditForm.description.trim(),
+      image: communitySponsorEditForm.image.trim(),
+      placement: communitySponsorEditForm.placement,
+      websiteUrl: communitySponsorEditForm.websiteUrl.trim(),
+      instagramUrl: communitySponsorEditForm.instagramUrl.trim(),
+    };
+
+    try {
+      const response = await fetch("/api/admin/community-sponsors", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunitySponsorsStatus({ type: "error", message: json?.error ?? "Could not update sponsor." });
+        return;
+      }
+
+      setCommunitySponsorsStatus({ type: "success", message: "Sponsor updated." });
+      setCommunitySponsors((json?.sponsors ?? []) as CommunitySponsor[]);
+      setEditingSponsorId(null);
+    } catch {
+      setCommunitySponsorsStatus({ type: "error", message: "Could not update sponsor." });
+    }
+  };
+
+  const handleDeleteCommunitySponsor = async (sponsor: CommunitySponsor) => {
+    if (!supabase) return;
+    const confirmed = window.confirm(`Delete sponsor "${sponsor.name}"?`);
+    if (!confirmed) return;
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setCommunitySponsorsStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    setCommunitySponsorsStatus({ type: "loading" });
+    try {
+      const response = await fetch("/api/admin/community-sponsors", {
+        method: "DELETE",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ id: sponsor.id }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setCommunitySponsorsStatus({ type: "error", message: json?.error ?? "Could not delete sponsor." });
+        return;
+      }
+
+      setCommunitySponsorsStatus({ type: "success", message: "Sponsor deleted." });
+      setCommunitySponsors((json?.sponsors ?? []) as CommunitySponsor[]);
+      setExpandedCommunitySponsorCards((prev) => {
+        const next = { ...prev };
+        delete next[sponsor.id];
+        return next;
+      });
+      if (editingSponsorId === sponsor.id) {
+        setEditingSponsorId(null);
+      }
+    } catch {
+      setCommunitySponsorsStatus({ type: "error", message: "Could not delete sponsor." });
+    }
+  };
+
+  const handleCreateCommunitySponsorImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setCommunitySponsorsStatus({ type: "error", message: "Please select a valid image file." });
+      return;
+    }
+
+    try {
+      setUploadingCreateSponsorImage(true);
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        setCommunitySponsorsStatus({ type: "error", message: "Sign in again to continue." });
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/admin/community-sponsor-upload", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: formData,
+      });
+      const json = await response.json();
+      if (!response.ok || typeof json?.imageUrl !== "string") {
+        setCommunitySponsorsStatus({ type: "error", message: json?.error ?? "Could not upload image." });
+        return;
+      }
+
+      const publicUrl = json.imageUrl;
+      updateCommunitySponsor("image", publicUrl);
+      setCommunitySponsorsStatus({
+        type: "success",
+        message: "Image uploaded. The generated URL was added to the sponsor form. Click Add Sponsor to save it.",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload image.";
+      setCommunitySponsorsStatus({ type: "error", message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})` });
+    } finally {
+      setUploadingCreateSponsorImage(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleEditCommunitySponsorImageUpload = async (sponsorId: string, e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setCommunitySponsorsStatus({ type: "error", message: "Please select a valid image file." });
+      return;
+    }
+
+    try {
+      setUploadingEditSponsorImageId(sponsorId);
+      const accessToken = await getAccessToken();
+      if (!accessToken) {
+        setCommunitySponsorsStatus({ type: "error", message: "Sign in again to continue." });
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const response = await fetch("/api/admin/community-sponsor-upload", {
+        method: "POST",
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: formData,
+      });
+      const json = await response.json();
+      if (!response.ok || typeof json?.imageUrl !== "string") {
+        setCommunitySponsorsStatus({ type: "error", message: json?.error ?? "Could not upload image." });
+        return;
+      }
+
+      const publicUrl = json.imageUrl;
+      updateCommunitySponsorEdit("image", publicUrl);
+      setCommunitySponsorsStatus({
+        type: "success",
+        message: "Image uploaded. Click Save to publish this updated sponsor card.",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload image.";
+      setCommunitySponsorsStatus({ type: "error", message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})` });
+    } finally {
+      setUploadingEditSponsorImageId(null);
+      e.target.value = "";
+    }
   };
 
   const handleCreateCommunityArticle = async (event: FormEvent) => {
@@ -3003,8 +3370,8 @@ export default function AdminPage() {
             {activeModule === "community" ? (
               <>
                 <section className="account-card">
-                  <h2>Community Articles</h2>
-                  <p className="muted">Add featured articles shown on the Community page.</p>
+                  <h2>Community Content</h2>
+                  <p className="muted">Manage the intro block, sponsor shout-outs, and featured articles shown on the Community page.</p>
                 </section>
                 <section className="account-card">
                   <div className="account-card__header">
@@ -3058,6 +3425,344 @@ export default function AdminPage() {
                     <p className={`form-help ${communityContentStatus.type === "error" ? "error" : "muted"}`}>
                       {communityContentStatus.message}
                     </p>
+                  ) : null}
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Add Sponsor</h2>
+                      <p className="muted">Create a sponsor callout with an image and description for the Community page.</p>
+                    </div>
+                    {!showCreateSponsorForm ? (
+                      <button className="button primary" type="button" onClick={openCreateSponsorForm}>
+                        Add Sponsor
+                      </button>
+                    ) : null}
+                  </div>
+                  {showCreateSponsorForm ? (
+                    <form className="register-form" onSubmit={handleCreateCommunitySponsor}>
+                      <div className="register-form-grid">
+                        <div className="form-control">
+                          <label htmlFor="community-sponsor-name">Business Name *</label>
+                          <input
+                            id="community-sponsor-name"
+                            value={communitySponsorForm.name}
+                            onChange={(e) => updateCommunitySponsor("name", e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div className="form-control">
+                          <label htmlFor="community-sponsor-image">Image URL *</label>
+                          <input
+                            id="community-sponsor-image"
+                            value={communitySponsorForm.image}
+                            onChange={(e) => updateCommunitySponsor("image", e.target.value)}
+                            required
+                          />
+                          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                            <label className="button ghost" htmlFor="community-sponsor-image-upload" style={{ padding: "0.45rem 0.75rem" }}>
+                              {uploadingCreateSponsorImage ? "Uploading..." : "Upload a sponsor image"}
+                            </label>
+                            <input
+                              id="community-sponsor-image-upload"
+                              type="file"
+                              accept="image/*"
+                              onChange={handleCreateCommunitySponsorImageUpload}
+                              disabled={uploadingCreateSponsorImage}
+                              style={{ display: "none" }}
+                            />
+                          </div>
+                        </div>
+                        <div className="form-control">
+                          <label htmlFor="community-sponsor-placement">Sponsor Section *</label>
+                          <select
+                            id="community-sponsor-placement"
+                            value={communitySponsorForm.placement}
+                            onChange={(e) => updateCommunitySponsor("placement", e.target.value as CommunitySponsorPlacement)}
+                          >
+                            {COMMUNITY_SPONSOR_PLACEMENT_OPTIONS.map((placement) => (
+                              <option key={placement} value={placement}>
+                                {sponsorPlacementLabel(placement)}
+                              </option>
+                            ))}
+                          </select>
+                          <p className="form-help muted">Top Sponsors is limited to two sponsors and powers the split layout on the Community page.</p>
+                        </div>
+                      </div>
+                      <div className="form-control">
+                        <label htmlFor="community-sponsor-description">Description *</label>
+                        <textarea
+                          id="community-sponsor-description"
+                          value={communitySponsorForm.description}
+                          onChange={(e) => updateCommunitySponsor("description", e.target.value)}
+                          rows={5}
+                          required
+                        />
+                      </div>
+                      <div className="register-form-grid">
+                        <div className="form-control">
+                          <label htmlFor="community-sponsor-website">Website URL</label>
+                          <input
+                            id="community-sponsor-website"
+                            value={communitySponsorForm.websiteUrl}
+                            onChange={(e) => updateCommunitySponsor("websiteUrl", e.target.value)}
+                            placeholder="https://example.com"
+                          />
+                        </div>
+                        <div className="form-control">
+                          <label htmlFor="community-sponsor-instagram">Instagram URL</label>
+                          <input
+                            id="community-sponsor-instagram"
+                            value={communitySponsorForm.instagramUrl}
+                            onChange={(e) => updateCommunitySponsor("instagramUrl", e.target.value)}
+                            placeholder="https://instagram.com/yourhandle"
+                          />
+                        </div>
+                      </div>
+                      {communitySponsorForm.image ? (
+                        <div className="form-control">
+                          <label>Preview</label>
+                          <div
+                            style={{
+                              width: 140,
+                              height: 140,
+                              overflow: "hidden",
+                              borderRadius: 16,
+                              border: "1px solid var(--border)",
+                              backgroundColor: "rgba(255, 255, 255, 0.04)",
+                              backgroundImage: `url(${communitySponsorForm.image})`,
+                              backgroundPosition: "center",
+                              backgroundRepeat: "no-repeat",
+                              backgroundSize: "cover",
+                            }}
+                            role="img"
+                            aria-label={communitySponsorForm.name || "Sponsor preview"}
+                            aria-hidden={!communitySponsorForm.name}
+                          />
+                        </div>
+                      ) : null}
+                      <div className="cta-row">
+                        <button className="button primary" type="submit" disabled={communitySponsorsStatus.type === "loading"}>
+                          {communitySponsorsStatus.type === "loading" ? "Saving..." : "Add Sponsor"}
+                        </button>
+                        <button className="button ghost" type="button" onClick={closeCreateSponsorForm}>
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : null}
+                  {communitySponsorsStatus.message ? (
+                    <p className={`form-help ${communitySponsorsStatus.type === "error" ? "error" : "muted"}`}>
+                      {communitySponsorsStatus.message}
+                    </p>
+                  ) : null}
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Current Sponsors</h2>
+                      <p className="muted">These sponsor cards are loaded from the local community sponsors source file.</p>
+                    </div>
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => void loadCommunitySponsors()}
+                      disabled={loadingCommunitySponsors}
+                    >
+                      {loadingCommunitySponsors ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  {loadingCommunitySponsors ? <p className="muted">Loading sponsors...</p> : null}
+                  {!loadingCommunitySponsors && communitySponsors.length === 0 ? (
+                    <p className="muted">No sponsors found.</p>
+                  ) : null}
+                  {!loadingCommunitySponsors && communitySponsors.length > 0 ? (
+                    <div className="event-list admin-scroll-panel">
+                      {communitySponsors.map((sponsor) => {
+                        const isExpanded = expandedCommunitySponsorCards[sponsor.id] || editingSponsorId === sponsor.id;
+
+                        return (
+                          <article key={sponsor.id} className="event-card-simple">
+                            <div className="event-card__header">
+                              <h3>{sponsor.name}</h3>
+                              {editingSponsorId !== sponsor.id ? (
+                                <button
+                                  className="button ghost"
+                                  type="button"
+                                  onClick={() => toggleCommunitySponsorCard(sponsor.id)}
+                                >
+                                  {isExpanded ? "Collapse" : "Expand"}
+                                </button>
+                              ) : null}
+                            </div>
+                            {isExpanded ? (
+                              <>
+                                <div className="register-form-grid" style={{ alignItems: "center", marginTop: 12 }}>
+                                  <div
+                                    style={{
+                                      width: "100%",
+                                      maxWidth: 160,
+                                      aspectRatio: "1 / 1",
+                                      overflow: "hidden",
+                                      borderRadius: 18,
+                                      border: "1px solid var(--border)",
+                                      backgroundColor: "rgba(255, 255, 255, 0.04)",
+                                      backgroundImage: `url(${sponsor.image})`,
+                                      backgroundPosition: "center",
+                                      backgroundRepeat: "no-repeat",
+                                      backgroundSize: "cover",
+                                    }}
+                                    role="img"
+                                    aria-label={sponsor.name}
+                                  />
+                                  <div style={{ display: "grid", gap: 10 }}>
+                                    <p className="muted" style={{ margin: 0 }}>
+                                      Section: {sponsorPlacementLabel(sponsor.placement)}
+                                    </p>
+                                    {sponsor.websiteUrl ? <p className="muted" style={{ margin: 0 }}>Website: {sponsor.websiteUrl}</p> : null}
+                                    {sponsor.instagramUrl ? <p className="muted" style={{ margin: 0 }}>Instagram: {sponsor.instagramUrl}</p> : null}
+                                    <p className="muted" style={{ margin: 0, whiteSpace: "pre-line" }}>{sponsor.description}</p>
+                                  </div>
+                                </div>
+                                <div className="cta-row" style={{ marginTop: 16 }}>
+                                  <button className="button ghost" type="button" onClick={() => startEditingCommunitySponsor(sponsor)}>
+                                    {editingSponsorId === sponsor.id ? "Editing" : "Edit"}
+                                  </button>
+                                  <button
+                                    className="button ghost"
+                                    type="button"
+                                    onClick={() => void handleDeleteCommunitySponsor(sponsor)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                                {editingSponsorId === sponsor.id ? (
+                                  <div className="register-form" style={{ marginTop: 12 }}>
+                                    <div className="register-form-grid">
+                                      <div className="form-control">
+                                        <label htmlFor={`edit-community-sponsor-name-${sponsor.id}`}>Business Name *</label>
+                                        <input
+                                          id={`edit-community-sponsor-name-${sponsor.id}`}
+                                          value={communitySponsorEditForm.name}
+                                          onChange={(e) => updateCommunitySponsorEdit("name", e.target.value)}
+                                          required
+                                        />
+                                      </div>
+                                <div className="form-control">
+                                  <label htmlFor={`edit-community-sponsor-image-${sponsor.id}`}>Image URL *</label>
+                                  <input
+                                    id={`edit-community-sponsor-image-${sponsor.id}`}
+                                    value={communitySponsorEditForm.image}
+                                          onChange={(e) => updateCommunitySponsorEdit("image", e.target.value)}
+                                          required
+                                        />
+                                        <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                          <label
+                                            className="button ghost"
+                                            htmlFor={`edit-community-sponsor-image-upload-${sponsor.id}`}
+                                            style={{ padding: "0.45rem 0.75rem" }}
+                                          >
+                                            {uploadingEditSponsorImageId === sponsor.id ? "Uploading..." : "Upload a sponsor image"}
+                                          </label>
+                                          <input
+                                            id={`edit-community-sponsor-image-upload-${sponsor.id}`}
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => void handleEditCommunitySponsorImageUpload(sponsor.id, e)}
+                                            disabled={uploadingEditSponsorImageId === sponsor.id}
+                                            style={{ display: "none" }}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="form-control">
+                                  <label htmlFor={`edit-community-sponsor-placement-${sponsor.id}`}>Sponsor Section *</label>
+                                  <select
+                                    id={`edit-community-sponsor-placement-${sponsor.id}`}
+                                    value={communitySponsorEditForm.placement}
+                                    onChange={(e) => updateCommunitySponsorEdit("placement", e.target.value as CommunitySponsorPlacement)}
+                                  >
+                                    {COMMUNITY_SPONSOR_PLACEMENT_OPTIONS.map((placement) => (
+                                      <option key={placement} value={placement}>
+                                        {sponsorPlacementLabel(placement)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <p className="form-help muted">Top Sponsors is limited to two sponsors and powers the split layout on the Community page.</p>
+                                </div>
+                              </div>
+                              <div className="form-control">
+                                <label htmlFor={`edit-community-sponsor-description-${sponsor.id}`}>Description *</label>
+                                      <textarea
+                                        id={`edit-community-sponsor-description-${sponsor.id}`}
+                                        value={communitySponsorEditForm.description}
+                                        onChange={(e) => updateCommunitySponsorEdit("description", e.target.value)}
+                                        rows={5}
+                                        required
+                                      />
+                                    </div>
+                                    <div className="register-form-grid">
+                                      <div className="form-control">
+                                        <label htmlFor={`edit-community-sponsor-website-${sponsor.id}`}>Website URL</label>
+                                        <input
+                                          id={`edit-community-sponsor-website-${sponsor.id}`}
+                                          value={communitySponsorEditForm.websiteUrl}
+                                          onChange={(e) => updateCommunitySponsorEdit("websiteUrl", e.target.value)}
+                                          placeholder="https://example.com"
+                                        />
+                                      </div>
+                                      <div className="form-control">
+                                        <label htmlFor={`edit-community-sponsor-instagram-${sponsor.id}`}>Instagram URL</label>
+                                        <input
+                                          id={`edit-community-sponsor-instagram-${sponsor.id}`}
+                                          value={communitySponsorEditForm.instagramUrl}
+                                          onChange={(e) => updateCommunitySponsorEdit("instagramUrl", e.target.value)}
+                                          placeholder="https://instagram.com/yourhandle"
+                                        />
+                                      </div>
+                                    </div>
+                                    {communitySponsorEditForm.image ? (
+                                      <div className="form-control">
+                                        <label>Preview</label>
+                                        <div
+                                          style={{
+                                            width: 140,
+                                            height: 140,
+                                            overflow: "hidden",
+                                            borderRadius: 16,
+                                            border: "1px solid var(--border)",
+                                            backgroundColor: "rgba(255, 255, 255, 0.04)",
+                                            backgroundImage: `url(${communitySponsorEditForm.image})`,
+                                            backgroundPosition: "center",
+                                            backgroundRepeat: "no-repeat",
+                                            backgroundSize: "cover",
+                                          }}
+                                          role="img"
+                                          aria-label={communitySponsorEditForm.name || "Sponsor preview"}
+                                          aria-hidden={!communitySponsorEditForm.name}
+                                        />
+                                      </div>
+                                    ) : null}
+                                    <div className="cta-row">
+                                      <button
+                                        className="button primary"
+                                        type="button"
+                                        onClick={() => void handleSaveCommunitySponsor(sponsor.id)}
+                                        disabled={communitySponsorsStatus.type === "loading"}
+                                      >
+                                        {communitySponsorsStatus.type === "loading" ? "Saving..." : "Save"}
+                                      </button>
+                                      <button className="button ghost" type="button" onClick={cancelEditingCommunitySponsor}>
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : null}
+                              </>
+                            ) : null}
+                          </article>
+                        );
+                      })}
+                    </div>
                   ) : null}
                 </section>
                 <section className="account-card">
