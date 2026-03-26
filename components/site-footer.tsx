@@ -32,7 +32,7 @@ export function SiteFooter() {
                 priority
               />
             </div>
-            <span className="sr-only">ASL Website home</span>
+            <span className="sr-only">Aldrich Sports home</span>
           </Link>
           <p className="muted">Community sports. Real competition. Local impact.</p>
         </div>

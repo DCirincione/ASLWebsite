@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+
+import { SITE_DESCRIPTION, SITE_NAME, SITE_SOCIALS, SITE_TITLE, SITE_URL } from "@/lib/site-metadata";
+
 import "./globals.css";
 
 const accessibilityBootstrapScript = `
@@ -38,16 +41,58 @@ const accessibilityBootstrapScript = `
 `;
 
 export const metadata: Metadata = {
-  title: "Aldrich Sports",
-  description: "Next.js App Router starter with shared components.",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: SITE_TITLE,
+    template: `%s | ${SITE_NAME}`,
+  },
+  description: SITE_DESCRIPTION,
+  applicationName: SITE_NAME,
   formatDetection: {
     telephone: false,
     address: false,
     email: false,
     date: false,
   },
+  openGraph: {
+    type: "website",
+    locale: "en_US",
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    url: SITE_URL,
+    images: [
+      {
+        url: "/ASLLogo.png",
+        alt: `${SITE_NAME} logo`,
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/ASLLogo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
   icons: {
-    icon: "/ASLLogo.png",
+    icon: [
+      {
+        url: "/favicon.ico",
+        sizes: "any",
+      },
+    ],
+    shortcut: "/favicon.ico",
   },
 };
 
@@ -56,6 +101,30 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": `${SITE_URL}/#organization`,
+        name: SITE_NAME,
+        url: SITE_URL,
+        logo: `${SITE_URL}/ASLLogo.png`,
+        sameAs: SITE_SOCIALS,
+      },
+      {
+        "@type": "WebSite",
+        "@id": `${SITE_URL}/#website`,
+        url: SITE_URL,
+        name: SITE_NAME,
+        description: SITE_DESCRIPTION,
+        publisher: {
+          "@id": `${SITE_URL}/#organization`,
+        },
+      },
+    ],
+  };
+
   return (
     <html lang="en" data-scroll-behavior="smooth" data-theme="dark" suppressHydrationWarning>
       <body>
@@ -63,6 +132,12 @@ export default function RootLayout({
           id="accessibility-bootstrap"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{ __html: accessibilityBootstrapScript }}
+        />
+        <Script
+          id="site-structured-data"
+          type="application/ld+json"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         {children}
       </body>
