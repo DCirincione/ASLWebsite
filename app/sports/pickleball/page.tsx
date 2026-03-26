@@ -9,6 +9,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
+import { SportEventCard } from "@/components/sport-event-card";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
@@ -113,21 +114,16 @@ export default function PickleballPage() {
     return (
       <div className="list list--grid">
         {list.map((item, idx) => (
-          <article key={item.id ?? idx} className="soccer-card">
-            <div className="soccer-card__media">
-              {item.image ? (
-                <Image
-                  src={item.image}
-                  alt=""
-                  fill
-                  sizes="(max-width: 900px) 100vw, 33vw"
-                />
-              ) : null}
-            </div>
-            <div className="soccer-card__body">
-              <p className="list__title">{item.title}</p>
-              <p className="muted">{primaryTimeLabel(item)}</p>
-              <div className="cta-row">
+          <SportEventCard
+            key={item.id ?? idx}
+            title={item.title}
+            image={item.image}
+            dateLabel={primaryTimeLabel(item)}
+            location={item.location}
+            description={item.description}
+            onOpen={() => setDetailEvent(item)}
+            actions={
+              <>
                 <button className="button ghost" type="button" onClick={() => setDetailEvent(item)}>
                   View Details
                 </button>
@@ -139,9 +135,9 @@ export default function PickleballPage() {
                 >
                   {!item.registration_enabled ? getSignupUnavailableLabel(item) : isRegisteredEvent(item.id) ? getSignupSubmittedLabel(item) : getSignupActionLabel(item)}
                 </button>
-              </div>
-            </div>
-          </article>
+              </>
+            }
+          />
         ))}
       </div>
     );
@@ -217,19 +213,16 @@ export default function PickleballPage() {
         {!loadingEvents && events.length > 0 ? (
           <div className="sport-event-list">
             {events.map((ev) => (
-              <article key={ev.id} className="sport-event-card">
-                {ev.image ? (
-                  <div className="sport-event-card__media">
-                    <Image src={ev.image} alt="" width={200} height={130} />
-                  </div>
-                ) : null}
-                <div className="sport-event-card__body">
-                  <p className="eyebrow">Pickleball</p>
-                  <h3>{ev.title}</h3>
-                  <p className="sport-event__meta">
-                    <span>{primaryTimeLabel(ev)}</span>
-                  </p>
-                  <div className="sport-event__actions">
+              <SportEventCard
+                key={ev.id}
+                title={ev.title}
+                image={ev.image}
+                dateLabel={primaryTimeLabel(ev)}
+                location={ev.location}
+                description={ev.description}
+                onOpen={() => setDetailEvent(ev)}
+                actions={
+                  <>
                     <button className="button ghost" type="button" onClick={() => setDetailEvent(ev)}>
                       View Details
                     </button>
@@ -241,9 +234,9 @@ export default function PickleballPage() {
                     >
                       {!ev.registration_enabled ? getSignupUnavailableLabel(ev) : isRegisteredEvent(ev.id) ? getSignupSubmittedLabel(ev) : getSignupActionLabel(ev)}
                     </button>
-                  </div>
-                </div>
-              </article>
+                  </>
+                }
+              />
             ))}
           </div>
         ) : null}

@@ -9,6 +9,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
+import { SportEventCard } from "@/components/sport-event-card";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
@@ -123,21 +124,16 @@ export default function SoccerPage() {
           const isSundayLeague = isRegularAslSundayLeagueEvent(item);
 
           return (
-            <article key={item.id ?? idx} className="soccer-card">
-              <div className="soccer-card__media">
-                {item.image ? (
-                  <Image
-                    src={item.image}
-                    alt=""
-                    fill
-                    sizes="(max-width: 900px) 100vw, 33vw"
-                  />
-                ) : null}
-              </div>
-              <div className="soccer-card__body">
-                <p className="list__title">{item.title}</p>
-                <p className="muted">{primaryTimeLabel(item)}</p>
-                <div className="cta-row">
+            <SportEventCard
+              key={item.id ?? idx}
+              title={item.title}
+              image={item.image}
+              dateLabel={primaryTimeLabel(item)}
+              location={item.location}
+              description={item.description}
+              onOpen={isSundayLeague ? undefined : () => setDetailEvent(item)}
+              actions={
+                <>
                   {isSundayLeague ? (
                     <>
                       <Link className="button ghost" href={SUNDAY_LEAGUE_HREF}>
@@ -165,13 +161,13 @@ export default function SoccerPage() {
                         disabled={!item.registration_enabled || isRegisteredEvent(item.id)}
                         onClick={() => openModal(item.id, item.title)}
                       >
-                        {!item.registration_enabled ? getSignupUnavailableLabel(item) : isRegisteredEvent(item.id) ? getSignupSubmittedLabel(item) : getSignupActionLabel(item)}
-                      </button>
+                          {!item.registration_enabled ? getSignupUnavailableLabel(item) : isRegisteredEvent(item.id) ? getSignupSubmittedLabel(item) : getSignupActionLabel(item)}
+                        </button>
                     </>
                   )}
-                </div>
-              </div>
-            </article>
+                </>
+              }
+            />
           );
         })}
       </div>
@@ -277,19 +273,16 @@ export default function SoccerPage() {
               const isSundayLeague = isRegularAslSundayLeagueEvent(ev);
 
               return (
-                <article key={ev.id} className="sport-event-card">
-                  {ev.image ? (
-                    <div className="sport-event-card__media">
-                      <Image src={ev.image} alt="" width={200} height={130} />
-                    </div>
-                  ) : null}
-                  <div className="sport-event-card__body">
-                    <p className="eyebrow">Soccer</p>
-                    <h3>{ev.title}</h3>
-                    <p className="sport-event__meta">
-                      <span>{primaryTimeLabel(ev)}</span>
-                    </p>
-                    <div className="sport-event__actions">
+                <SportEventCard
+                  key={ev.id}
+                  title={ev.title}
+                  image={ev.image}
+                  dateLabel={primaryTimeLabel(ev)}
+                  location={ev.location}
+                  description={ev.description}
+                  onOpen={isSundayLeague ? undefined : () => setDetailEvent(ev)}
+                  actions={
+                    <>
                       {isSundayLeague ? (
                         <>
                           <Link className="button ghost" href={SUNDAY_LEAGUE_HREF}>
@@ -321,9 +314,9 @@ export default function SoccerPage() {
                         </button>
                         </>
                       )}
-                    </div>
-                  </div>
-                </article>
+                    </>
+                  }
+                />
               );
             })}
           </div>

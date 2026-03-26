@@ -11,16 +11,23 @@ import type { SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/ty
 
 type AccountSundayLeagueTeam = Pick<SundayLeagueTeam, "id" | "team_name" | "team_logo_url" | "user_id">;
 type TeamInvite = SundayLeagueTeamMember & { team: AccountSundayLeagueTeam | null };
+type TeamMembershipEntry = {
+  membership: SundayLeagueTeamMember | null;
+  team: AccountSundayLeagueTeam;
+  isCaptain: boolean;
+  isCoCaptain: boolean;
+};
 type ActionState = { type: "idle" | "loading" | "success" | "error"; message?: string };
 
 export default function AccountTeamPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [managedTeams, setManagedTeams] = useState<AccountSundayLeagueTeam[]>([]);
-  const [joinedTeams, setJoinedTeams] = useState<AccountSundayLeagueTeam[]>([]);
+  const [managedTeams, setManagedTeams] = useState<TeamMembershipEntry[]>([]);
+  const [joinedTeams, setJoinedTeams] = useState<TeamMembershipEntry[]>([]);
   const [pendingInvites, setPendingInvites] = useState<TeamInvite[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [inviteStates, setInviteStates] = useState<Record<string, ActionState>>({});
+  const [leaveStates, setLeaveStates] = useState<Record<string, ActionState>>({});
 
   const loadTeams = useCallback(async () => {
     if (!supabase) {
@@ -90,18 +97,43 @@ export default function AccountTeamPage() {
       teamMap = new Map((teamData ?? []).map((team) => [team.id, team as AccountSundayLeagueTeam]));
     }
 
-    setManagedTeams([
-      ...captainList,
-      ...Array.from(managedTeamIds)
-        .filter((teamId) => !captainList.some((team) => team.id === teamId))
-        .map((teamId) => teamMap.get(teamId) ?? null)
-        .filter((team): team is AccountSundayLeagueTeam => Boolean(team)),
-    ]);
+    const acceptedMemberships = memberships.filter((membership) => membership.status === "accepted");
+    const captainManagedTeams: TeamMembershipEntry[] = captainList.map((team) => ({
+      team,
+      membership: null,
+      isCaptain: true,
+      isCoCaptain: false,
+    }));
+    const coCaptainManagedTeams: TeamMembershipEntry[] = acceptedMemberships
+      .filter((membership) => membership.role === "co_captain")
+      .map((membership) => {
+        const team = teamMap.get(membership.team_id) ?? null;
+        if (!team) return null;
+        return {
+          team,
+          membership,
+          isCaptain: false,
+          isCoCaptain: true,
+        };
+      })
+      .filter((entry): entry is TeamMembershipEntry => Boolean(entry))
+      .filter((entry) => !captainManagedTeams.some((captainEntry) => captainEntry.team.id === entry.team.id));
+
+    setManagedTeams([...captainManagedTeams, ...coCaptainManagedTeams]);
     setJoinedTeams(
-      memberships
-        .filter((membership) => membership.status === "accepted")
+      acceptedMemberships
         .map((membership) => teamMap.get(membership.team_id) ?? null)
-        .filter((team): team is AccountSundayLeagueTeam => Boolean(team && !managedTeamIds.has(team.id))),
+        .map((team, index) => {
+          const membership = acceptedMemberships[index];
+          if (!team || managedTeamIds.has(team.id)) return null;
+          return {
+            team,
+            membership,
+            isCaptain: false,
+            isCoCaptain: false,
+          };
+        })
+        .filter((entry): entry is TeamMembershipEntry => Boolean(entry)),
     );
     setPendingInvites(
       memberships
@@ -176,6 +208,48 @@ export default function AccountTeamPage() {
       [invite.id]: {
         type: "success",
         message: nextStatus === "accepted" ? "Invite accepted. Your team is now listed below." : "Invite declined.",
+      },
+    }));
+  };
+
+  const handleLeaveTeam = async (entry: TeamMembershipEntry) => {
+    if (!supabase || !userId || !entry.membership || entry.isCaptain) return;
+    const confirmMessage = entry.isCoCaptain
+      ? `Leave ${entry.team.team_name} and remove your co-captain access?`
+      : `Leave ${entry.team.team_name}?`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setLeaveStates((prev) => ({
+      ...prev,
+      [entry.team.id]: { type: "loading" },
+    }));
+
+    const { error } = await supabase
+      .from("sunday_league_team_members")
+      .update({
+        role: "player",
+        status: "declined",
+      })
+      .eq("id", entry.membership.id)
+      .eq("player_user_id", userId);
+
+    if (error) {
+      setLeaveStates((prev) => ({
+        ...prev,
+        [entry.team.id]: { type: "error", message: error.message },
+      }));
+      return;
+    }
+
+    await loadTeams();
+    setLeaveStates((prev) => ({
+      ...prev,
+      [entry.team.id]: {
+        type: "success",
+        message: entry.isCoCaptain ? "You left the team and no longer have co-captain access." : "You left the team.",
       },
     }));
   };
@@ -263,18 +337,43 @@ export default function AccountTeamPage() {
                 <p className="muted">Open the portal to approve requests, invite players, manage captains, and edit your team.</p>
               </div>
               <ul className="list list--grid">
-                {managedTeams.map((team) => (
-                  <li key={team.id} className="team-card">
+                {managedTeams.map((entry) => (
+                  <li key={entry.team.id} className="team-card">
                     <div className="team-card__logo">
-                      <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="80px" />
+                      <TeamLogoImage src={entry.team.team_logo_url} alt="" fill sizes="80px" />
                     </div>
                     <div className="team-card__info">
-                      <p className="list__title">{team.team_name}</p>
-                      <p className="muted">Sunday League team</p>
+                      <p className="list__title">{entry.team.team_name}</p>
+                      <p className="muted">{entry.isCaptain ? "Team captain" : "Co-captain access"}</p>
+                      {leaveStates[entry.team.id]?.message ? (
+                        <p
+                          className={`form-help ${
+                            leaveStates[entry.team.id]?.type === "error"
+                              ? "error"
+                              : leaveStates[entry.team.id]?.type === "success"
+                                ? "success"
+                                : ""
+                          }`}
+                        >
+                          {leaveStates[entry.team.id]?.message}
+                        </p>
+                      ) : null}
                     </div>
-                    <Link className="button ghost" href={`/leagues/sunday-league/team/${team.id}`}>
-                      Team Portal
-                    </Link>
+                    <div className="sunday-league-team-card__actions">
+                      <Link className="button ghost" href={`/leagues/sunday-league/team/${entry.team.id}`}>
+                        Team Portal
+                      </Link>
+                      {!entry.isCaptain ? (
+                        <button
+                          className="button ghost"
+                          type="button"
+                          onClick={() => void handleLeaveTeam(entry)}
+                          disabled={leaveStates[entry.team.id]?.type === "loading"}
+                        >
+                          {leaveStates[entry.team.id]?.type === "loading" ? "Leaving..." : "Leave Team"}
+                        </button>
+                      ) : null}
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -288,18 +387,41 @@ export default function AccountTeamPage() {
                 <p className="muted">View the public team page for the roster and weekly schedule.</p>
               </div>
               <ul className="list list--grid">
-                {joinedTeams.map((team) => (
-                  <li key={team.id} className="team-card">
+                {joinedTeams.map((entry) => (
+                  <li key={entry.team.id} className="team-card">
                     <div className="team-card__logo">
-                      <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="80px" />
+                      <TeamLogoImage src={entry.team.team_logo_url} alt="" fill sizes="80px" />
                     </div>
                     <div className="team-card__info">
-                      <p className="list__title">{team.team_name}</p>
+                      <p className="list__title">{entry.team.team_name}</p>
                       <p className="muted">Accepted roster spot</p>
+                      {leaveStates[entry.team.id]?.message ? (
+                        <p
+                          className={`form-help ${
+                            leaveStates[entry.team.id]?.type === "error"
+                              ? "error"
+                              : leaveStates[entry.team.id]?.type === "success"
+                                ? "success"
+                                : ""
+                          }`}
+                        >
+                          {leaveStates[entry.team.id]?.message}
+                        </p>
+                      ) : null}
                     </div>
-                    <Link className="button ghost" href={`/leagues/sunday-league/teams/${team.id}`}>
-                      View Team
-                    </Link>
+                    <div className="sunday-league-team-card__actions">
+                      <Link className="button ghost" href={`/leagues/sunday-league/teams/${entry.team.id}`}>
+                        View Team
+                      </Link>
+                      <button
+                        className="button ghost"
+                        type="button"
+                        onClick={() => void handleLeaveTeam(entry)}
+                        disabled={leaveStates[entry.team.id]?.type === "loading"}
+                      >
+                        {leaveStates[entry.team.id]?.type === "loading" ? "Leaving..." : "Leave Team"}
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>

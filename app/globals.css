@@ -4174,7 +4174,9 @@ html[data-theme="dark"] .pill--muted {
 
 .sport-event-list {
   display: grid;
-  gap: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 320px));
+  gap: 16px;
+  justify-content: start;
   margin-top: 18px;
 }
 
@@ -4292,7 +4294,8 @@ html[data-theme="dark"] .soccer-card__media {
 }
 
 .soccer-section .list--grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 320px));
+  justify-content: start;
 }
 
 .run-club-overview {
@@ -4387,6 +4390,10 @@ html[data-theme="dark"] .run-club-overview__flyer img {
   }
 
   .soccer-section .list--grid {
+    grid-template-columns: 1fr;
+  }
+
+  .sport-event-list {
     grid-template-columns: 1fr;
   }
 }

@@ -9,6 +9,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
+import { SportEventCard } from "@/components/sport-event-card";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
@@ -97,16 +98,16 @@ export default function GolfPage() {
     return (
       <div className="list list--grid">
         {list.map((item, idx) => (
-          <article key={item.id ?? idx} className="soccer-card">
-            <div className="soccer-card__media">
-              {item.image ? (
-                <Image src={item.image} alt="" fill sizes="(max-width: 900px) 100vw, 33vw" />
-              ) : null}
-            </div>
-            <div className="soccer-card__body">
-              <p className="list__title">{item.title}</p>
-              <p className="muted">{primaryTimeLabel(item)}</p>
-              <div className="cta-row">
+          <SportEventCard
+            key={item.id ?? idx}
+            title={item.title}
+            image={item.image}
+            dateLabel={primaryTimeLabel(item)}
+            location={item.location}
+            description={item.description}
+            onOpen={() => setDetailEvent(item)}
+            actions={
+              <>
                 <button className="button ghost" type="button" onClick={() => setDetailEvent(item)}>
                   View Details
                 </button>
@@ -118,9 +119,9 @@ export default function GolfPage() {
                 >
                   {!item.registration_enabled ? getSignupUnavailableLabel(item) : isRegisteredEvent(item.id) ? getSignupSubmittedLabel(item) : getSignupActionLabel(item)}
                 </button>
-              </div>
-            </div>
-          </article>
+              </>
+            }
+          />
         ))}
       </div>
     );
