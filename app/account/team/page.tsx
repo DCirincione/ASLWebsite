@@ -104,36 +104,45 @@ export default function AccountTeamPage() {
       isCaptain: true,
       isCoCaptain: false,
     }));
-    const coCaptainManagedTeams: TeamMembershipEntry[] = acceptedMemberships
-      .filter((membership) => membership.role === "co_captain")
-      .map((membership) => {
-        const team = teamMap.get(membership.team_id) ?? null;
-        if (!team) return null;
-        return {
-          team,
-          membership,
-          isCaptain: false,
-          isCoCaptain: true,
-        };
-      })
-      .filter((entry): entry is TeamMembershipEntry => Boolean(entry))
-      .filter((entry) => !captainManagedTeams.some((captainEntry) => captainEntry.team.id === entry.team.id));
+    const coCaptainManagedTeams = acceptedMemberships.reduce<TeamMembershipEntry[]>((entries, membership) => {
+      if (membership.role !== "co_captain") {
+        return entries;
+      }
+
+      const team = teamMap.get(membership.team_id);
+      if (!team) {
+        return entries;
+      }
+
+      if (captainManagedTeams.some((captainEntry) => captainEntry.team.id === team.id)) {
+        return entries;
+      }
+
+      entries.push({
+        team,
+        membership,
+        isCaptain: false,
+        isCoCaptain: true,
+      });
+      return entries;
+    }, []);
 
     setManagedTeams([...captainManagedTeams, ...coCaptainManagedTeams]);
     setJoinedTeams(
-      acceptedMemberships
-        .map((membership) => teamMap.get(membership.team_id) ?? null)
-        .map((team, index) => {
-          const membership = acceptedMemberships[index];
-          if (!team || managedTeamIds.has(team.id)) return null;
-          return {
-            team,
-            membership,
-            isCaptain: false,
-            isCoCaptain: false,
-          };
-        })
-        .filter((entry): entry is TeamMembershipEntry => Boolean(entry)),
+      acceptedMemberships.reduce<TeamMembershipEntry[]>((entries, membership) => {
+        const team = teamMap.get(membership.team_id);
+        if (!team || managedTeamIds.has(team.id)) {
+          return entries;
+        }
+
+        entries.push({
+          team,
+          membership,
+          isCaptain: false,
+          isCoCaptain: false,
+        });
+        return entries;
+      }, []),
     );
     setPendingInvites(
       memberships
