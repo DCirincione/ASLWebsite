@@ -9,7 +9,7 @@ import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
-import type { SundayLeagueScheduleWeek, SundayLeagueTeam } from "@/lib/supabase/types";
+import type { SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
 type TeamRosterPlayer = {
   id: string;
@@ -18,6 +18,14 @@ type TeamRosterPlayer = {
   avatarUrl: string | null;
   countryCode: string | null;
   jerseyNumber: string | null;
+};
+
+type TeamMemberProfile = {
+  id: string;
+  name: string | null;
+  avatar_url: string | null;
+  country_code: string | null;
+  positions: string[] | null;
 };
 
 const buildTeamHistory = (team: SundayLeagueTeam | null) => {
@@ -90,28 +98,64 @@ export default function SundayLeaguePublicTeamPage() {
       const nextTeam = data as SundayLeagueTeam;
       setTeam(nextTeam);
 
-      if (!nextTeam.captain_is_playing) {
-        setRosterPlayers([]);
-        setStatus("ready");
-        return;
+      const { data: memberData } = await supabase
+        .from("sunday_league_team_members")
+        .select("*")
+        .eq("team_id", nextTeam.id)
+        .eq("status", "accepted")
+        .order("created_at", { ascending: true });
+
+      const members = (memberData ?? []) as SundayLeagueTeamMember[];
+      const profileIds = new Set<string>();
+      if (nextTeam.captain_is_playing) {
+        profileIds.add(nextTeam.user_id);
+      }
+      for (const member of members) {
+        if (member.player_user_id) {
+          profileIds.add(member.player_user_id);
+        }
       }
 
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id,name,avatar_url,country_code,positions")
-        .eq("id", nextTeam.user_id)
-        .maybeSingle();
+      const profileMap = new Map<string, TeamMemberProfile>();
+      if (profileIds.size > 0) {
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("id,name,avatar_url,country_code,positions")
+          .in("id", Array.from(profileIds));
 
-      setRosterPlayers([
-        {
+        for (const profile of (profileData ?? []) as TeamMemberProfile[]) {
+          profileMap.set(profile.id, profile);
+        }
+      }
+
+      const nextRosterPlayers: TeamRosterPlayer[] = [];
+      if (nextTeam.captain_is_playing) {
+        const captainProfile = profileMap.get(nextTeam.user_id);
+        nextRosterPlayers.push({
           id: nextTeam.user_id,
-          name: profileData?.name?.trim() || nextTeam.captain_name,
-          position: Array.isArray(profileData?.positions) ? profileData.positions[0] ?? null : null,
-          avatarUrl: profileData?.avatar_url ?? null,
-          countryCode: profileData?.country_code?.trim()?.toUpperCase() ?? null,
+          name: captainProfile?.name?.trim() || nextTeam.captain_name,
+          position: Array.isArray(captainProfile?.positions) ? captainProfile.positions[0] ?? null : null,
+          avatarUrl: captainProfile?.avatar_url ?? null,
+          countryCode: captainProfile?.country_code?.trim()?.toUpperCase() ?? null,
           jerseyNumber: nextTeam.jersey_numbers?.[0]?.trim() || null,
-        },
-      ]);
+        });
+      }
+
+      members
+        .filter((member) => member.player_user_id && member.player_user_id !== nextTeam.user_id)
+        .forEach((member, index) => {
+          const profile = profileMap.get(member.player_user_id as string);
+          nextRosterPlayers.push({
+            id: member.id,
+            name: profile?.name?.trim() || member.invite_name?.trim() || "Player",
+            position: Array.isArray(profile?.positions) ? profile.positions[0] ?? null : null,
+            avatarUrl: profile?.avatar_url ?? null,
+            countryCode: profile?.country_code?.trim()?.toUpperCase() ?? null,
+            jerseyNumber: nextTeam.jersey_numbers?.[index + (nextTeam.captain_is_playing ? 1 : 0)]?.trim() || null,
+          });
+        });
+
+      setRosterPlayers(nextRosterPlayers);
       setStatus("ready");
     };
 
@@ -230,34 +274,11 @@ export default function SundayLeaguePublicTeamPage() {
 
                 <section className="sunday-league-team-board__section">
                   <h3>Schedule</h3>
-                  {scheduleWeeks.length === 0 ? <p className="muted">No weekly schedule has been posted yet.</p> : null}
-                  {scheduleWeeks.length > 0 ? (
-                    <div className="sunday-league-schedule__weeks">
-                      <div className="sunday-league-schedule__grid sunday-league-schedule__grid--header">
-                        <div className="sunday-league-schedule__column">
-                          <h3>Black Sheep Field</h3>
-                        </div>
-                        <div className="sunday-league-schedule__column">
-                          <h3>Magic Fountain Field</h3>
-                        </div>
-                      </div>
-                      {scheduleWeeks.map((week) => (
-                        <article key={week.id} className="sunday-league-panel-box sunday-league-schedule__week">
-                          <div className="sunday-league-stack">
-                            <p className="eyebrow">Week {week.week_number}</p>
-                            <div className="sunday-league-schedule__grid">
-                              <div className="sunday-league-schedule__column">
-                                <p className="sunday-league-schedule__body">{week.black_sheep_field_schedule}</p>
-                              </div>
-                              <div className="sunday-league-schedule__column">
-                                <p className="sunday-league-schedule__body">{week.magic_fountain_field_schedule}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : null}
+                  {scheduleWeeks.length === 0 ? (
+                    <p className="muted">No weekly schedule has been posted yet.</p>
+                  ) : (
+                    <p className="muted">Weekly field assignments and match times are posted on the Sunday League schedule page.</p>
+                  )}
                 </section>
 
                 <section className="sunday-league-team-board__section">

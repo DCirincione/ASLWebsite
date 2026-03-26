@@ -322,6 +322,42 @@ export type SundayLeagueLeaderboardUpdate = {
   updated_at?: string | null;
 };
 
+export type SundayLeagueTeamMember = {
+  id: string;
+  team_id: string;
+  player_user_id?: string | null;
+  invite_email?: string | null;
+  invite_name?: string | null;
+  status: "pending" | "accepted" | "declined";
+  source: "player_request" | "captain_invite";
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueTeamMemberInsert = {
+  id?: string;
+  team_id: string;
+  player_user_id?: string | null;
+  invite_email?: string | null;
+  invite_name?: string | null;
+  status?: "pending" | "accepted" | "declined";
+  source: "player_request" | "captain_invite";
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueTeamMemberUpdate = {
+  id?: string;
+  team_id?: string;
+  player_user_id?: string | null;
+  invite_email?: string | null;
+  invite_name?: string | null;
+  status?: "pending" | "accepted" | "declined";
+  source?: "player_request" | "captain_invite";
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type SundayLeagueScheduleWeek = {
   id: string;
   week_number: number;
@@ -641,6 +677,12 @@ export type Database = {
         Row: SundayLeagueTeam;
         Insert: SundayLeagueTeamInsert;
         Update: SundayLeagueTeamUpdate;
+        Relationships: [];
+      };
+      sunday_league_team_members: {
+        Row: SundayLeagueTeamMember;
+        Insert: SundayLeagueTeamMemberInsert;
+        Update: SundayLeagueTeamMemberUpdate;
         Relationships: [];
       };
       sunday_league_leaderboard: {

@@ -1329,10 +1329,20 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   min-width: 0;
 }
 
+.sunday-league-team-card__actions {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+}
+
 .sunday-league-team-card__button {
   padding: 8px 12px;
   font-size: 0.92rem;
   border-radius: 10px;
+}
+
+.sunday-league-team-card__status {
+  text-align: center;
 }
 
 .sunday-league-team-card__logo img {
@@ -1764,6 +1774,45 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   gap: 18px;
 }
 
+.sunday-league-team-board__section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.sunday-league-team-board__section-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sunday-league-team-board__action-button {
+  position: relative;
+}
+
+.sunday-league-team-board__action-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #dc2626;
+  color: #ffffff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 8px 18px rgba(127, 29, 29, 0.28);
+  pointer-events: none;
+}
+
 .sunday-league-team-board__section h3 {
   margin: 0;
   font-size: clamp(2rem, 3vw, 3.2rem);
@@ -1900,6 +1949,184 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.sunday-league-team-board__request-row {
+  display: grid;
+  gap: 12px;
+}
+
+.sunday-league-team-board__request-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.sunday-league-team-board__request-copy strong,
+.sunday-league-team-board__request-copy span {
+  margin: 0;
+}
+
+.sunday-league-team-board__request-actions,
+.sunday-league-team-board__invite-form {
+  display: grid;
+  gap: 12px;
+}
+
+.sunday-league-team-board__request-actions {
+  grid-template-columns: repeat(auto-fit, minmax(140px, max-content));
+}
+
+.sunday-league-team-board__invite-form {
+  max-width: 560px;
+  padding: 18px;
+  border-radius: 22px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.sunday-league-team-board__invite-form .form-control {
+  gap: 8px;
+}
+
+.sunday-league-team-board__invite-form .form-control span {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(248, 250, 252, 0.82);
+}
+
+.sunday-league-team-board__invite-form input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 16px;
+  padding: 14px 16px;
+  font: inherit;
+  font-weight: 600;
+  color: #f8fafc;
+  background:
+    linear-gradient(180deg, rgba(9, 14, 24, 0.92), rgba(15, 23, 42, 0.86));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 8px 18px rgba(0, 0, 0, 0.16);
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    transform 0.16s ease,
+    background 0.16s ease;
+}
+
+.sunday-league-team-board__invite-form input::placeholder {
+  color: rgba(226, 232, 240, 0.46);
+}
+
+.sunday-league-team-board__invite-form input:focus {
+  outline: none;
+  border-color: rgba(216, 171, 7, 0.9);
+  background:
+    linear-gradient(180deg, rgba(12, 19, 31, 0.98), rgba(17, 24, 39, 0.92));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 4px rgba(216, 171, 7, 0.16),
+    0 12px 24px rgba(0, 0, 0, 0.22);
+  transform: translateY(-1px);
+}
+
+.sunday-league-team-board__invite-search {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.sunday-league-team-board__invite-results {
+  background: rgba(15, 23, 42, 0.98);
+  border-color: rgba(255, 255, 255, 0.14);
+  box-shadow: 0 18px 40px rgba(2, 6, 23, 0.4);
+}
+
+.sunday-league-team-board__invite-results .search-dropdown__item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.sunday-league-team-board__invite-results .search-dropdown__info .list__title,
+.sunday-league-team-board__invite-results .search-dropdown__info .muted {
+  color: #f8fafc;
+}
+
+.sunday-league-team-board__invite-results .search-dropdown__info .muted {
+  opacity: 0.72;
+}
+
+.sunday-league-invite-modal {
+  display: grid;
+  gap: 18px;
+  width: min(760px, calc(100vw - 48px));
+  height: auto;
+  max-height: min(78dvh, 760px);
+  margin: auto;
+  border-radius: 24px;
+  overflow: auto;
+  padding: 20px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.32);
+}
+
+.sunday-league-invite-modal__list {
+  align-items: start;
+}
+
+.sunday-league-invite-modal__item {
+  padding: 12px 14px;
+  gap: 10px;
+  align-items: center;
+}
+
+.sunday-league-invite-modal__item .team-card__logo {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+}
+
+.sunday-league-invite-modal__item .team-card__info .list__title {
+  margin-bottom: 2px;
+  font-size: 0.95rem;
+}
+
+.sunday-league-invite-modal__item .team-card__info .muted {
+  font-size: 0.88rem;
+  line-height: 1.25;
+}
+
+.sunday-league-invite-modal__actions {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  align-content: center;
+}
+
+.sunday-league-invite-modal__actions .button {
+  justify-self: center;
+}
+
+.sunday-league-invite-modal__button {
+  min-width: 96px;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.92rem;
+}
+
+.sunday-league-invite-modal__button--ghost {
+  min-width: 84px;
+  padding: 7px 12px;
+}
+
+.sunday-league-invite-modal__footer {
+  align-items: stretch;
+}
+
+.register-modal-backdrop:has(.sunday-league-invite-modal) {
+  place-items: center;
+  padding: 24px;
 }
 
 html[data-theme="dark"] .sunday-league-team-board {
@@ -2677,6 +2904,22 @@ html[data-theme="dark"] .account-tabs__button.is-active {
   justify-self: end;
 }
 
+@media (max-width: 720px) {
+  .team-card {
+    grid-template-columns: auto 1fr;
+  }
+
+  .team-card .button,
+  .team-card .sunday-league-team-card__actions {
+    grid-column: 1 / -1;
+    justify-self: stretch;
+  }
+
+  .team-card .sunday-league-team-card__actions .button {
+    width: 100%;
+  }
+}
+
 html[data-theme="dark"] .account-card,
 html[data-theme="dark"] .account-header {
   border-color: #1f2a40;
@@ -3262,6 +3505,22 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   gap: 12px;
   flex-wrap: wrap;
   margin-top: 12px;
+}
+
+.register-modal-backdrop:has(.register-modal.sunday-league-invite-modal) {
+  place-items: center;
+  padding: 24px;
+}
+
+.register-modal.sunday-league-invite-modal {
+  width: min(760px, calc(100vw - 48px));
+  height: auto;
+  max-height: min(78dvh, 760px);
+  margin: auto;
+  border-radius: 24px;
+  overflow: auto;
+  padding: 20px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.32);
 }
 
 .register-footer__left {

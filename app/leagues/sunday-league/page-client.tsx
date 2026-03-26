@@ -16,7 +16,7 @@ import {
 } from "@/lib/sunday-league";
 import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
-import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam } from "@/lib/supabase/types";
+import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
 type SundayLeagueSection = "overview" | "rules" | "teams" | "leaderboards" | "schedule" | "inquiries";
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -214,6 +214,8 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [myMemberships, setMyMemberships] = useState<SundayLeagueTeamMember[]>([]);
+  const [joinStates, setJoinStates] = useState<Record<string, Status>>({});
   const [status, setStatus] = useState<Status>({ type: "idle" });
   const [teamStatus, setTeamStatus] = useState<Status>({ type: "idle" });
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
@@ -298,6 +300,26 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
         captain_email: prev.captain_email || sessionUser?.email || "",
       }));
 
+      if (sessionUser?.id) {
+        const membershipResults = await Promise.all([
+          supabase.from("sunday_league_team_members").select("*").eq("player_user_id", sessionUser.id),
+          sessionUser.email
+            ? supabase.from("sunday_league_team_members").select("*").eq("invite_email", sessionUser.email.trim().toLowerCase())
+            : Promise.resolve({ data: [], error: null }),
+        ]);
+
+        const membershipMap = new Map<string, SundayLeagueTeamMember>();
+        for (const result of membershipResults) {
+          if (result.error || !result.data) continue;
+          for (const membership of result.data as SundayLeagueTeamMember[]) {
+            membershipMap.set(membership.id, membership);
+          }
+        }
+        setMyMemberships(Array.from(membershipMap.values()));
+      } else {
+        setMyMemberships([]);
+      }
+
       if (!teamsResponse.error) {
         setTeams((teamsResponse.data ?? []) as SundayLeagueTeam[]);
       }
@@ -321,6 +343,30 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
   const myTeam = useMemo(
     () => teams.find((team) => team.user_id === userId) ?? null,
     [teams, userId],
+  );
+
+  const membershipByTeamId = useMemo(() => {
+    const rank = { accepted: 3, pending: 2, declined: 1 } as const;
+    const map = new Map<string, SundayLeagueTeamMember>();
+
+    for (const membership of myMemberships) {
+      const existing = map.get(membership.team_id);
+      if (!existing || rank[membership.status] > rank[existing.status]) {
+        map.set(membership.team_id, membership);
+      }
+    }
+
+    return map;
+  }, [myMemberships]);
+
+  const acceptedMembership = useMemo(
+    () => myMemberships.find((membership) => membership.status === "accepted") ?? null,
+    [myMemberships],
+  );
+
+  const joinedTeam = useMemo(
+    () => teams.find((team) => team.id === acceptedMembership?.team_id) ?? null,
+    [acceptedMembership?.team_id, teams],
   );
 
   const divisionTeams = useMemo(
@@ -575,6 +621,81 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     router.push(`/leagues/sunday-league/deposit?teamId=${nextTeam.id}`);
   };
 
+  const handleRequestToJoin = async (team: SundayLeagueTeam) => {
+    if (!supabase) {
+      setJoinStates((prev) => ({
+        ...prev,
+        [team.id]: { type: "error", message: "Supabase is not configured." },
+      }));
+      return;
+    }
+
+    if (!userId) {
+      router.push("/account/team");
+      return;
+    }
+
+    if (myTeam) {
+      setJoinStates((prev) => ({
+        ...prev,
+        [team.id]: { type: "error", message: "Captains already manage their own team here." },
+      }));
+      return;
+    }
+
+    if (acceptedMembership && acceptedMembership.team_id !== team.id) {
+      setJoinStates((prev) => ({
+        ...prev,
+        [team.id]: { type: "error", message: "You already belong to another Sunday League team." },
+      }));
+      return;
+    }
+
+    setJoinStates((prev) => ({ ...prev, [team.id]: { type: "loading" } }));
+
+    const existingMembership = membershipByTeamId.get(team.id) ?? null;
+    const payload = {
+      team_id: team.id,
+      player_user_id: userId,
+      invite_email: null,
+      invite_name: null,
+      status: "pending" as const,
+      source: "player_request" as const,
+    };
+
+    const response = existingMembership
+      ? await supabase
+          .from("sunday_league_team_members")
+          .update(payload)
+          .eq("id", existingMembership.id)
+          .select("*")
+          .single()
+      : await supabase
+          .from("sunday_league_team_members")
+          .insert(payload)
+          .select("*")
+          .single();
+
+    if (response.error || !response.data) {
+      setJoinStates((prev) => ({
+        ...prev,
+        [team.id]: { type: "error", message: response.error?.message ?? "Could not send your join request." },
+      }));
+      return;
+    }
+
+    const nextMembership = response.data as SundayLeagueTeamMember;
+    setMyMemberships((prev) => {
+      const next = prev.filter((membership) => membership.id !== nextMembership.id);
+      next.push(nextMembership);
+      return next;
+    });
+    setJoinStates((prev) => ({
+      ...prev,
+      [team.id]: { type: "success", message: "Join request sent to the captain." },
+    }));
+  };
+
   const renderContent = () => {
     switch (activeSection) {
       case "overview":
@@ -645,9 +766,65 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                   <div className="sunday-league-stack">
                     <h3>{team.team_name}</h3>
                   </div>
-                  <Link className="button ghost sunday-league-team-card__button" href={`/leagues/sunday-league/teams/${team.id}`}>
-                    View Team
-                  </Link>
+                  <div className="sunday-league-team-card__actions">
+                    <Link className="button ghost sunday-league-team-card__button" href={`/leagues/sunday-league/teams/${team.id}`}>
+                      View Team
+                    </Link>
+                    {team.user_id === userId ? null : (() => {
+                      const membership = membershipByTeamId.get(team.id) ?? null;
+                      const joinState = joinStates[team.id];
+                      const hasOtherAcceptedTeam = Boolean(acceptedMembership && acceptedMembership.team_id !== team.id);
+                      const isInvitePending = membership?.status === "pending" && membership.source === "captain_invite";
+                      const isRequestPending = membership?.status === "pending" && membership.source === "player_request";
+
+                      let label = "Request to Join";
+                      let disabled = false;
+                      let onClick: () => void = () => void handleRequestToJoin(team);
+
+                      if (joinState?.type === "loading") {
+                        label = "Sending...";
+                        disabled = true;
+                      } else if (membership?.status === "accepted") {
+                        label = "On Team";
+                        disabled = true;
+                      } else if (isRequestPending) {
+                        label = "Request Sent";
+                        disabled = true;
+                      } else if (isInvitePending) {
+                        label = "View Invite";
+                        onClick = () => router.push("/account/team");
+                      } else if (hasOtherAcceptedTeam) {
+                        label = "Already on a Team";
+                        disabled = true;
+                      } else if (!userId) {
+                        onClick = () => router.push("/account/team");
+                      } else if (membership?.status === "declined") {
+                        label = "Request Again";
+                      }
+
+                      return (
+                        <>
+                          <button
+                            className="button primary sunday-league-team-card__button"
+                            type="button"
+                            onClick={onClick}
+                            disabled={disabled}
+                          >
+                            {label}
+                          </button>
+                          {joinState?.message ? (
+                            <p
+                              className={`form-help sunday-league-team-card__status${
+                                joinState.type === "error" ? " error" : joinState.type === "success" ? " success" : ""
+                              }`}
+                            >
+                              {joinState.message}
+                            </p>
+                          ) : null}
+                        </>
+                      );
+                    })()}
+                  </div>
                 </article>
               ))}
             </div>
@@ -797,6 +974,15 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                 <button className="button primary" type="button" onClick={() => router.push(`/leagues/sunday-league/team/${myTeam.id}`)}>
                   Your Sunday League Team
                 </button>
+              ) : joinedTeam ? (
+                <>
+                  <button className="button primary" type="button" onClick={() => router.push(`/leagues/sunday-league/teams/${joinedTeam.id}`)}>
+                    Your Team Page
+                  </button>
+                  <button className="button ghost" type="button" onClick={() => router.push("/account/team")}>
+                    Team Invites
+                  </button>
+                </>
               ) : (
                 <>
                   <button className="button primary" type="button" onClick={() => setActiveSection("teams")}>
@@ -807,7 +993,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                   </button>
                 </>
               )}
-              {!myTeam ? (
+              {!myTeam && !joinedTeam ? (
                 <button className="button ghost" type="button" onClick={() => setActiveSection("inquiries")}>
                   Free Agent
                 </button>
