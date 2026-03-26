@@ -36,7 +36,6 @@ export default function SundayLeagueDepositPageClient({ teamId }: SundayLeagueDe
         .from("sunday_league_teams")
         .select("*")
         .eq("id", teamId)
-        .eq("user_id", userId)
         .maybeSingle();
 
       if (error || !data) {
@@ -44,7 +43,24 @@ export default function SundayLeagueDepositPageClient({ teamId }: SundayLeagueDe
         return;
       }
 
-      setTeam(data as SundayLeagueTeam);
+      const nextTeam = data as SundayLeagueTeam;
+      if (nextTeam.user_id !== userId) {
+        const { data: roleData } = await supabase
+          .from("sunday_league_team_members")
+          .select("id")
+          .eq("team_id", nextTeam.id)
+          .eq("player_user_id", userId)
+          .eq("status", "accepted")
+          .eq("role", "co_captain")
+          .limit(1);
+
+        if ((roleData ?? []).length === 0) {
+          setStatus("error");
+          return;
+        }
+      }
+
+      setTeam(nextTeam);
       setStatus("ready");
     };
 
@@ -76,7 +92,7 @@ export default function SundayLeagueDepositPageClient({ teamId }: SundayLeagueDe
                 <h3>What happens next</h3>
                 <p>1. Collect the $100 deposit.</p>
                 <p>2. Confirm payment and any league requirements.</p>
-                <p>3. Send the captain into the roster portal.</p>
+                <p>3. Send the captain or co-captain into the roster portal.</p>
               </div>
             </div>
           ) : null}

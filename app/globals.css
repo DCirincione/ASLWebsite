@@ -1789,6 +1789,17 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   flex-wrap: wrap;
 }
 
+.sunday-league-team-board .button.ghost {
+  color: #f8fafc;
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.sunday-league-team-board .button.ghost:hover:not(:disabled) {
+  border-color: rgba(255, 255, 255, 0.24);
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .sunday-league-team-board__action-button {
   position: relative;
 }

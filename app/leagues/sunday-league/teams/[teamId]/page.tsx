@@ -9,7 +9,7 @@ import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
-import type { SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
+import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
 type TeamRosterPlayer = {
   id: string;
@@ -73,8 +73,10 @@ export default function SundayLeaguePublicTeamPage() {
   const params = useParams<{ teamId: string }>();
   const teamId = params.teamId;
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
+  const [coCaptainName, setCoCaptainName] = useState<string | null>(null);
   const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
   const [rosterPlayers, setRosterPlayers] = useState<TeamRosterPlayer[]>([]);
+  const [record, setRecord] = useState<Pick<SundayLeagueLeaderboard, "wins" | "draws" | "losses">>({ wins: 0, draws: 0, losses: 0 });
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
 
   useEffect(() => {
@@ -98,14 +100,27 @@ export default function SundayLeaguePublicTeamPage() {
       const nextTeam = data as SundayLeagueTeam;
       setTeam(nextTeam);
 
-      const { data: memberData } = await supabase
-        .from("sunday_league_team_members")
-        .select("*")
-        .eq("team_id", nextTeam.id)
-        .eq("status", "accepted")
-        .order("created_at", { ascending: true });
+      const [leaderboardResponse, memberResponse] = await Promise.all([
+        supabase
+          .from("sunday_league_leaderboard")
+          .select("wins,draws,losses")
+          .eq("team_id", nextTeam.id)
+          .maybeSingle(),
+        supabase
+          .from("sunday_league_team_members")
+          .select("*")
+          .eq("team_id", nextTeam.id)
+          .eq("status", "accepted")
+          .order("created_at", { ascending: true }),
+      ]);
 
-      const members = (memberData ?? []) as SundayLeagueTeamMember[];
+      setRecord({
+        wins: leaderboardResponse.data?.wins ?? 0,
+        draws: leaderboardResponse.data?.draws ?? 0,
+        losses: leaderboardResponse.data?.losses ?? 0,
+      });
+
+      const members = (memberResponse.data ?? []) as SundayLeagueTeamMember[];
       const profileIds = new Set<string>();
       if (nextTeam.captain_is_playing) {
         profileIds.add(nextTeam.user_id);
@@ -155,6 +170,9 @@ export default function SundayLeaguePublicTeamPage() {
           });
         });
 
+      const coCaptain = members.find((member) => member.role === "co_captain" && member.player_user_id);
+      const coCaptainProfile = coCaptain?.player_user_id ? profileMap.get(coCaptain.player_user_id) : null;
+      setCoCaptainName(coCaptainProfile?.name?.trim() || coCaptain?.invite_name?.trim() || null);
       setRosterPlayers(nextRosterPlayers);
       setStatus("ready");
     };
@@ -206,6 +224,7 @@ export default function SundayLeaguePublicTeamPage() {
                       <h2>{team.team_name}</h2>
                     </div>
                     <p className="sunday-league-team-board__captain">Captain: {team.captain_name}</p>
+                    {coCaptainName ? <p className="sunday-league-team-board__captain">Co-Captain: {coCaptainName}</p> : null}
                   </div>
                   <div className="sunday-league-team-board__logo">
                     <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="220px" />
@@ -214,11 +233,11 @@ export default function SundayLeaguePublicTeamPage() {
 
                 <p className="sunday-league-team-board__established">Established {establishedLabel}</p>
                 <div className="sunday-league-team-board__record">
-                  <span>0</span>
+                  <span>{record.wins}</span>
                   <span>-</span>
-                  <span>0</span>
+                  <span>{record.draws}</span>
                   <span>-</span>
-                  <span>0</span>
+                  <span>{record.losses}</span>
                 </div>
 
                 <section className="sunday-league-team-board__section">

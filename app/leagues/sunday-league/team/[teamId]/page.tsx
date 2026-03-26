@@ -11,7 +11,7 @@ import { TeamLogoImage } from "@/components/team-logo-image";
 import { createId } from "@/lib/create-id";
 import { getSundayLeagueColor, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
-import type { SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
+import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
 type AgreementKey =
   | "captain_confirmed"
@@ -136,9 +136,11 @@ export default function SundayLeagueTeamPortalPage() {
   const params = useParams<{ teamId: string }>();
   const teamId = params.teamId;
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
   const [rosterPlayers, setRosterPlayers] = useState<TeamRosterPlayer[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberRecord[]>([]);
+  const [record, setRecord] = useState<Pick<SundayLeagueLeaderboard, "wins" | "draws" | "losses">>({ wins: 0, draws: 0, losses: 0 });
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [isEditing, setIsEditing] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -148,6 +150,7 @@ export default function SundayLeagueTeamPortalPage() {
   const [inviteSuggestionsLoading, setInviteSuggestionsLoading] = useState(false);
   const [inviteState, setInviteState] = useState<{ type: "idle" | "loading" | "success" | "error"; message?: string }>({ type: "idle" });
   const [memberActionStates, setMemberActionStates] = useState<Record<string, { type: "idle" | "loading" | "success" | "error"; message?: string }>>({});
+  const [leadershipStates, setLeadershipStates] = useState<Record<string, { type: "idle" | "loading" | "success" | "error"; message?: string }>>({});
   const [form, setForm] = useState<TeamPortalFormState | null>(null);
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
 
@@ -239,12 +242,12 @@ export default function SundayLeagueTeamPortalPage() {
         setStatus("no-session");
         return;
       }
+      setCurrentUserId(userId);
 
       const { data, error } = await supabase
         .from("sunday_league_teams")
         .select("*")
         .eq("id", teamId)
-        .eq("user_id", userId)
         .maybeSingle();
 
       if (error || !data) {
@@ -253,8 +256,34 @@ export default function SundayLeagueTeamPortalPage() {
       }
 
       const nextTeam = data as SundayLeagueTeam;
+      if (nextTeam.user_id !== userId) {
+        const { data: roleData } = await supabase
+          .from("sunday_league_team_members")
+          .select("id")
+          .eq("team_id", nextTeam.id)
+          .eq("player_user_id", userId)
+          .eq("status", "accepted")
+          .eq("role", "co_captain")
+          .limit(1);
+
+        if ((roleData ?? []).length === 0) {
+          setStatus("error");
+          return;
+        }
+      }
+
       setTeam(nextTeam);
       setForm(createTeamPortalFormState(nextTeam));
+      const { data: leaderboardData } = await supabase
+        .from("sunday_league_leaderboard")
+        .select("wins,draws,losses")
+        .eq("team_id", nextTeam.id)
+        .maybeSingle();
+      setRecord({
+        wins: leaderboardData?.wins ?? 0,
+        draws: leaderboardData?.draws ?? 0,
+        losses: leaderboardData?.losses ?? 0,
+      });
       await loadTeamRoster(nextTeam);
       setStatus("ready");
     };
@@ -288,6 +317,18 @@ export default function SundayLeagueTeamPortalPage() {
   const pendingInvites = useMemo(
     () => teamMembers.filter((member) => member.status === "pending" && member.source === "captain_invite"),
     [teamMembers],
+  );
+  const acceptedLeadershipCandidates = useMemo(
+    () => teamMembers.filter((member) => member.status === "accepted" && Boolean(member.player_user_id) && member.player_user_id !== team?.user_id),
+    [team?.user_id, teamMembers],
+  );
+  const currentCoCaptain = useMemo(
+    () => acceptedLeadershipCandidates.find((member) => member.role === "co_captain") ?? null,
+    [acceptedLeadershipCandidates],
+  );
+  const viewerIsCaptain = useMemo(
+    () => Boolean(team && currentUserId && team.user_id === currentUserId),
+    [currentUserId, team],
   );
   const inviteablePlayerIds = useMemo(() => {
     const blockedIds = new Set<string>();
@@ -404,6 +445,44 @@ export default function SundayLeagueTeamPortalPage() {
         };
       }),
     );
+  };
+
+  const handleSetCoCaptain = async (member: TeamMemberRecord | null, actionKey = member?.id ?? "co-captain") => {
+    if (!supabase || !team || !viewerIsCaptain) return;
+    setLeadershipStates((prev) => ({ ...prev, [actionKey]: { type: "loading" } }));
+
+    const { error: clearError } = await supabase
+      .from("sunday_league_team_members")
+      .update({ role: "player" })
+      .eq("team_id", team.id)
+      .eq("status", "accepted")
+      .eq("role", "co_captain");
+
+    if (clearError) {
+      setLeadershipStates((prev) => ({ ...prev, [actionKey]: { type: "error", message: clearError.message } }));
+      return;
+    }
+
+    if (member) {
+      const { error: assignError } = await supabase
+        .from("sunday_league_team_members")
+        .update({ role: "co_captain" })
+        .eq("id", member.id);
+
+      if (assignError) {
+        setLeadershipStates((prev) => ({ ...prev, [actionKey]: { type: "error", message: assignError.message } }));
+        return;
+      }
+    }
+
+    await reloadTeamMembers(team);
+    setLeadershipStates((prev) => ({
+      ...prev,
+      [actionKey]: {
+        type: "success",
+        message: member ? `${member.displayName} is now the co-captain.` : "Co-captain removed.",
+      },
+    }));
   };
 
   const handleSave = async () => {
@@ -662,6 +741,7 @@ export default function SundayLeagueTeamPortalPage() {
                       <h2>{team.team_name}</h2>
                     </div>
                     <p className="sunday-league-team-board__captain">Captain: {team.captain_name}</p>
+                    {currentCoCaptain ? <p className="sunday-league-team-board__captain">Co-Captain: {currentCoCaptain.displayName}</p> : null}
                   </div>
                   <div className="sunday-league-team-board__logo">
                     <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="220px" />
@@ -670,17 +750,32 @@ export default function SundayLeagueTeamPortalPage() {
 
                 <p className="sunday-league-team-board__established">Established {establishedLabel}</p>
                 <div className="sunday-league-team-board__record">
-                  <span>0</span>
+                  <span>{record.wins}</span>
                   <span>-</span>
-                  <span>0</span>
+                  <span>{record.draws}</span>
                   <span>-</span>
-                  <span>0</span>
+                  <span>{record.losses}</span>
                 </div>
 
                 <section className="sunday-league-team-board__section">
                   <div className="sunday-league-team-board__section-header">
                     <h3>Roster</h3>
                     <div className="sunday-league-team-board__section-actions">
+                      <button
+                        className="button ghost"
+                        type="button"
+                        onClick={() => {
+                          if (isEditing) {
+                            setForm(createTeamPortalFormState(team));
+                            setIsEditing(false);
+                            setSaveState({ type: "idle" });
+                            return;
+                          }
+                          setIsEditing(true);
+                        }}
+                      >
+                        {isEditing ? "Close Edit" : "Edit Team"}
+                      </button>
                       <button className="button ghost" type="button" onClick={() => setShowInviteModal(true)}>
                         Invite Players
                       </button>
@@ -738,6 +833,53 @@ export default function SundayLeagueTeamPortalPage() {
                         ))}
                       </div>
                     )
+                  ) : null}
+                  {isEditing && acceptedLeadershipCandidates.length > 0 ? (
+                    <div className="sunday-league-stack">
+                      <div>
+                        <p className="eyebrow">Leadership</p>
+                        <p className="muted">
+                          {viewerIsCaptain
+                            ? "Promote an accepted roster player to co-captain."
+                            : "Only the current captain can update leadership roles."}
+                        </p>
+                      </div>
+                      <div className="sunday-league-team-board__list">
+                        {acceptedLeadershipCandidates.map((member) => (
+                          <div key={member.id} className="sunday-league-team-board__list-row sunday-league-team-board__request-row">
+                            <div className="sunday-league-team-board__request-copy">
+                              <strong>{member.displayName}</strong>
+                              <span>{member.role === "co_captain" ? "Co-Captain" : member.position ?? "Accepted player"}</span>
+                            </div>
+                            {viewerIsCaptain ? (
+                              <div className="sunday-league-team-board__request-actions">
+                                <button
+                                  className="button ghost"
+                                  type="button"
+                                  onClick={() => void handleSetCoCaptain(member.role === "co_captain" ? null : member, member.id)}
+                                  disabled={leadershipStates[member.id]?.type === "loading"}
+                                >
+                                  {member.role === "co_captain" ? "Remove Co-Captain" : "Set Co-Captain"}
+                                </button>
+                              </div>
+                            ) : null}
+                            {leadershipStates[member.id]?.message ? (
+                              <p
+                                className={`form-help ${
+                                  leadershipStates[member.id]?.type === "error"
+                                    ? "error"
+                                    : leadershipStates[member.id]?.type === "success"
+                                      ? "success"
+                                      : ""
+                                }`}
+                              >
+                                {leadershipStates[member.id]?.message}
+                              </p>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
                   ) : null}
                   {rosterPlayers.length > 0 ? (
                     <div className="sunday-league-team-board__roster">
@@ -808,36 +950,6 @@ export default function SundayLeagueTeamPortalPage() {
                   </div>
                 </section>
               </article>
-
-              <div className="sunday-league-inline-actions sunday-league-team-portal__actions">
-                {!isEditing ? (
-                  <button className="button primary" type="button" onClick={() => setIsEditing(true)}>
-                    Edit Team
-                  </button>
-                ) : (
-                  <>
-                    <button className="button primary" type="button" onClick={() => void handleSave()} disabled={saveState.type === "loading"}>
-                      {saveState.type === "loading" ? "Saving..." : "Save Changes"}
-                    </button>
-                    <button
-                      className="button ghost"
-                      type="button"
-                      onClick={() => {
-                        setForm(createTeamPortalFormState(team));
-                        setIsEditing(false);
-                        setSaveState({ type: "idle" });
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                )}
-              </div>
-              {saveState.message ? (
-                <p className={`form-help ${saveState.type === "error" ? "error" : saveState.type === "success" ? "success" : ""}`}>
-                  {saveState.message}
-                </p>
-              ) : null}
 
               {isEditing && form ? (
                 <article className="sunday-league-flow-summary__card">
@@ -931,6 +1043,27 @@ export default function SundayLeagueTeamPortalPage() {
                           </label>
                         ))}
                       </div>
+                    </div>
+                    {saveState.message ? (
+                      <p className={`form-help ${saveState.type === "error" ? "error" : saveState.type === "success" ? "success" : ""}`}>
+                        {saveState.message}
+                      </p>
+                    ) : null}
+                    <div className="sunday-league-inline-actions sunday-league-team-portal__actions">
+                      <button className="button primary" type="button" onClick={() => void handleSave()} disabled={saveState.type === "loading"}>
+                        {saveState.type === "loading" ? "Saving..." : "Save Changes"}
+                      </button>
+                      <button
+                        className="button ghost"
+                        type="button"
+                        onClick={() => {
+                          setForm(createTeamPortalFormState(team));
+                          setIsEditing(false);
+                          setSaveState({ type: "idle" });
+                        }}
+                      >
+                        Cancel
+                      </button>
                     </div>
                   </div>
                 </article>
@@ -1042,14 +1175,6 @@ export default function SundayLeagueTeamPortalPage() {
               </div>
             </div>
           ) : null}
-
-          <div className="sunday-league-inline-actions">
-            {team ? (
-              <Link className="button primary" href={`/leagues/sunday-league/deposit?teamId=${team.id}`}>
-                Deposit Page
-              </Link>
-            ) : null}
-          </div>
         </div>
       </section>
     </PageShell>

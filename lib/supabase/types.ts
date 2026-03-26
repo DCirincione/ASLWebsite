@@ -330,6 +330,7 @@ export type SundayLeagueTeamMember = {
   invite_name?: string | null;
   status: "pending" | "accepted" | "declined";
   source: "player_request" | "captain_invite";
+  role: "player" | "co_captain";
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -342,6 +343,7 @@ export type SundayLeagueTeamMemberInsert = {
   invite_name?: string | null;
   status?: "pending" | "accepted" | "declined";
   source: "player_request" | "captain_invite";
+  role?: "player" | "co_captain";
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -354,6 +356,7 @@ export type SundayLeagueTeamMemberUpdate = {
   invite_name?: string | null;
   status?: "pending" | "accepted" | "declined";
   source?: "player_request" | "captain_invite";
+  role?: "player" | "co_captain";
   created_at?: string | null;
   updated_at?: string | null;
 };

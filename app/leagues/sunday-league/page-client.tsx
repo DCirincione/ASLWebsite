@@ -341,8 +341,18 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
   }, []);
 
   const myTeam = useMemo(
-    () => teams.find((team) => team.user_id === userId) ?? null,
-    [teams, userId],
+    () =>
+      teams.find(
+        (team) =>
+          team.user_id === userId
+          || myMemberships.some(
+            (membership) =>
+              membership.team_id === team.id
+              && membership.status === "accepted"
+              && membership.role === "co_captain",
+          ),
+      ) ?? null,
+    [myMemberships, teams, userId],
   );
 
   const membershipByTeamId = useMemo(() => {
@@ -615,10 +625,10 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
 
     const nextTeam = data as SundayLeagueTeam;
     setTeams((prev) => [...prev, nextTeam].sort((a, b) => (a.division - b.division) || (a.slot_number - b.slot_number)));
-    setTeamStatus({ type: "success", message: "Team created. Continue to the deposit page." });
+    setTeamStatus({ type: "success", message: "Team created. Opening your team portal." });
     setTeamForm(createEmptyTeamForm());
     setTeamLogoFile(null);
-    router.push(`/leagues/sunday-league/deposit?teamId=${nextTeam.id}`);
+    router.push(`/leagues/sunday-league/team/${nextTeam.id}`);
   };
 
   const handleRequestToJoin = async (team: SundayLeagueTeam) => {
@@ -638,7 +648,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     if (myTeam) {
       setJoinStates((prev) => ({
         ...prev,
-        [team.id]: { type: "error", message: "Captains already manage their own team here." },
+        [team.id]: { type: "error", message: "Team managers already manage their own team here." },
       }));
       return;
     }
@@ -770,7 +780,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                     <Link className="button ghost sunday-league-team-card__button" href={`/leagues/sunday-league/teams/${team.id}`}>
                       View Team
                     </Link>
-                    {team.user_id === userId ? null : (() => {
+                    {myTeam?.id === team.id ? null : (() => {
                       const membership = membershipByTeamId.get(team.id) ?? null;
                       const joinState = joinStates[team.id];
                       const hasOtherAcceptedTeam = Boolean(acceptedMembership && acceptedMembership.team_id !== team.id);
@@ -1044,9 +1054,6 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                     <button className="button primary" type="button" onClick={() => router.push(`/leagues/sunday-league/team/${myTeam.id}`)}>
                       Your Sunday League Team
                     </button>
-                    <button className="button ghost" type="button" onClick={() => router.push(`/leagues/sunday-league/deposit?teamId=${myTeam.id}`)}>
-                      Deposit Page
-                    </button>
                   </div>
                 </div>
               ) : (
@@ -1168,7 +1175,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                       <p className={`form-help ${teamStatus.type === "error" ? "error" : "muted"}`}>{teamStatus.message}</p>
                     ) : null}
                     <button className="button primary" type="submit" disabled={teamStatus.type === "loading"}>
-                      {teamStatus.type === "loading" ? "Creating team..." : "Create Team & Continue to Deposit"}
+                      {teamStatus.type === "loading" ? "Creating team..." : "Create Team"}
                     </button>
                   </div>
                 </form>

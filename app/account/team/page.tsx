@@ -16,7 +16,7 @@ type ActionState = { type: "idle" | "loading" | "success" | "error"; message?: s
 export default function AccountTeamPage() {
   const [userId, setUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
-  const [captainTeams, setCaptainTeams] = useState<AccountSundayLeagueTeam[]>([]);
+  const [managedTeams, setManagedTeams] = useState<AccountSundayLeagueTeam[]>([]);
   const [joinedTeams, setJoinedTeams] = useState<AccountSundayLeagueTeam[]>([]);
   const [pendingInvites, setPendingInvites] = useState<TeamInvite[]>([]);
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
@@ -24,7 +24,7 @@ export default function AccountTeamPage() {
 
   const loadTeams = useCallback(async () => {
     if (!supabase) {
-      setCaptainTeams([]);
+      setManagedTeams([]);
       setJoinedTeams([]);
       setPendingInvites([]);
       setStatus("ready");
@@ -71,7 +71,14 @@ export default function AccountTeamPage() {
     }
 
     const memberships = Array.from(membershipMap.values());
-    const relatedTeamIds = Array.from(new Set(memberships.map((membership) => membership.team_id)));
+    const managedTeamIds = new Set(captainList.map((team) => team.id));
+    for (const membership of memberships) {
+      if (membership.status === "accepted" && membership.role === "co_captain") {
+        managedTeamIds.add(membership.team_id);
+      }
+    }
+
+    const relatedTeamIds = Array.from(new Set([...memberships.map((membership) => membership.team_id), ...managedTeamIds]));
     let teamMap = new Map<string, AccountSundayLeagueTeam>();
 
     if (relatedTeamIds.length > 0) {
@@ -83,12 +90,18 @@ export default function AccountTeamPage() {
       teamMap = new Map((teamData ?? []).map((team) => [team.id, team as AccountSundayLeagueTeam]));
     }
 
-    setCaptainTeams(captainList);
+    setManagedTeams([
+      ...captainList,
+      ...Array.from(managedTeamIds)
+        .filter((teamId) => !captainList.some((team) => team.id === teamId))
+        .map((teamId) => teamMap.get(teamId) ?? null)
+        .filter((team): team is AccountSundayLeagueTeam => Boolean(team)),
+    ]);
     setJoinedTeams(
       memberships
         .filter((membership) => membership.status === "accepted")
         .map((membership) => teamMap.get(membership.team_id) ?? null)
-        .filter((team): team is AccountSundayLeagueTeam => Boolean(team && team.user_id !== nextUserId)),
+        .filter((team): team is AccountSundayLeagueTeam => Boolean(team && !managedTeamIds.has(team.id))),
     );
     setPendingInvites(
       memberships
@@ -112,10 +125,10 @@ export default function AccountTeamPage() {
   const handleInviteResponse = async (invite: TeamInvite, nextStatus: "accepted" | "declined") => {
     if (!supabase || !userId || !userEmail) return;
 
-    if (nextStatus === "accepted" && captainTeams.length > 0) {
+    if (nextStatus === "accepted" && managedTeams.length > 0) {
       setInviteStates((prev) => ({
         ...prev,
-        [invite.id]: { type: "error", message: "Captains already manage their own Sunday League team." },
+        [invite.id]: { type: "error", message: "Team managers already manage their own Sunday League team." },
       }));
       return;
     }
@@ -167,7 +180,7 @@ export default function AccountTeamPage() {
     }));
   };
 
-  const hasAnyTeams = captainTeams.length > 0 || joinedTeams.length > 0 || pendingInvites.length > 0;
+  const hasAnyTeams = managedTeams.length > 0 || joinedTeams.length > 0 || pendingInvites.length > 0;
 
   return (
     <>
@@ -178,7 +191,7 @@ export default function AccountTeamPage() {
           <div>
             <p className="eyebrow">Account</p>
             <h1>Your Sunday League Team</h1>
-            <p className="muted">Manage your captain portal, pending invites, and teams you have joined.</p>
+            <p className="muted">Manage your team portal, pending invites, and teams you have joined.</p>
           </div>
           <Link className="button primary" href="/leagues/sunday-league">
             Sunday League Hub
@@ -243,14 +256,14 @@ export default function AccountTeamPage() {
             </div>
           ) : null}
 
-          {captainTeams.length > 0 ? (
+          {managedTeams.length > 0 ? (
             <div className="sunday-league-stack">
               <div>
-                <h2>Teams You Captain</h2>
-                <p className="muted">Open the portal to approve requests, invite players, and edit your team.</p>
+                <h2>Teams You Manage</h2>
+                <p className="muted">Open the portal to approve requests, invite players, manage captains, and edit your team.</p>
               </div>
               <ul className="list list--grid">
-                {captainTeams.map((team) => (
+                {managedTeams.map((team) => (
                   <li key={team.id} className="team-card">
                     <div className="team-card__logo">
                       <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="80px" />
