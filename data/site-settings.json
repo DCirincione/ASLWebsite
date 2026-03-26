@@ -1,0 +1,9 @@
+{
+  "homeBanner": {
+    "enabled": true,
+    "text": "Sign-ups for Community vs Kids Open Now!",
+    "buttonTarget": "event",
+    "buttonEventId": "aa7e234f-5190-4068-8fb7-c019c248a6bf",
+    "buttonPageHref": ""
+  }
+}

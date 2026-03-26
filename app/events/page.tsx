@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import { PageShell } from "@/components/page-shell";
 import { EventDetailModal } from "@/components/event-detail-modal";
@@ -35,6 +35,7 @@ type EventItem = {
 
 export default function EventsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -44,6 +45,10 @@ export default function EventsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [detailEvent, setDetailEvent] = useState<EventItem | null>(null);
   const { isRegisteredEvent, refreshRegisteredEvents } = useRegisteredEventIds();
+  const eventIdFromQuery = searchParams.get("eventId")?.trim() || "";
+  const directLinkedEvent = eventIdFromQuery ? events.find((event) => event.id === eventIdFromQuery) ?? null : null;
+  const activeDetailEvent =
+    detailEvent ?? (directLinkedEvent && !isRegularAslSundayLeagueEvent(directLinkedEvent) ? directLinkedEvent : null);
 
   useEffect(() => {
     const loadEvents = async () => {
@@ -124,7 +129,23 @@ export default function EventsPage() {
     }
   };
 
+  const clearDirectEventQuery = () => {
+    if (!eventIdFromQuery) return;
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.delete("eventId");
+    const nextQuery = nextParams.toString();
+    router.replace(nextQuery ? `/events?${nextQuery}` : "/events", { scroll: false });
+  };
+
   const ensureImage = (event: EventItem) => event.image_url || undefined;
+
+  const openEventDetails = (event: EventItem) => {
+    if (isRegularAslSundayLeagueEvent(event)) {
+      router.push(SUNDAY_LEAGUE_HREF);
+      return;
+    }
+    setDetailEvent(event);
+  };
 
   const sortByStartDate = (a: EventItem, b: EventItem) => {
     const aDate = parseDateUTC(a.start_date);
@@ -192,21 +213,11 @@ export default function EventsPage() {
           role="button"
           tabIndex={0}
           aria-label={`Open details for ${event.title}`}
-          onClick={() => {
-            if (isSundayLeague) {
-              router.push(SUNDAY_LEAGUE_HREF);
-              return;
-            }
-            setDetailEvent(event);
-          }}
+          onClick={() => openEventDetails(event)}
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") {
               e.preventDefault();
-              if (isSundayLeague) {
-                router.push(SUNDAY_LEAGUE_HREF);
-                return;
-              }
-              setDetailEvent(event);
+              openEventDetails(event);
             }
           }}
         >
@@ -258,7 +269,7 @@ export default function EventsPage() {
                 <button
                   className="button ghost"
                   type="button"
-                  onClick={() => setDetailEvent(event)}
+                  onClick={() => openEventDetails(event)}
                 >
                   View Details
                 </button>
@@ -296,6 +307,12 @@ export default function EventsPage() {
       </article>
     );
   };
+
+  useEffect(() => {
+    if (directLinkedEvent && isRegularAslSundayLeagueEvent(directLinkedEvent)) {
+      router.replace(SUNDAY_LEAGUE_HREF);
+    }
+  }, [directLinkedEvent, router]);
 
   return (
     <PageShell>
@@ -393,11 +410,14 @@ export default function EventsPage() {
         onSubmitted={refreshRegisteredEvents}
       />
       <EventDetailModal
-        open={Boolean(detailEvent)}
-        event={detailEvent}
-        dateLabel={detailEvent ? primaryDateLabel(detailEvent) : undefined}
-        isRegistered={isRegisteredEvent(detailEvent?.id)}
-        onClose={() => setDetailEvent(null)}
+        open={Boolean(activeDetailEvent)}
+        event={activeDetailEvent}
+        dateLabel={activeDetailEvent ? primaryDateLabel(activeDetailEvent) : undefined}
+        isRegistered={isRegisteredEvent(activeDetailEvent?.id)}
+        onClose={() => {
+          setDetailEvent(null);
+          clearDirectEventQuery();
+        }}
         onRegister={(event) => {
           if (!event.registration_enabled) {
             setMessage(getSignupUnavailableMessage(event));
@@ -411,6 +431,7 @@ export default function EventsPage() {
             return;
           }
           setDetailEvent(null);
+          clearDirectEventQuery();
           setModalEventId(event.id);
           setModalTitle(event.title);
           setModalOpen(true);

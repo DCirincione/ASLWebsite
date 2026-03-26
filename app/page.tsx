@@ -1,16 +1,27 @@
 import Image from "next/image";
 import Link from "next/link";
+import { unstable_noStore as noStore } from "next/cache";
 import { CSSProperties } from "react";
 
 import { HomeUpcomingEvents } from "@/components/home-upcoming-events";
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
-export default function Home() {
+import { resolveHomeBannerButtonHref } from "@/lib/home-banner";
+import { readSiteSettings } from "@/lib/site-settings";
+
+export default async function Home() {
+  noStore();
+
+  const siteSettings = await readSiteSettings();
+  const homeBannerText = siteSettings.homeBanner.text.trim();
+  const homeBannerButtonHref = resolveHomeBannerButtonHref(siteSettings.homeBanner);
+  const showHomeBanner = siteSettings.homeBanner.enabled && Boolean(homeBannerText);
+
   return (
     <PageShell>
       <Section
         id="home"
-        className="hero hero--image hero--full"
+        className={`hero hero--image hero--full${showHomeBanner ? " hero--with-banner" : ""}`}
         title="Community Sports. Real Competition. Local Impact."
         description=""
         headingLevel="h1"
@@ -21,6 +32,22 @@ export default function Home() {
           } as CSSProperties
         }
       >
+        {showHomeBanner ? (
+          <div className="home-banner home-banner--overlay" aria-label="Home page announcement">
+            <div className="home-banner__inner">
+              <span className="home-banner__label">Announcement</span>
+              <p className="home-banner__message">{homeBannerText}</p>
+              {homeBannerButtonHref ? (
+                <Link
+                  className="button ghost home-banner__button"
+                  href={homeBannerButtonHref}
+                >
+                  Take Me There
+                </Link>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         <div className="hero__panel">
           <div className="hero__content">
             <h1 className="hero__title">

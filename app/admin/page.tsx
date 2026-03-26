@@ -9,6 +9,7 @@ import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { parseAldrichCommunicationsPreferenceFromMessage } from "@/lib/aldrich-communications";
 import { createId } from "@/lib/create-id";
 import type { SignupMode } from "@/lib/event-signups";
+import { DEFAULT_HOME_BANNER_TEXT, HOME_BANNER_PAGE_OPTIONS, type HomeBannerButtonTarget } from "@/lib/home-banner";
 import { parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Flyer, JsonValue, Sport, SundayLeagueScheduleWeek } from "@/lib/supabase/types";
@@ -285,6 +286,7 @@ export default function AdminPage() {
   const [communityStatus, setCommunityStatus] = useState<FormStatus>({ type: "idle" });
   const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
   const [communitySponsorsStatus, setCommunitySponsorsStatus] = useState<FormStatus>({ type: "idle" });
+  const [siteSettingsStatus, setSiteSettingsStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [sportsError, setSportsError] = useState<string | null>(null);
   const [flyers, setFlyers] = useState<Flyer[]>([]);
@@ -310,6 +312,7 @@ export default function AdminPage() {
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [communitySponsors, setCommunitySponsors] = useState<CommunitySponsor[]>([]);
   const [loadingCommunitySponsors, setLoadingCommunitySponsors] = useState(false);
+  const [loadingSiteSettings, setLoadingSiteSettings] = useState(false);
   const [expandedCommunitySponsorCards, setExpandedCommunitySponsorCards] = useState<Record<string, boolean>>({});
   const [registrations, setRegistrations] = useState<RegistrationRecord[]>([]);
   const [loadingRegistrations, setLoadingRegistrations] = useState(false);
@@ -375,6 +378,13 @@ export default function AdminPage() {
   const [communityContentForm, setCommunityContentForm] = useState({
     boardTitle: "",
     body: "",
+  });
+  const [siteSettingsForm, setSiteSettingsForm] = useState({
+    homeBannerEnabled: true,
+    homeBannerText: DEFAULT_HOME_BANNER_TEXT,
+    homeBannerButtonTarget: "none" as HomeBannerButtonTarget,
+    homeBannerButtonEventId: "",
+    homeBannerButtonPageHref: "",
   });
   const [form, setForm] = useState<EventFormState>({
     title: "",
@@ -470,7 +480,7 @@ export default function AdminPage() {
       id: "settings",
       title: "Settings",
       description: "Global admin and site settings.",
-      enabled: false,
+      enabled: true,
     },
   ];
 
@@ -619,6 +629,52 @@ export default function AdminPage() {
       setCommunitySponsors([]);
     } finally {
       setLoadingCommunitySponsors(false);
+    }
+  };
+
+  const loadSiteSettings = async () => {
+    setLoadingSiteSettings(true);
+    setSiteSettingsStatus({ type: "idle" });
+    try {
+      const response = await fetch("/api/admin/site-settings");
+      const json = await response.json();
+      if (!response.ok) {
+        setSiteSettingsStatus({ type: "error", message: json?.error ?? "Could not load site settings." });
+        return;
+      }
+
+      const settings = (json?.settings ?? {}) as {
+        homeBanner?: {
+          enabled?: boolean;
+          text?: string;
+          buttonTarget?: HomeBannerButtonTarget;
+          buttonEventId?: string;
+          buttonPageHref?: string;
+        };
+      };
+
+      setSiteSettingsForm({
+        homeBannerEnabled: Boolean(settings.homeBanner?.enabled),
+        homeBannerText:
+          typeof settings.homeBanner?.text === "string"
+            ? settings.homeBanner.text
+            : DEFAULT_HOME_BANNER_TEXT,
+        homeBannerButtonTarget: settings.homeBanner?.buttonTarget === "event" || settings.homeBanner?.buttonTarget === "page"
+          ? settings.homeBanner.buttonTarget
+          : "none",
+        homeBannerButtonEventId:
+          typeof settings.homeBanner?.buttonEventId === "string"
+            ? settings.homeBanner.buttonEventId
+            : "",
+        homeBannerButtonPageHref:
+          typeof settings.homeBanner?.buttonPageHref === "string"
+            ? settings.homeBanner.buttonPageHref
+            : "",
+      });
+    } catch {
+      setSiteSettingsStatus({ type: "error", message: "Could not load site settings." });
+    } finally {
+      setLoadingSiteSettings(false);
     }
   };
 
@@ -1840,6 +1896,10 @@ export default function AdminPage() {
     if (module === "users") {
       void loadUsers();
     }
+    if (module === "settings") {
+      void loadEvents();
+      void loadSiteSettings();
+    }
   };
 
   const openManageUser = (user: UserDirectoryRecord) => {
@@ -1989,6 +2049,10 @@ export default function AdminPage() {
 
   const updateCommunityContent = (key: keyof typeof communityContentForm, value: string) => {
     setCommunityContentForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateSiteSettings = <K extends keyof typeof siteSettingsForm>(key: K, value: (typeof siteSettingsForm)[K]) => {
+    setSiteSettingsForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const openCommunityContentForm = () => {
@@ -2514,6 +2578,90 @@ export default function AdminPage() {
       setShowCommunityContentForm(false);
     } catch {
       setCommunityContentStatus({ type: "error", message: "Could not update intro block." });
+    }
+  };
+
+  const handleSaveSiteSettings = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setSiteSettingsStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    const homeBannerText = siteSettingsForm.homeBannerText.trim();
+    const homeBannerButtonEventId = siteSettingsForm.homeBannerButtonEventId.trim();
+    const homeBannerButtonPageHref = siteSettingsForm.homeBannerButtonPageHref.trim();
+    if (siteSettingsForm.homeBannerEnabled && !homeBannerText) {
+      setSiteSettingsStatus({ type: "error", message: "Banner text is required when the banner is enabled." });
+      return;
+    }
+    if (siteSettingsForm.homeBannerButtonTarget === "event" && !homeBannerButtonEventId) {
+      setSiteSettingsStatus({ type: "error", message: "Choose an event for the banner button." });
+      return;
+    }
+    if (siteSettingsForm.homeBannerButtonTarget === "page" && !homeBannerButtonPageHref) {
+      setSiteSettingsStatus({ type: "error", message: "Choose a page for the banner button." });
+      return;
+    }
+
+    setSiteSettingsStatus({ type: "loading" });
+    try {
+      const response = await fetch("/api/admin/site-settings", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          homeBanner: {
+            enabled: siteSettingsForm.homeBannerEnabled,
+            text: homeBannerText,
+            buttonTarget: siteSettingsForm.homeBannerButtonTarget,
+            buttonEventId: homeBannerButtonEventId,
+            buttonPageHref: homeBannerButtonPageHref,
+          },
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setSiteSettingsStatus({ type: "error", message: json?.error ?? "Could not update site settings." });
+        return;
+      }
+
+      const settings = (json?.settings ?? {}) as {
+        homeBanner?: {
+          enabled?: boolean;
+          text?: string;
+          buttonTarget?: HomeBannerButtonTarget;
+          buttonEventId?: string;
+          buttonPageHref?: string;
+        };
+      };
+
+      setSiteSettingsForm({
+        homeBannerEnabled: Boolean(settings.homeBanner?.enabled),
+        homeBannerText:
+          typeof settings.homeBanner?.text === "string"
+            ? settings.homeBanner.text
+            : homeBannerText,
+        homeBannerButtonTarget: settings.homeBanner?.buttonTarget === "event" || settings.homeBanner?.buttonTarget === "page"
+          ? settings.homeBanner.buttonTarget
+          : "none",
+        homeBannerButtonEventId:
+          typeof settings.homeBanner?.buttonEventId === "string"
+            ? settings.homeBanner.buttonEventId
+            : homeBannerButtonEventId,
+        homeBannerButtonPageHref:
+          typeof settings.homeBanner?.buttonPageHref === "string"
+            ? settings.homeBanner.buttonPageHref
+            : homeBannerButtonPageHref,
+      });
+      setSiteSettingsStatus({ type: "success", message: "Home page banner settings updated." });
+    } catch {
+      setSiteSettingsStatus({ type: "error", message: "Could not update site settings." });
     }
   };
 
@@ -3975,6 +4123,134 @@ export default function AdminPage() {
                         </article>
                       ))}
                     </div>
+                  ) : null}
+                </section>
+              </>
+            ) : null}
+            {activeModule === "settings" ? (
+              <>
+                <section className="account-card">
+                  <h2>Settings</h2>
+                  <p className="muted">Control the site-wide announcement banner shown at the top of the home page.</p>
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Home Page Banner</h2>
+                      <p className="muted">Show or hide the banner and update the message without editing code.</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => void loadSiteSettings()} disabled={loadingSiteSettings}>
+                      {loadingSiteSettings ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  <form className="register-form" onSubmit={handleSaveSiteSettings}>
+                    <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={siteSettingsForm.homeBannerEnabled}
+                          onChange={(e) => updateSiteSettings("homeBannerEnabled", e.target.checked)}
+                        />
+                        <span>Show banner on the home page</span>
+                      </label>
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="settings-home-banner-text">Banner Text</label>
+                      <textarea
+                        id="settings-home-banner-text"
+                        value={siteSettingsForm.homeBannerText}
+                        onChange={(e) => updateSiteSettings("homeBannerText", e.target.value)}
+                        rows={3}
+                        placeholder={DEFAULT_HOME_BANNER_TEXT}
+                        required={siteSettingsForm.homeBannerEnabled}
+                      />
+                      <p className="form-help muted">
+                        When enabled, this message appears above the hero section on the home page.
+                      </p>
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="settings-home-banner-button-target">Button Destination</label>
+                      <select
+                        id="settings-home-banner-button-target"
+                        value={siteSettingsForm.homeBannerButtonTarget}
+                        onChange={(e) =>
+                          setSiteSettingsForm((prev) => ({
+                            ...prev,
+                            homeBannerButtonTarget: e.target.value as HomeBannerButtonTarget,
+                            homeBannerButtonEventId: e.target.value === "event" ? prev.homeBannerButtonEventId : "",
+                            homeBannerButtonPageHref: e.target.value === "page" ? prev.homeBannerButtonPageHref : "",
+                          }))
+                        }
+                      >
+                        <option value="none">No button</option>
+                        <option value="event">Specific event</option>
+                        <option value="page">Specific page</option>
+                      </select>
+                      <p className="form-help muted">
+                        The banner button always says Take Me There.
+                      </p>
+                    </div>
+                    {siteSettingsForm.homeBannerButtonTarget === "event" ? (
+                      <div className="form-control">
+                        <label htmlFor="settings-home-banner-button-event">Choose Event</label>
+                        <select
+                          id="settings-home-banner-button-event"
+                          value={siteSettingsForm.homeBannerButtonEventId}
+                          onChange={(e) => updateSiteSettings("homeBannerButtonEventId", e.target.value)}
+                          disabled={loadingEvents}
+                        >
+                          <option value="">{loadingEvents ? "Loading events..." : "Select an event"}</option>
+                          {events.map((event) => (
+                            <option key={event.id} value={event.id}>
+                              {event.title} • {dateLabel(event.start_date, event.end_date)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+                    {siteSettingsForm.homeBannerButtonTarget === "page" ? (
+                      <div className="form-control">
+                        <label htmlFor="settings-home-banner-button-page">Choose Page</label>
+                        <select
+                          id="settings-home-banner-button-page"
+                          value={siteSettingsForm.homeBannerButtonPageHref}
+                          onChange={(e) => updateSiteSettings("homeBannerButtonPageHref", e.target.value)}
+                        >
+                          <option value="">Select a page</option>
+                          {HOME_BANNER_PAGE_OPTIONS.map((option) => (
+                            <option key={option.href} value={option.href}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+                    <div className="admin-home-banner-preview">
+                      <p className="admin-home-banner-preview__heading">
+                        Preview
+                        <span>{siteSettingsForm.homeBannerEnabled ? "Visible" : "Hidden"}</span>
+                      </p>
+                      <div className={`admin-home-banner-preview__bar${siteSettingsForm.homeBannerEnabled ? "" : " is-muted"}`}>
+                        <span className="admin-home-banner-preview__label">Announcement</span>
+                        <p className="admin-home-banner-preview__text">
+                          {siteSettingsForm.homeBannerText.trim() || "Banner text will appear here."}
+                        </p>
+                        {(siteSettingsForm.homeBannerButtonTarget === "event" && siteSettingsForm.homeBannerButtonEventId) ||
+                        (siteSettingsForm.homeBannerButtonTarget === "page" && siteSettingsForm.homeBannerButtonPageHref) ? (
+                          <span className="admin-home-banner-preview__button">Take Me There</span>
+                        ) : null}
+                      </div>
+                    </div>
+                    <div className="cta-row">
+                      <button className="button primary" type="submit" disabled={siteSettingsStatus.type === "loading"}>
+                        {siteSettingsStatus.type === "loading" ? "Saving..." : "Save Settings"}
+                      </button>
+                    </div>
+                  </form>
+                  {siteSettingsStatus.message ? (
+                    <p className={`form-help ${siteSettingsStatus.type === "error" ? "error" : "muted"}`}>
+                      {siteSettingsStatus.message}
+                    </p>
                   ) : null}
                 </section>
               </>

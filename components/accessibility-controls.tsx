@@ -7,13 +7,14 @@ const FONT_MIN = 0.9;
 const FONT_MAX = 1.5;
 const FONT_STEP = 0.1;
 const STORAGE_KEY = "asl-accessibility-settings";
+const DEFAULT_THEME = "dark" as const;
 
 export function AccessibilityControls() {
   const getSavedSettings = () => {
     if (typeof window === "undefined") {
       return {
         fontScale: 1,
-        theme: "light" as const,
+        theme: DEFAULT_THEME,
         highlightLinks: "off" as Toggle,
       };
     }
@@ -21,7 +22,7 @@ export function AccessibilityControls() {
     if (!saved) {
       return {
         fontScale: 1,
-        theme: "light" as const,
+        theme: DEFAULT_THEME,
         highlightLinks: "off" as Toggle,
       };
     }
@@ -33,13 +34,13 @@ export function AccessibilityControls() {
       };
       return {
         fontScale: parsed.fontScale ?? 1,
-        theme: parsed.theme ?? ("light" as const),
+        theme: parsed.theme ?? DEFAULT_THEME,
         highlightLinks: parsed.highlightLinks ?? ("off" as Toggle),
       };
     } catch {
       return {
         fontScale: 1,
-        theme: "light" as const,
+        theme: DEFAULT_THEME,
         highlightLinks: "off" as Toggle,
       };
     }
@@ -58,7 +59,7 @@ export function AccessibilityControls() {
 
   const resetAll = () => {
     setFontScale(1);
-    setTheme("light");
+    setTheme(DEFAULT_THEME);
     setHighlightLinks("off");
     setOpen(false);
   };
