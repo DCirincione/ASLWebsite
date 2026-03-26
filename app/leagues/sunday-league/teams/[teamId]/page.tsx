@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { HistoryBackButton } from "@/components/history-back-button";
@@ -72,6 +72,7 @@ const countryCodeToFlag = (value?: string | null) => {
 
 export default function SundayLeaguePublicTeamPage() {
   const params = useParams<{ teamId: string }>();
+  const router = useRouter();
   const teamId = params.teamId;
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
@@ -241,26 +242,39 @@ export default function SundayLeaguePublicTeamPage() {
 
     setLeaveState({ type: "loading" });
 
-    const { error } = await supabase
-      .from("sunday_league_team_members")
-      .delete()
-      .eq("id", viewerMembership.id)
-      .eq("player_user_id", currentUserId);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? null;
+    if (!accessToken) {
+      setLeaveState({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
 
-    if (error) {
-      setLeaveState({ type: "error", message: error.message });
+    const response = await fetch("/api/sunday-league/leave-team", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ teamId: team.id }),
+    });
+    const json = await response.json();
+
+    if (!response.ok) {
+      setLeaveState({ type: "error", message: json?.error ?? "Could not leave the team." });
       return;
     }
 
     setViewerMembership(null);
-    setRosterPlayers((prev) => prev.filter((player) => player.id !== viewerMembership.id));
-    if (viewerMembership.role === "co_captain") {
+    setRosterPlayers((prev) => prev.filter((player) => !json?.deletedMembershipIds?.includes(player.id)));
+    if (json?.removedCoCaptain) {
       setCoCaptainName(null);
     }
     setLeaveState({
       type: "success",
-      message: viewerMembership.role === "co_captain" ? "You left the team and no longer have co-captain access." : "You left the team.",
+      message: json?.removedCoCaptain ? "You left the team and no longer have co-captain access." : "You left the team.",
     });
+    router.replace("/leagues/sunday-league");
+    router.refresh();
   };
 
   return (

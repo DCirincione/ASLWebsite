@@ -1,7 +1,7 @@
 "use client";
 import Image from "next/image";
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 import { PageShell } from "@/components/page-shell";
 import { EventDetailModal } from "@/components/event-detail-modal";
@@ -35,7 +35,6 @@ type EventItem = {
 
 export default function EventsPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
@@ -44,8 +43,8 @@ export default function EventsPage() {
   const [modalTitle, setModalTitle] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailEvent, setDetailEvent] = useState<EventItem | null>(null);
+  const [eventIdFromQuery, setEventIdFromQuery] = useState("");
   const { isRegisteredEvent, refreshRegisteredEvents } = useRegisteredEventIds();
-  const eventIdFromQuery = searchParams.get("eventId")?.trim() || "";
   const directLinkedEvent = eventIdFromQuery ? events.find((event) => event.id === eventIdFromQuery) ?? null : null;
   const activeDetailEvent =
     detailEvent ?? (directLinkedEvent && !isRegularAslSundayLeagueEvent(directLinkedEvent) ? directLinkedEvent : null);
@@ -82,6 +81,19 @@ export default function EventsPage() {
 
     return () => {
       subscription?.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    const syncEventIdFromUrl = () => {
+      const nextParams = new URLSearchParams(window.location.search);
+      setEventIdFromQuery(nextParams.get("eventId")?.trim() || "");
+    };
+
+    syncEventIdFromUrl();
+    window.addEventListener("popstate", syncEventIdFromUrl);
+    return () => {
+      window.removeEventListener("popstate", syncEventIdFromUrl);
     };
   }, []);
 
@@ -131,9 +143,10 @@ export default function EventsPage() {
 
   const clearDirectEventQuery = () => {
     if (!eventIdFromQuery) return;
-    const nextParams = new URLSearchParams(searchParams.toString());
+    const nextParams = new URLSearchParams(window.location.search);
     nextParams.delete("eventId");
     const nextQuery = nextParams.toString();
+    setEventIdFromQuery("");
     router.replace(nextQuery ? `/events?${nextQuery}` : "/events", { scroll: false });
   };
 
