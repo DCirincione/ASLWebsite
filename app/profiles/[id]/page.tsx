@@ -8,6 +8,7 @@ import { useParams } from "next/navigation";
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { TeamLogoImage } from "@/components/team-logo-image";
+import { getCountryNameFromCode } from "@/lib/countries";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Profile, SundayLeagueTeam } from "@/lib/supabase/types";
@@ -37,6 +38,7 @@ const fallbackProfile: ProfileWithAvatar = {
   avatar_url: null,
   height_cm: null,
   weight_lbs: null,
+  country_code: null,
 };
 
 const parseDateUTC = (value?: string | null) => {
@@ -95,7 +97,7 @@ export default function PublicProfilePage() {
       }
       const { data, error } = await supabase
         .from("profiles")
-        .select("id,name,about,age,positions,skill_level,sports,avatar_url")
+        .select("id,name,about,age,positions,skill_level,sports,avatar_url,country_code")
         .eq("id", profileId)
         .maybeSingle();
 
@@ -258,6 +260,10 @@ export default function PublicProfilePage() {
               <div className="stat">
                 <p className="stat__label">Age</p>
                 <p className="stat__value">{calculateAgeFromDateString(data.age) ?? "—"}</p>
+              </div>
+              <div className="stat">
+                <p className="stat__label">Country</p>
+                <p className="stat__value">{getCountryNameFromCode(data.country_code) ?? "—"}</p>
               </div>
               <div className="stat">
                 <p className="stat__label">Skill (1-10)</p>

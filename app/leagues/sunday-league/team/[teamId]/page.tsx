@@ -14,6 +14,7 @@ import {
   getAldrichCommunicationsPreferenceFromJson,
   syncAldrichCommunicationsPreference,
 } from "@/lib/aldrich-communications";
+import { countryCodeToFlag, getCountryNameFromCode } from "@/lib/countries";
 import { createId } from "@/lib/create-id";
 import { getSundayLeagueColor, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
@@ -117,31 +118,6 @@ const getEstablishedLabel = (team: SundayLeagueTeam | null) => {
   return /^\d{4}$/.test(year) ? year : "2026";
 };
 
-const normalizeCountryCode = (value?: string | null) => {
-  const normalized = (value ?? "").trim().toUpperCase();
-  if (!normalized) return null;
-  if (/^[A-Z]{2}$/.test(normalized)) return normalized;
-
-  const callingCodeMap: Record<string, string> = {
-    "+1": "US",
-    "1": "US",
-    "+44": "GB",
-    "44": "GB",
-    "+52": "MX",
-    "52": "MX",
-    "+61": "AU",
-    "61": "AU",
-  };
-
-  return callingCodeMap[normalized] ?? null;
-};
-
-const countryCodeToFlag = (value?: string | null) => {
-  const normalized = normalizeCountryCode(value);
-  if (!normalized) return null;
-  return String.fromCodePoint(...Array.from(normalized).map((char) => 127397 + char.charCodeAt(0)));
-};
-
 export default function SundayLeagueTeamPortalPage() {
   const params = useParams<{ teamId: string }>();
   const router = useRouter();
@@ -163,6 +139,7 @@ export default function SundayLeagueTeamPortalPage() {
   const [inviteState, setInviteState] = useState<{ type: "idle" | "loading" | "success" | "error"; message?: string }>({ type: "idle" });
   const [memberActionStates, setMemberActionStates] = useState<Record<string, { type: "idle" | "loading" | "success" | "error"; message?: string }>>({});
   const [leadershipStates, setLeadershipStates] = useState<Record<string, { type: "idle" | "loading" | "success" | "error"; message?: string }>>({});
+  const [kickStates, setKickStates] = useState<Record<string, ActionState>>({});
   const [leaveState, setLeaveState] = useState<ActionState>({ type: "idle" });
   const [form, setForm] = useState<TeamPortalFormState | null>(null);
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
@@ -349,6 +326,14 @@ export default function SundayLeagueTeamPortalPage() {
     () => Boolean(team && currentUserId && team.user_id === currentUserId),
     [currentUserId, team],
   );
+  const viewerIsCoCaptain = useMemo(
+    () => Boolean(viewerMembership?.role === "co_captain"),
+    [viewerMembership],
+  );
+  const viewerCanKickPlayers = useMemo(
+    () => viewerIsCaptain || viewerIsCoCaptain,
+    [viewerIsCaptain, viewerIsCoCaptain],
+  );
   const canLeaveTeam = useMemo(
     () => Boolean(team && currentUserId && viewerMembership && !viewerIsCaptain),
     [currentUserId, team, viewerIsCaptain, viewerMembership],
@@ -474,6 +459,7 @@ export default function SundayLeagueTeamPortalPage() {
 
   const handleSetCoCaptain = async (member: TeamMemberRecord | null, actionKey = member?.id ?? "co-captain") => {
     if (!supabase || !team || !viewerIsCaptain) return;
+    setKickStates((prev) => ({ ...prev, [actionKey]: { type: "idle" } }));
     setLeadershipStates((prev) => ({ ...prev, [actionKey]: { type: "loading" } }));
 
     const { error: clearError } = await supabase
@@ -506,6 +492,69 @@ export default function SundayLeagueTeamPortalPage() {
       [actionKey]: {
         type: "success",
         message: member ? `${member.displayName} is now the co-captain.` : "Co-captain removed.",
+      },
+    }));
+  };
+
+  const handleKickPlayer = async (member: TeamMemberRecord) => {
+    if (!supabase || !team || !currentUserId || !viewerCanKickPlayers) return;
+
+    if (viewerIsCoCaptain && member.player_user_id === currentUserId) {
+      setKickStates((prev) => ({
+        ...prev,
+        [member.id]: { type: "error", message: "Use Leave Team if you want to remove yourself from the roster." },
+      }));
+      return;
+    }
+
+    const confirmMessage =
+      member.role === "co_captain"
+        ? `Kick ${member.displayName} from ${team.team_name}? They will lose co-captain access and be removed from the roster.`
+        : `Kick ${member.displayName} from ${team.team_name}?`;
+
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    setKickStates((prev) => ({ ...prev, [member.id]: { type: "loading" } }));
+    setLeadershipStates((prev) => ({ ...prev, [member.id]: { type: "idle" } }));
+
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? null;
+    if (!accessToken) {
+      setKickStates((prev) => ({
+        ...prev,
+        [member.id]: { type: "error", message: "Sign in again to continue." },
+      }));
+      return;
+    }
+
+    const response = await fetch("/api/sunday-league/kick-player", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ teamId: team.id, memberId: member.id }),
+    });
+    const json = await response.json();
+
+    if (!response.ok) {
+      setKickStates((prev) => ({
+        ...prev,
+        [member.id]: { type: "error", message: json?.error ?? "Could not remove that player." },
+      }));
+      return;
+    }
+
+    await reloadTeamMembers(team);
+    setKickStates((prev) => ({
+      ...prev,
+      [member.id]: {
+        type: "success",
+        message: json?.removedCoCaptain
+          ? `${member.displayName} was removed from the roster and no longer has co-captain access.`
+          : `${member.displayName} was removed from the roster.`,
       },
     }));
   };
@@ -926,44 +975,68 @@ export default function SundayLeagueTeamPortalPage() {
                         <p className="eyebrow">Leadership</p>
                         <p className="muted">
                           {viewerIsCaptain
-                            ? "Promote an accepted roster player to co-captain."
-                            : "Only the current captain can update leadership roles."}
+                            ? "Promote an accepted roster player to co-captain or remove them from the roster."
+                            : viewerCanKickPlayers
+                              ? "Co-captains can remove accepted roster players. Only the current captain can update leadership roles."
+                              : "Only the current captain can update leadership roles."}
                         </p>
                       </div>
                       <div className="sunday-league-team-board__list">
-                        {acceptedLeadershipCandidates.map((member) => (
-                          <div key={member.id} className="sunday-league-team-board__list-row sunday-league-team-board__request-row">
-                            <div className="sunday-league-team-board__request-copy">
-                              <strong>{member.displayName}</strong>
-                              <span>{member.role === "co_captain" ? "Co-Captain" : member.position ?? "Accepted player"}</span>
-                            </div>
-                            {viewerIsCaptain ? (
-                              <div className="sunday-league-team-board__request-actions">
-                                <button
-                                  className="button ghost"
-                                  type="button"
-                                  onClick={() => void handleSetCoCaptain(member.role === "co_captain" ? null : member, member.id)}
-                                  disabled={leadershipStates[member.id]?.type === "loading"}
-                                >
-                                  {member.role === "co_captain" ? "Remove Co-Captain" : "Set Co-Captain"}
-                                </button>
+                        {acceptedLeadershipCandidates.map((member) => {
+                          const actionState =
+                            kickStates[member.id]?.type && kickStates[member.id]?.type !== "idle"
+                              ? kickStates[member.id]
+                              : leadershipStates[member.id];
+                          const isRowLoading =
+                            leadershipStates[member.id]?.type === "loading" || kickStates[member.id]?.type === "loading";
+                          const canKickThisPlayer = viewerCanKickPlayers && (!viewerIsCoCaptain || member.player_user_id !== currentUserId);
+
+                          return (
+                            <div key={member.id} className="sunday-league-team-board__list-row sunday-league-team-board__request-row">
+                              <div className="sunday-league-team-board__request-copy">
+                                <strong>{member.displayName}</strong>
+                                <span>{member.role === "co_captain" ? "Co-Captain" : member.position ?? "Accepted player"}</span>
                               </div>
-                            ) : null}
-                            {leadershipStates[member.id]?.message ? (
-                              <p
-                                className={`form-help ${
-                                  leadershipStates[member.id]?.type === "error"
-                                    ? "error"
-                                    : leadershipStates[member.id]?.type === "success"
-                                      ? "success"
-                                      : ""
-                                }`}
-                              >
-                                {leadershipStates[member.id]?.message}
-                              </p>
-                            ) : null}
-                          </div>
-                        ))}
+                              {viewerIsCaptain || canKickThisPlayer ? (
+                                <div className="sunday-league-team-board__request-actions">
+                                  {viewerIsCaptain ? (
+                                    <button
+                                      className="button ghost"
+                                      type="button"
+                                      onClick={() => void handleSetCoCaptain(member.role === "co_captain" ? null : member, member.id)}
+                                      disabled={isRowLoading}
+                                    >
+                                      {member.role === "co_captain" ? "Remove Co-Captain" : "Set Co-Captain"}
+                                    </button>
+                                  ) : null}
+                                  {canKickThisPlayer ? (
+                                    <button
+                                      className="button ghost"
+                                      type="button"
+                                      onClick={() => void handleKickPlayer(member)}
+                                      disabled={isRowLoading}
+                                    >
+                                      {kickStates[member.id]?.type === "loading" ? "Kicking..." : "Kick Player"}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              {actionState?.message ? (
+                                <p
+                                  className={`form-help ${
+                                    actionState.type === "error"
+                                      ? "error"
+                                      : actionState.type === "success"
+                                        ? "success"
+                                        : ""
+                                  }`}
+                                >
+                                  {actionState.message}
+                                </p>
+                              ) : null}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   ) : null}
@@ -995,7 +1068,7 @@ export default function SundayLeagueTeamPortalPage() {
                             <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
                             <div className="sunday-league-team-board__player-row">
                               {countryCodeToFlag(player.countryCode) ? (
-                                <p className="sunday-league-team-board__player-flag" aria-label={normalizeCountryCode(player.countryCode) ?? undefined}>
+                                <p className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
                                   {countryCodeToFlag(player.countryCode)}
                                 </p>
                               ) : (

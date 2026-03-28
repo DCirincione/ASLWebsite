@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
+import { countryCodeToFlag, getCountryNameFromCode } from "@/lib/countries";
 import { getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
 import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
@@ -44,31 +45,6 @@ const getEstablishedLabel = (team: SundayLeagueTeam | null) => {
   const raw = typeof team?.created_at === "string" ? team.created_at : "";
   const year = raw.slice(0, 4);
   return /^\d{4}$/.test(year) ? year : "2026";
-};
-
-const normalizeCountryCode = (value?: string | null) => {
-  const normalized = (value ?? "").trim().toUpperCase();
-  if (!normalized) return null;
-  if (/^[A-Z]{2}$/.test(normalized)) return normalized;
-
-  const callingCodeMap: Record<string, string> = {
-    "+1": "US",
-    "1": "US",
-    "+44": "GB",
-    "44": "GB",
-    "+52": "MX",
-    "52": "MX",
-    "+61": "AU",
-    "61": "AU",
-  };
-
-  return callingCodeMap[normalized] ?? null;
-};
-
-const countryCodeToFlag = (value?: string | null) => {
-  const normalized = normalizeCountryCode(value);
-  if (!normalized) return null;
-  return String.fromCodePoint(...Array.from(normalized).map((char) => 127397 + char.charCodeAt(0)));
 };
 
 export default function SundayLeaguePublicTeamPage() {
@@ -363,7 +339,7 @@ export default function SundayLeaguePublicTeamPage() {
                             <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
                             <div className="sunday-league-team-board__player-row">
                               {countryCodeToFlag(player.countryCode) ? (
-                                <p className="sunday-league-team-board__player-flag" aria-label={normalizeCountryCode(player.countryCode) ?? undefined}>
+                                <p className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
                                   {countryCodeToFlag(player.countryCode)}
                                 </p>
                               ) : (

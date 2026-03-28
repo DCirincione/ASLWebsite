@@ -8,6 +8,7 @@ import {
   ALDRICH_COMMUNICATIONS_LABEL,
   getAldrichCommunicationsPreferenceFromMetadata,
 } from "@/lib/aldrich-communications";
+import { COUNTRY_OPTIONS, normalizeCountryCode } from "@/lib/countries";
 import { supabase } from "@/lib/supabase/client";
 
 const PASSWORD_RESET_REDIRECT = "https://aldrichsports.com/reset-password";
@@ -16,6 +17,7 @@ type SettingsFormState = {
   display_name: string;
   sports: string;
   about: string;
+  country_code: string;
   email: string;
   birthday: string;
   profile_visibility: "public" | "members" | "private";
@@ -31,6 +33,7 @@ const emptySettingsForm: SettingsFormState = {
   display_name: "",
   sports: "",
   about: "",
+  country_code: "",
   email: "",
   birthday: "",
   profile_visibility: "members",
@@ -66,7 +69,7 @@ export default function AccountSettingsPage() {
       const rawSettings = user.user_metadata?.settings as Partial<SettingsFormState> | undefined;
       const { data: profile } = await supabase
         .from("profiles")
-        .select("name,age,sports,about")
+        .select("name,age,sports,about,country_code")
         .eq("id", user.id)
         .maybeSingle();
 
@@ -75,6 +78,7 @@ export default function AccountSettingsPage() {
         display_name: profile?.name ?? "",
         sports: Array.isArray(profile?.sports) ? profile.sports.join(", ") : "",
         about: profile?.about ?? "",
+        country_code: normalizeCountryCode(profile?.country_code) ?? "",
         email: user.email ?? "",
         birthday: profile?.age ?? "",
         profile_visibility:
@@ -135,6 +139,7 @@ export default function AccountSettingsPage() {
         .map((entry) => entry.trim())
         .filter(Boolean),
       about: settingsForm.about.trim() || null,
+      country_code: settingsForm.country_code || null,
     };
 
     const { error: profileError } = await supabase
@@ -284,6 +289,21 @@ export default function AccountSettingsPage() {
                       onChange={(event) => updateSettingsForm("sports", event.target.value)}
                       placeholder="Basketball, Flag Football"
                     />
+                  </div>
+                  <div className="form-control">
+                    <label htmlFor="settings-country">Country</label>
+                    <select
+                      id="settings-country"
+                      value={settingsForm.country_code}
+                      onChange={(event) => updateSettingsForm("country_code", event.target.value)}
+                    >
+                      <option value="">Select country</option>
+                      {COUNTRY_OPTIONS.map((country) => (
+                        <option key={country.code} value={country.code}>
+                          {country.name}
+                        </option>
+                      ))}
+                    </select>
                   </div>
                   <div className="form-control">
                     <label htmlFor="settings-profile-visibility">Profile visibility</label>

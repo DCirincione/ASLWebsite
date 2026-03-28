@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { ALDRICH_COMMUNICATIONS_LABEL } from "@/lib/aldrich-communications";
+import { COUNTRY_OPTIONS } from "@/lib/countries";
 import { supabase } from "@/lib/supabase/client";
 
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -20,6 +21,7 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
     email: "",
     password: "",
     age: "",
+    country_code: "",
     positions: "",
     sports: "",
     skill_level: "",
@@ -49,7 +51,7 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
 
     setStatus({ type: "loading" });
 
-    const { email, password, name, about, communications_opt_in } = form;
+    const { email, password, name, about, communications_opt_in, country_code } = form;
     const age = form.age.trim() || null;
     const skill_level = Number.isNaN(Number(form.skill_level)) ? null : Number(form.skill_level);
     const positions = parseArray(form.positions);
@@ -78,6 +80,7 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
       id: userId,
       name,
       age,
+      country_code: country_code || null,
       positions,
       skill_level,
       sports,
@@ -155,6 +158,22 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
             onChange={(e) => update("skill_level", e.target.value)}
             inputMode="numeric"
           />
+        </div>
+        <div className="form-control">
+          <label htmlFor="country_code">Country</label>
+          <select
+            id="country_code"
+            name="country_code"
+            value={form.country_code}
+            onChange={(e) => update("country_code", e.target.value)}
+          >
+            <option value="">Select country</option>
+            {COUNTRY_OPTIONS.map((country) => (
+              <option key={country.code} value={country.code}>
+                {country.name}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="form-control">
           <label htmlFor="positions">Positions</label>

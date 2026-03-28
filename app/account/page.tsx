@@ -9,6 +9,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { RegistrationModal } from "@/components/registration-modal";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { TeamLogoImage } from "@/components/team-logo-image";
+import { COUNTRY_OPTIONS, getCountryNameFromCode, normalizeCountryCode } from "@/lib/countries";
 import { createId } from "@/lib/create-id";
 import { isWaitlistEvent } from "@/lib/event-signups";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
@@ -109,6 +110,7 @@ type ProfileFormState = {
   positions: string;
   sports: string;
   about: string;
+  country_code: string;
 };
 
 type SaveStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -121,6 +123,7 @@ const emptyProfileForm: ProfileFormState = {
   positions: "",
   sports: "",
   about: "",
+  country_code: "",
 };
 
 const toProfileFormState = (profile: Profile | null): ProfileFormState => ({
@@ -130,6 +133,7 @@ const toProfileFormState = (profile: Profile | null): ProfileFormState => ({
   positions: profile?.positions?.join(", ") ?? "",
   sports: profile?.sports?.join(", ") ?? "",
   about: profile?.about ?? "",
+  country_code: normalizeCountryCode(profile?.country_code) ?? "",
 });
 
 export default function AccountPage() {
@@ -290,6 +294,7 @@ export default function AccountPage() {
       positions: parseArray(profileForm.positions),
       sports: parseArray(profileForm.sports),
       about: profileForm.about.trim() || null,
+      country_code: profileForm.country_code || null,
     };
 
     setProfileSaveStatus({ type: "loading" });
@@ -334,7 +339,7 @@ export default function AccountPage() {
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("id,name,about,age,positions,skill_level,sports,avatar_url")
+        .select("id,name,about,age,positions,skill_level,sports,avatar_url,country_code")
         .eq("id", uid)
         .maybeSingle();
 
@@ -784,6 +789,21 @@ export default function AccountPage() {
                   />
                 </div>
                 <div className="form-control">
+                  <label htmlFor="profile-country">Country</label>
+                  <select
+                    id="profile-country"
+                    value={profileForm.country_code}
+                    onChange={(event) => updateProfileForm("country_code", event.target.value)}
+                  >
+                    <option value="">Select country</option>
+                    {COUNTRY_OPTIONS.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {country.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-control">
                   <label htmlFor="profile-positions">Positions</label>
                   <input
                     id="profile-positions"
@@ -854,6 +874,7 @@ export default function AccountPage() {
               <p className="muted">{data.about || "Add a bio so other players know how you play."}</p>
               <div className="profile-grid">
                 <Stat label="Age" value={calculateAgeFromDateString(data.age)} />
+                <Stat label="Country" value={getCountryNameFromCode(data.country_code)} />
                 <Stat label="Skill (1-10)" value={data.skill_level} />
                 <Stat label="Positions" value={data.positions?.join(", ") ?? "—"} />
                 <Stat label="Sports" value={data.sports?.join(", ") ?? "—"} />
