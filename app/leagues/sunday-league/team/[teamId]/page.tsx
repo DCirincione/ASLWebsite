@@ -358,6 +358,23 @@ export default function SundayLeagueTeamPortalPage() {
     () => Boolean(team && currentUserId && viewerMembership && !viewerIsCaptain),
     [currentUserId, team, viewerIsCaptain, viewerMembership],
   );
+  const jerseyNumberLabels = useMemo(() => {
+    if (!form) return [];
+
+    const rosterSlotLabels: string[] = [];
+
+    if (form.captain_is_playing) {
+      rosterSlotLabels.push(form.captain_name.trim() || team?.captain_name?.trim() || "Captain");
+    }
+
+    teamMembers
+      .filter((member) => member.status === "accepted" && Boolean(member.player_user_id) && member.player_user_id !== team?.user_id)
+      .forEach((member) => {
+        rosterSlotLabels.push(member.displayName.trim() || "Player");
+      });
+
+    return form.jersey_numbers.map((_, index) => rosterSlotLabels[index] ?? `Number ${index + 1}`);
+  }, [form, team?.captain_name, team?.user_id, teamMembers]);
   const inviteablePlayerIds = useMemo(() => {
     const blockedIds = new Set<string>();
     if (team) {
@@ -1223,7 +1240,7 @@ export default function SundayLeagueTeamPortalPage() {
                       <div className="sunday-league-jersey-grid">
                         {form.jersey_numbers.map((number, index) => (
                           <label key={`jersey-${index + 1}`} className="form-control">
-                            <span>Number {index + 1}</span>
+                            <span>{jerseyNumberLabels[index] ?? `Number ${index + 1}`}</span>
                             <input value={number} onChange={(event) => updateJerseyNumber(index, event.target.value)} />
                           </label>
                         ))}
