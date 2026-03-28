@@ -53,6 +53,8 @@ export default function SundayLeaguePublicTeamPage() {
   const teamId = params.teamId;
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [myMemberships, setMyMemberships] = useState<SundayLeagueTeamMember[]>([]);
+  const [managedTeamId, setManagedTeamId] = useState<string | null>(null);
   const [viewerMembership, setViewerMembership] = useState<SundayLeagueTeamMember | null>(null);
   const [coCaptainName, setCoCaptainName] = useState<string | null>(null);
   const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
@@ -60,6 +62,7 @@ export default function SundayLeaguePublicTeamPage() {
   const [record, setRecord] = useState<Pick<SundayLeagueLeaderboard, "wins" | "draws" | "losses">>({ wins: 0, draws: 0, losses: 0 });
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [leaveState, setLeaveState] = useState<ActionState>({ type: "idle" });
+  const [joinState, setJoinState] = useState<ActionState>({ type: "idle" });
 
   useEffect(() => {
     const loadTeam = async () => {
@@ -82,22 +85,41 @@ export default function SundayLeaguePublicTeamPage() {
       const nextTeam = data as SundayLeagueTeam;
       setTeam(nextTeam);
       setLeaveState({ type: "idle" });
+      setJoinState({ type: "idle" });
 
       const { data: sessionData } = await supabase.auth.getSession();
       const nextUserId = sessionData.session?.user.id ?? null;
+      const nextUserEmail = sessionData.session?.user.email?.trim().toLowerCase() ?? null;
       setCurrentUserId(nextUserId);
 
-      if (nextUserId && nextUserId !== nextTeam.user_id) {
-        const { data: membershipData } = await supabase
-          .from("sunday_league_team_members")
-          .select("*")
-          .eq("team_id", nextTeam.id)
-          .eq("player_user_id", nextUserId)
-          .eq("status", "accepted")
-          .maybeSingle();
+      if (nextUserId) {
+        const membershipResults = await Promise.all([
+          supabase.from("sunday_league_team_members").select("*").eq("player_user_id", nextUserId),
+          nextUserEmail
+            ? supabase.from("sunday_league_team_members").select("*").eq("invite_email", nextUserEmail)
+            : Promise.resolve({ data: [], error: null }),
+          supabase.from("sunday_league_teams").select("id").eq("user_id", nextUserId).limit(1),
+        ]);
 
-        setViewerMembership((membershipData as SundayLeagueTeamMember | null) ?? null);
+        const membershipMap = new Map<string, SundayLeagueTeamMember>();
+        for (const result of membershipResults.slice(0, 2)) {
+          if (result.error || !result.data) continue;
+          for (const membership of result.data as SundayLeagueTeamMember[]) {
+            membershipMap.set(membership.id, membership);
+          }
+        }
+
+        const nextMemberships = Array.from(membershipMap.values());
+        setMyMemberships(nextMemberships);
+        setManagedTeamId((membershipResults[2].data?.[0]?.id as string | undefined) ?? null);
+        setViewerMembership(
+          nextUserId !== nextTeam.user_id
+            ? nextMemberships.find((membership) => membership.team_id === nextTeam.id && membership.status === "accepted") ?? null
+            : null,
+        );
       } else {
+        setMyMemberships([]);
+        setManagedTeamId(null);
         setViewerMembership(null);
       }
 
@@ -202,10 +224,98 @@ export default function SundayLeaguePublicTeamPage() {
 
   const historyRows = useMemo(() => buildTeamHistory(team), [team]);
   const establishedLabel = useMemo(() => getEstablishedLabel(team), [team]);
+  const membershipByTeamId = useMemo(() => {
+    const rank = { accepted: 3, pending: 2, declined: 1 } as const;
+    const map = new Map<string, SundayLeagueTeamMember>();
+
+    for (const membership of myMemberships) {
+      const existing = map.get(membership.team_id);
+      if (!existing || rank[membership.status] > rank[existing.status]) {
+        map.set(membership.team_id, membership);
+      }
+    }
+
+    return map;
+  }, [myMemberships]);
+  const acceptedMembership = useMemo(
+    () => myMemberships.find((membership) => membership.status === "accepted") ?? null,
+    [myMemberships],
+  );
+  const currentTeamMembership = useMemo(
+    () => (team ? membershipByTeamId.get(team.id) ?? null : null),
+    [membershipByTeamId, team],
+  );
   const canLeaveTeam = useMemo(
     () => Boolean(team && currentUserId && viewerMembership && currentUserId !== team.user_id),
     [currentUserId, team, viewerMembership],
   );
+  const canShowJoinAction = useMemo(() => {
+    if (!team || canLeaveTeam) return false;
+    if (currentUserId === team.user_id) return false;
+    if (managedTeamId) return false;
+    if (acceptedMembership && acceptedMembership.team_id !== team.id) return false;
+    return true;
+  }, [acceptedMembership, canLeaveTeam, currentUserId, managedTeamId, team]);
+
+  const handleRequestToJoin = async () => {
+    if (!supabase || !team) {
+      setJoinState({ type: "error", message: "Supabase is not configured." });
+      return;
+    }
+
+    if (!currentUserId) {
+      router.push("/account/create");
+      return;
+    }
+
+    if (managedTeamId) {
+      setJoinState({ type: "error", message: "Team managers already manage their own team here." });
+      return;
+    }
+
+    if (acceptedMembership && acceptedMembership.team_id !== team.id) {
+      setJoinState({ type: "error", message: "You already belong to another Sunday League team." });
+      return;
+    }
+
+    setJoinState({ type: "loading" });
+
+    const existingMembership = membershipByTeamId.get(team.id) ?? null;
+    const payload = {
+      team_id: team.id,
+      player_user_id: currentUserId,
+      invite_email: null,
+      invite_name: null,
+      status: "pending" as const,
+      source: "player_request" as const,
+    };
+
+    const response = existingMembership
+      ? await supabase
+          .from("sunday_league_team_members")
+          .update(payload)
+          .eq("id", existingMembership.id)
+          .select("*")
+          .single()
+      : await supabase
+          .from("sunday_league_team_members")
+          .insert(payload)
+          .select("*")
+          .single();
+
+    if (response.error || !response.data) {
+      setJoinState({ type: "error", message: response.error?.message ?? "Could not send your join request." });
+      return;
+    }
+
+    const nextMembership = response.data as SundayLeagueTeamMember;
+    setMyMemberships((prev) => {
+      const next = prev.filter((membership) => membership.id !== nextMembership.id);
+      next.push(nextMembership);
+      return next;
+    });
+    setJoinState({ type: "success", message: "Join request sent to the captain." });
+  };
 
   const handleLeaveTeam = async () => {
     if (!supabase || !team || !currentUserId || !viewerMembership) return;
@@ -289,6 +399,43 @@ export default function SundayLeaguePublicTeamPage() {
                         {leaveState.message ? (
                           <p className={`form-help ${leaveState.type === "error" ? "error" : leaveState.type === "success" ? "success" : ""}`}>
                             {leaveState.message}
+                          </p>
+                        ) : null}
+                      </div>
+                    ) : canShowJoinAction ? (
+                      <div className="sunday-league-team-board__identity-actions">
+                        {(() => {
+                          const isInvitePending = currentTeamMembership?.status === "pending" && currentTeamMembership.source === "captain_invite";
+                          const isRequestPending = currentTeamMembership?.status === "pending" && currentTeamMembership.source === "player_request";
+
+                          let label = "Request to Join";
+                          let disabled = false;
+                          let onClick: () => void = () => void handleRequestToJoin();
+
+                          if (joinState.type === "loading") {
+                            label = "Sending...";
+                            disabled = true;
+                          } else if (isRequestPending) {
+                            label = "Request Sent";
+                            disabled = true;
+                          } else if (isInvitePending) {
+                            label = "View Invite";
+                            onClick = () => router.push("/account/team");
+                          } else if (!currentUserId) {
+                            onClick = () => router.push("/account/create");
+                          } else if (currentTeamMembership?.status === "declined") {
+                            label = "Request Again";
+                          }
+
+                          return (
+                            <button className="button primary" type="button" onClick={onClick} disabled={disabled}>
+                              {label}
+                            </button>
+                          );
+                        })()}
+                        {joinState.message ? (
+                          <p className={`form-help ${joinState.type === "error" ? "error" : joinState.type === "success" ? "success" : ""}`}>
+                            {joinState.message}
                           </p>
                         ) : null}
                       </div>

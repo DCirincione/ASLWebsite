@@ -1961,13 +1961,21 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: #dc2626;
-  color: #ffffff;
+  background: rgba(248, 250, 252, 0.16);
+  border: 1px solid rgba(248, 250, 252, 0.24);
+  color: #f8fafc;
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 8px 18px rgba(127, 29, 29, 0.28);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
   pointer-events: none;
+}
+
+.sunday-league-team-board__action-badge--unread {
+  background: #dc2626;
+  border-color: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 8px 18px rgba(127, 29, 29, 0.28);
 }
 
 .sunday-league-team-board__section h3 {
@@ -5118,6 +5126,13 @@ html[data-theme="dark"] .account-form textarea {
   background: rgba(255, 255, 255, 0.06);
   border-color: #1f2a40;
   color: #e8edf7;
+  color-scheme: dark;
+}
+
+html[data-theme="dark"] .account-form select option,
+html[data-theme="dark"] .account-form select optgroup {
+  background: #0f192d;
+  color: #e8edf7;
 }
 
 html[data-theme="dark"] .account-form input::placeholder,
@@ -5409,7 +5424,7 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
   padding-right: 8px;
   scroll-snap-type: y mandatory;
   scrollbar-width: thin;
-  scrollbar-color: rgba(244, 183, 138, 0.5) rgba(255, 255, 255, 0.06);
+  scrollbar-color: rgba(148, 163, 184, 0.72) rgba(15, 23, 42, 0.68);
 }
 
 .community-sponsors-carousel__track::-webkit-scrollbar {
@@ -5418,12 +5433,14 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
 
 .community-sponsors-carousel__track::-webkit-scrollbar-track {
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(15, 23, 42, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.74);
 }
 
 .community-sponsors-carousel__track::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: rgba(244, 183, 138, 0.52);
+  background: linear-gradient(180deg, rgba(100, 116, 139, 0.96), rgba(71, 85, 105, 0.96));
+  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.22);
 }
 
 .community-sponsors-carousel__track::after {
@@ -5447,7 +5464,7 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
   justify-items: center;
   align-content: center;
   gap: 8px;
-  color: rgba(244, 183, 138, 0.9);
+  color: rgba(203, 213, 225, 0.9);
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -5458,7 +5475,7 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
   width: 1px;
   height: 34px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(244, 183, 138, 0.12), rgba(244, 183, 138, 0.9), rgba(244, 183, 138, 0.12));
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0.86), rgba(148, 163, 184, 0.1));
 }
 
 .community-sponsors-carousel__cue-arrow {

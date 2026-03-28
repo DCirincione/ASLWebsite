@@ -142,6 +142,7 @@ export default function SundayLeagueTeamPortalPage() {
   const [leadershipStates, setLeadershipStates] = useState<Record<string, { type: "idle" | "loading" | "success" | "error"; message?: string }>>({});
   const [kickStates, setKickStates] = useState<Record<string, ActionState>>({});
   const [leaveState, setLeaveState] = useState<ActionState>({ type: "idle" });
+  const [seenJoinRequestVersions, setSeenJoinRequestVersions] = useState<Record<string, string>>({});
   const [form, setForm] = useState<TeamPortalFormState | null>(null);
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
   const editSectionRef = useRef<HTMLElement | null>(null);
@@ -324,11 +325,43 @@ export default function SundayLeagueTeamPortalPage() {
     return () => cancelAnimationFrame(frameId);
   }, [isEditing]);
 
+  useEffect(() => {
+    if (!currentUserId) {
+      setSeenJoinRequestVersions({});
+      return;
+    }
+
+    try {
+      const storedValue = window.localStorage.getItem(`asl-sunday-league-join-requests-seen:${currentUserId}:${teamId}`);
+      if (!storedValue) {
+        setSeenJoinRequestVersions({});
+        return;
+      }
+
+      const parsedValue = JSON.parse(storedValue);
+      setSeenJoinRequestVersions(
+        parsedValue && typeof parsedValue === "object" && !Array.isArray(parsedValue)
+          ? (parsedValue as Record<string, string>)
+          : {},
+      );
+    } catch {
+      setSeenJoinRequestVersions({});
+    }
+  }, [currentUserId, teamId]);
+
   const historyRows = useMemo(() => buildTeamHistory(team), [team]);
   const establishedLabel = useMemo(() => getEstablishedLabel(team), [team]);
   const pendingJoinRequests = useMemo(
     () => teamMembers.filter((member) => member.status === "pending" && member.source === "player_request"),
     [teamMembers],
+  );
+  const hasUnreadJoinRequests = useMemo(
+    () =>
+      pendingJoinRequests.some((member) => {
+        const requestVersion = member.updated_at ?? member.created_at ?? member.id;
+        return seenJoinRequestVersions[member.id] !== requestVersion;
+      }),
+    [pendingJoinRequests, seenJoinRequestVersions],
   );
   const pendingInvites = useMemo(
     () => teamMembers.filter((member) => member.status === "pending" && member.source === "captain_invite"),
@@ -358,6 +391,20 @@ export default function SundayLeagueTeamPortalPage() {
     () => Boolean(team && currentUserId && viewerMembership && !viewerIsCaptain),
     [currentUserId, team, viewerIsCaptain, viewerMembership],
   );
+  useEffect(() => {
+    if (!showJoinRequests || !currentUserId) return;
+
+    const nextSeenVersions = pendingJoinRequests.reduce<Record<string, string>>((accumulator, member) => {
+      accumulator[member.id] = member.updated_at ?? member.created_at ?? member.id;
+      return accumulator;
+    }, {});
+
+    setSeenJoinRequestVersions(nextSeenVersions);
+
+    try {
+      window.localStorage.setItem(`asl-sunday-league-join-requests-seen:${currentUserId}:${teamId}`, JSON.stringify(nextSeenVersions));
+    } catch {}
+  }, [currentUserId, pendingJoinRequests, showJoinRequests, teamId]);
   const jerseyNumberLabels = useMemo(() => {
     if (!form) return [];
 
@@ -950,7 +997,10 @@ export default function SundayLeagueTeamPortalPage() {
                       </button>
                       <button className="button ghost sunday-league-team-board__action-button" type="button" onClick={() => setShowJoinRequests((prev) => !prev)}>
                         {showJoinRequests ? "Close Requests" : "Join Requests"}
-                        <span className="sunday-league-team-board__action-badge" aria-label={`${pendingJoinRequests.length} pending join requests`}>
+                        <span
+                          className={`sunday-league-team-board__action-badge${hasUnreadJoinRequests ? " sunday-league-team-board__action-badge--unread" : ""}`}
+                          aria-label={`${pendingJoinRequests.length} pending join requests${hasUnreadJoinRequests ? ", unread" : ""}`}
+                        >
                           {pendingJoinRequests.length}
                         </span>
                       </button>
