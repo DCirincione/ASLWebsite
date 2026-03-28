@@ -7,6 +7,7 @@ export function AccountNav() {
       <HistoryBackButton label="← Back" fallbackHref="/account" />
       <div className="account-nav__links">
         <Link href="/account#profile">Profile</Link>
+        <Link href="/account/inbox">Inbox</Link>
         <Link href="/account#events">My Events</Link>
         <Link href="/account/settings">Settings</Link>
         <Link href="/account/team">My Team</Link>

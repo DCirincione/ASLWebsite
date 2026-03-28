@@ -403,9 +403,14 @@ export default function AccountFriendsPage() {
                   <div className="team-card__info">
                     <p className="list__title">{friend.name}</p>
                   </div>
-                  <Link className="button ghost" href={`/profiles/${friend.id}`}>
-                    View Profile
-                  </Link>
+                  <div className="sunday-league-team-card__actions">
+                    <Link className="button ghost" href={`/profiles/${friend.id}`}>
+                      View Profile
+                    </Link>
+                    <Link className="button ghost" href={`/account/inbox?tab=chats&chat=${friend.id}`}>
+                      Message
+                    </Link>
+                  </div>
                 </li>
               ))}
             </ul>

@@ -176,6 +176,9 @@ export function SiteHeader() {
                       <Link href="/account#profile" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
                         My Profile
                       </Link>
+                      <Link href="/account/inbox" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
+                        Inbox
+                      </Link>
                       <Link href="/account/settings" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
                         Settings
                       </Link>
@@ -221,6 +224,9 @@ export function SiteHeader() {
                   <div className="header-menu" role="menu">
                     <Link href="/account#profile" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                       My Profile
+                    </Link>
+                    <Link href="/account/inbox" role="menuitem" onClick={() => setIsMenuOpen(false)}>
+                      Inbox
                     </Link>
                     {canAccessAdmin ? (
                       <Link href="/admin" role="menuitem" onClick={() => setIsMenuOpen(false)}>

@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
+import { INBOX_ANNOUNCEMENT_AUDIENCE_OPTIONS, type InboxAnnouncementAudience } from "@/lib/inbox";
 import { parseAldrichCommunicationsPreferenceFromMessage } from "@/lib/aldrich-communications";
 import { createId } from "@/lib/create-id";
 import type { SignupMode } from "@/lib/event-signups";
@@ -129,6 +130,12 @@ type UserManageForm = {
   reason: string;
 };
 type ContactFilter = "all" | "unread" | "read";
+type AnnouncementFormState = {
+  audience: InboxAnnouncementAudience;
+  title: string;
+  message: string;
+  recipientIds: string[];
+};
 
 const FLYER_BUCKET = "flyers";
 const COMMUNITY_SPONSOR_PLACEMENT_OPTIONS: CommunitySponsorPlacement[] = ["standard", "top"];
@@ -255,6 +262,13 @@ const mapSportToForm = (sport: Sport): SportFormState => ({
   image_url: sport.image_url ?? "",
 });
 
+const createEmptyAnnouncementForm = (): AnnouncementFormState => ({
+  audience: "all_players",
+  title: "",
+  message: "",
+  recipientIds: [],
+});
+
 export default function AdminPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
   const [activeModule, setActiveModule] = useState<AdminModule>("none");
@@ -287,6 +301,7 @@ export default function AdminPage() {
   const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
   const [communitySponsorsStatus, setCommunitySponsorsStatus] = useState<FormStatus>({ type: "idle" });
   const [siteSettingsStatus, setSiteSettingsStatus] = useState<FormStatus>({ type: "idle" });
+  const [announcementStatus, setAnnouncementStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [sportsError, setSportsError] = useState<string | null>(null);
   const [flyers, setFlyers] = useState<Flyer[]>([]);
@@ -386,6 +401,8 @@ export default function AdminPage() {
     homeBannerButtonEventId: "",
     homeBannerButtonPageHref: "",
   });
+  const [announcementForm, setAnnouncementForm] = useState<AnnouncementFormState>(createEmptyAnnouncementForm());
+  const [announcementRecipientSearch, setAnnouncementRecipientSearch] = useState("");
   const [form, setForm] = useState<EventFormState>({
     title: "",
     start_date: "",
@@ -853,6 +870,36 @@ export default function AdminPage() {
 
     setLoadingUsers(false);
   };
+
+  const announcementRecipientDirectory = useMemo(
+    () => users,
+    [users],
+  );
+
+  const selectedAnnouncementPlayers = useMemo(() => {
+    const selectedIds = new Set(announcementForm.recipientIds);
+    return announcementRecipientDirectory.filter((user) => selectedIds.has(user.id));
+  }, [announcementForm.recipientIds, announcementRecipientDirectory]);
+
+  const filteredAnnouncementPlayers = useMemo(() => {
+    const selectedIds = new Set(announcementForm.recipientIds);
+    const query = announcementRecipientSearch.trim().toLowerCase();
+
+    return announcementRecipientDirectory
+      .filter((user) => {
+        if (selectedIds.has(user.id)) {
+          return false;
+        }
+
+        if (!query) {
+          return true;
+        }
+
+        const sports = Array.isArray(user.sports) ? user.sports.join(" ").toLowerCase() : "";
+        return user.name.toLowerCase().includes(query) || sports.includes(query);
+      })
+      .slice(0, 12);
+  }, [announcementForm.recipientIds, announcementRecipientSearch, announcementRecipientDirectory]);
 
   useEffect(() => {
     const loadAccess = async () => {
@@ -1908,6 +1955,7 @@ export default function AdminPage() {
     if (module === "settings") {
       void loadEvents();
       void loadSiteSettings();
+      void loadUsers();
     }
   };
 
@@ -2062,6 +2110,25 @@ export default function AdminPage() {
 
   const updateSiteSettings = <K extends keyof typeof siteSettingsForm>(key: K, value: (typeof siteSettingsForm)[K]) => {
     setSiteSettingsForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateAnnouncementForm = <K extends keyof AnnouncementFormState>(key: K, value: AnnouncementFormState[K]) => {
+    setAnnouncementForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const addAnnouncementRecipient = (userId: string) => {
+    setAnnouncementForm((prev) => ({
+      ...prev,
+      recipientIds: prev.recipientIds.includes(userId) ? prev.recipientIds : [...prev.recipientIds, userId],
+    }));
+    setAnnouncementRecipientSearch("");
+  };
+
+  const removeAnnouncementRecipient = (userId: string) => {
+    setAnnouncementForm((prev) => ({
+      ...prev,
+      recipientIds: prev.recipientIds.filter((id) => id !== userId),
+    }));
   };
 
   const openCommunityContentForm = () => {
@@ -2671,6 +2738,71 @@ export default function AdminPage() {
       setSiteSettingsStatus({ type: "success", message: "Home page banner settings updated." });
     } catch {
       setSiteSettingsStatus({ type: "error", message: "Could not update site settings." });
+    }
+  };
+
+  const handleSendAnnouncement = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setAnnouncementStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    const title = announcementForm.title.trim();
+    const message = announcementForm.message.trim();
+
+    if (!title) {
+      setAnnouncementStatus({ type: "error", message: "Title is required." });
+      return;
+    }
+
+    if (!message) {
+      setAnnouncementStatus({ type: "error", message: "Message is required." });
+      return;
+    }
+
+    if (announcementForm.audience === "selected_players" && announcementForm.recipientIds.length === 0) {
+      setAnnouncementStatus({ type: "error", message: "Choose at least one member." });
+      return;
+    }
+
+    setAnnouncementStatus({ type: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/inbox-announcements", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          audience: announcementForm.audience,
+          recipientIds: announcementForm.recipientIds,
+          title,
+          message,
+        }),
+      });
+
+      const json = await response.json();
+      if (!response.ok) {
+        setAnnouncementStatus({ type: "error", message: json?.error ?? "Could not send the announcement." });
+        return;
+      }
+
+      const sentCount = typeof json?.sentCount === "number" ? json.sentCount : null;
+      setAnnouncementForm(createEmptyAnnouncementForm());
+      setAnnouncementRecipientSearch("");
+      setAnnouncementStatus({
+        type: "success",
+        message: sentCount !== null
+          ? `Announcement sent to ${sentCount} member${sentCount === 1 ? "" : "s"}.`
+          : "Announcement sent.",
+      });
+    } catch {
+      setAnnouncementStatus({ type: "error", message: "Could not send the announcement." });
     }
   };
 
@@ -4138,7 +4270,7 @@ export default function AdminPage() {
               <>
                 <section className="account-card">
                   <h2>Settings</h2>
-                  <p className="muted">Control the site-wide announcement banner shown at the top of the home page.</p>
+                  <p className="muted">Control site-wide banners and send inbox announcements to site members.</p>
                 </section>
                 <section className="account-card">
                   <div className="account-card__header">
@@ -4259,6 +4391,134 @@ export default function AdminPage() {
                       {siteSettingsStatus.message}
                     </p>
                   ) : null}
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Inbox Announcements</h2>
+                      <p className="muted">Send announcements to everyone on the site or a selected list of members.</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => void loadUsers()} disabled={loadingUsers}>
+                      {loadingUsers ? "Refreshing..." : "Refresh Members"}
+                    </button>
+                  </div>
+                  <form className="register-form" onSubmit={handleSendAnnouncement}>
+                    <div className="form-control">
+                      <label htmlFor="announcement-audience">Audience</label>
+                      <select
+                        id="announcement-audience"
+                        value={announcementForm.audience}
+                        onChange={(event) =>
+                          setAnnouncementForm((prev) => ({
+                            ...prev,
+                            audience: event.target.value as InboxAnnouncementAudience,
+                            recipientIds: event.target.value === "selected_players" ? prev.recipientIds : [],
+                          }))
+                        }
+                      >
+                        {INBOX_ANNOUNCEMENT_AUDIENCE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option === "all_players" ? `Everyone on Site (${announcementRecipientDirectory.length})` : "Specific Members"}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {announcementForm.audience === "selected_players" ? (
+                      <>
+                        <div className="admin-user-search">
+                          <label htmlFor="announcement-player-search">Find Members</label>
+                          <input
+                            id="announcement-player-search"
+                            type="search"
+                            placeholder="Search by name or sport"
+                            value={announcementRecipientSearch}
+                            onChange={(event) => setAnnouncementRecipientSearch(event.target.value)}
+                          />
+                        </div>
+                        <div className="admin-recipient-picker">
+                          <div>
+                            <p className="list__title">Selected Members</p>
+                            {selectedAnnouncementPlayers.length > 0 ? (
+                              <div className="admin-recipient-pill-list">
+                                {selectedAnnouncementPlayers.map((player) => (
+                                  <button
+                                    key={player.id}
+                                    className="admin-recipient-pill"
+                                    type="button"
+                                    onClick={() => removeAnnouncementRecipient(player.id)}
+                                  >
+                                    <span>{player.name}</span>
+                                    <span aria-hidden>×</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="muted">No members selected yet.</p>
+                            )}
+                          </div>
+                          <div>
+                            <p className="list__title">Matching Members</p>
+                            {loadingUsers ? <p className="muted">Loading members...</p> : null}
+                            {!loadingUsers && filteredAnnouncementPlayers.length === 0 ? (
+                              <p className="muted">No members match that search.</p>
+                            ) : null}
+                            {!loadingUsers && filteredAnnouncementPlayers.length > 0 ? (
+                              <div className="admin-recipient-option-list">
+                                {filteredAnnouncementPlayers.map((player) => (
+                                  <button
+                                    key={player.id}
+                                    className="admin-recipient-option"
+                                    type="button"
+                                    onClick={() => addAnnouncementRecipient(player.id)}
+                                  >
+                                    <strong>{player.name}</strong>
+                                    <span>{Array.isArray(player.sports) && player.sports.length > 0 ? player.sports.join(", ") : "Member"}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <p className="form-help muted">
+                        This sends the message to every profile on the site with an inbox.
+                      </p>
+                    )}
+                    <div className="form-control">
+                      <label htmlFor="announcement-title">Title</label>
+                      <input
+                        id="announcement-title"
+                        type="text"
+                        value={announcementForm.title}
+                        onChange={(event) => updateAnnouncementForm("title", event.target.value)}
+                        placeholder="League update, schedule change, payment reminder..."
+                        required
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="announcement-message">Message</label>
+                      <textarea
+                        id="announcement-message"
+                        value={announcementForm.message}
+                        onChange={(event) => updateAnnouncementForm("message", event.target.value)}
+                        rows={5}
+                        placeholder="Write the announcement that should appear in each member's inbox."
+                        required
+                      />
+                    </div>
+                    {usersError ? <p className="form-help error">{usersError}</p> : null}
+                    {announcementStatus.message ? (
+                      <p className={`form-help ${announcementStatus.type === "error" ? "error" : "muted"}`}>
+                        {announcementStatus.message}
+                      </p>
+                    ) : null}
+                    <div className="cta-row">
+                      <button className="button primary" type="submit" disabled={announcementStatus.type === "loading"}>
+                        {announcementStatus.type === "loading" ? "Sending..." : "Send Announcement"}
+                      </button>
+                    </div>
+                  </form>
                 </section>
               </>
             ) : null}

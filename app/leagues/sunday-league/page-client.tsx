@@ -558,13 +558,10 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
       teamForm.captain_phone,
       teamForm.captain_email,
       teamForm.team_name,
-      teamForm.primary_color,
-      teamForm.secondary_color,
-      teamForm.preferred_jersey_design,
     ];
 
     if (requiredTextFields.some((value) => !value.trim())) {
-      setTeamStatus({ type: "error", message: "Complete the required captain, team, and jersey fields before submitting." });
+      setTeamStatus({ type: "error", message: "Complete the required captain and team fields before submitting." });
       return;
     }
 
@@ -613,11 +610,11 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
       captain_is_playing: teamForm.captain_is_playing,
       team_name: teamForm.team_name.trim(),
       preferred_jersey_colors: {
-        primary: teamForm.primary_color.trim(),
-        secondary: teamForm.secondary_color.trim(),
+        primary: teamForm.primary_color.trim() || null,
+        secondary: teamForm.secondary_color.trim() || null,
         accent: teamForm.accent_color.trim() || null,
       },
-      preferred_jersey_design: teamForm.preferred_jersey_design.trim(),
+      preferred_jersey_design: teamForm.preferred_jersey_design.trim() || null,
       team_logo_url: teamLogoUrl,
       logo_description: teamForm.logo_description.trim() || null,
       jersey_numbers: teamForm.jersey_numbers.map((value) => value.trim()),
@@ -1187,12 +1184,12 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                         <p className="form-help muted">Can be edited later in the team portal.</p>
                       </label>
                       <label className="form-control">
-                        <span>Primary color</span>
-                        <input type="text" value={teamForm.primary_color} onChange={(event) => updateTeamForm("primary_color", event.target.value)} required />
+                        <span>Primary color (Optional)</span>
+                        <input type="text" value={teamForm.primary_color} onChange={(event) => updateTeamForm("primary_color", event.target.value)} />
                       </label>
                       <label className="form-control">
-                        <span>Secondary color</span>
-                        <input type="text" value={teamForm.secondary_color} onChange={(event) => updateTeamForm("secondary_color", event.target.value)} required />
+                        <span>Secondary color (Optional)</span>
+                        <input type="text" value={teamForm.secondary_color} onChange={(event) => updateTeamForm("secondary_color", event.target.value)} />
                       </label>
                       <label className="form-control">
                         <span>Optional accent color</span>
@@ -1204,8 +1201,8 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                           type="text"
                           value={teamForm.preferred_jersey_design}
                           onChange={(event) => updateTeamForm("preferred_jersey_design", event.target.value)}
-                          required
                         />
+                        <p className="form-help muted">Optional. Add this if you already know the look you want.</p>
                       </label>
                       <label className="form-control">
                         <span>Upload Team Logo</span>

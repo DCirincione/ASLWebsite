@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
-import { countryCodeToFlag, getCountryNameFromCode } from "@/lib/countries";
+import { countryCodeToFlag, getCountryFlagAsset, getCountryNameFromCode } from "@/lib/countries";
 import { getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
 import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
@@ -313,15 +313,18 @@ export default function SundayLeaguePublicTeamPage() {
                   <h3>Roster</h3>
                   {rosterPlayers.length > 0 ? (
                     <div className="sunday-league-team-board__roster">
-                      {rosterPlayers.map((player) => (
-                        <article key={player.id} className="sunday-league-team-board__player-card">
+                      {rosterPlayers.map((player) => {
+                        const customFlagAsset = getCountryFlagAsset(player.countryCode);
+
+                        return (
+                          <article key={player.id} className="sunday-league-team-board__player-card">
                           {player.role !== "player" ? (
                             <span
                               className="sunday-league-team-board__player-crown"
                               role="img"
                               aria-label={player.role === "captain" ? "Captain" : "Co-Captain"}
                             >
-                              <Image src="/fifa-card/crown.png" alt="" width={56} height={56} />
+                              <Image src="/fifa-card/crown.png" alt="" width={56} height={56} loading="eager" />
                             </span>
                           ) : null}
                           <div className="sunday-league-team-board__player-avatar-wrap">
@@ -338,7 +341,18 @@ export default function SundayLeaguePublicTeamPage() {
                             <p className="sunday-league-team-board__player-name">{player.name}</p>
                             <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
                             <div className="sunday-league-team-board__player-row">
-                              {countryCodeToFlag(player.countryCode) ? (
+                              {customFlagAsset ? (
+                                <span className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
+                                  <Image
+                                    src={customFlagAsset.src}
+                                    alt=""
+                                    width={customFlagAsset.width}
+                                    height={customFlagAsset.height}
+                                    className="sunday-league-team-board__player-flag-image"
+                                    style={{ width: "34px", height: "auto" }}
+                                  />
+                                </span>
+                              ) : countryCodeToFlag(player.countryCode) ? (
                                 <p className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
                                   {countryCodeToFlag(player.countryCode)}
                                 </p>
@@ -354,14 +368,16 @@ export default function SundayLeaguePublicTeamPage() {
                               <Image
                                 src={getSundayLeagueDivisionLogoSrc(team.division as SundayLeagueDivision)}
                                 alt={`Division ${team.division}`}
-                                width={144}
-                                height={42}
+                                width={3141}
+                                height={949}
                                 className="sunday-league-team-board__player-division-image"
+                                style={{ width: "144px", height: "auto" }}
                               />
                             </div>
                           </div>
-                        </article>
-                      ))}
+                          </article>
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="muted">No players have signed up for this roster yet.</p>

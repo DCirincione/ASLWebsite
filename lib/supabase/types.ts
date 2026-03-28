@@ -643,6 +643,78 @@ export type ContactMessageUpdate = {
   created_at?: string | null;
 };
 
+export type UserInboxMessage = {
+  id: string;
+  recipient_user_id: string;
+  sender_user_id?: string | null;
+  sender_name?: string | null;
+  title: string;
+  message: string;
+  category?: "announcement" | null;
+  audience?: "all_players" | "selected_players" | null;
+  is_read?: boolean | null;
+  read_at?: string | null;
+  created_at?: string | null;
+};
+
+export type UserInboxMessageInsert = {
+  id?: string;
+  recipient_user_id: string;
+  sender_user_id?: string | null;
+  sender_name?: string | null;
+  title: string;
+  message: string;
+  category?: "announcement" | null;
+  audience?: "all_players" | "selected_players" | null;
+  is_read?: boolean | null;
+  read_at?: string | null;
+  created_at?: string | null;
+};
+
+export type UserInboxMessageUpdate = {
+  id?: string;
+  recipient_user_id?: string;
+  sender_user_id?: string | null;
+  sender_name?: string | null;
+  title?: string;
+  message?: string;
+  category?: "announcement" | null;
+  audience?: "all_players" | "selected_players" | null;
+  is_read?: boolean | null;
+  read_at?: string | null;
+  created_at?: string | null;
+};
+
+export type UserDirectMessage = {
+  id: string;
+  sender_user_id: string;
+  recipient_user_id: string;
+  message: string;
+  is_read?: boolean | null;
+  read_at?: string | null;
+  created_at?: string | null;
+};
+
+export type UserDirectMessageInsert = {
+  id?: string;
+  sender_user_id: string;
+  recipient_user_id: string;
+  message: string;
+  is_read?: boolean | null;
+  read_at?: string | null;
+  created_at?: string | null;
+};
+
+export type UserDirectMessageUpdate = {
+  id?: string;
+  sender_user_id?: string;
+  recipient_user_id?: string;
+  message?: string;
+  is_read?: boolean | null;
+  read_at?: string | null;
+  created_at?: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -740,6 +812,18 @@ export type Database = {
         Row: ContactMessage;
         Insert: ContactMessageInsert;
         Update: ContactMessageUpdate;
+        Relationships: [];
+      };
+      user_inbox_messages: {
+        Row: UserInboxMessage;
+        Insert: UserInboxMessageInsert;
+        Update: UserInboxMessageUpdate;
+        Relationships: [];
+      };
+      user_direct_messages: {
+        Row: UserDirectMessage;
+        Insert: UserDirectMessageInsert;
+        Update: UserDirectMessageUpdate;
         Relationships: [];
       };
     };

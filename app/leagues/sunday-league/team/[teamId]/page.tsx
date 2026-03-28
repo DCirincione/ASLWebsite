@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
@@ -14,7 +14,7 @@ import {
   getAldrichCommunicationsPreferenceFromJson,
   syncAldrichCommunicationsPreference,
 } from "@/lib/aldrich-communications";
-import { countryCodeToFlag, getCountryNameFromCode } from "@/lib/countries";
+import { countryCodeToFlag, getCountryFlagAsset, getCountryNameFromCode } from "@/lib/countries";
 import { createId } from "@/lib/create-id";
 import { getSundayLeagueColor, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
@@ -107,7 +107,8 @@ const buildTeamHistory = (team: SundayLeagueTeam | null) => {
 
   return [
     `${team.division ?? "Division placement pending"} reserved for the upcoming season`,
-    team.deposit_status === "paid" ? "Deposit received and team spot confirmed" : "Deposit pending before final approval",
+    team.deposit_status
+     === "paid" ? "Deposit received and team spot confirmed" : "Deposit pending before final approval",
     "Club history will expand after the first official league match",
   ];
 };
@@ -143,6 +144,7 @@ export default function SundayLeagueTeamPortalPage() {
   const [leaveState, setLeaveState] = useState<ActionState>({ type: "idle" });
   const [form, setForm] = useState<TeamPortalFormState | null>(null);
   const [teamLogoFile, setTeamLogoFile] = useState<File | null>(null);
+  const editSectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     const loadTeamRoster = async (nextTeam: SundayLeagueTeam) => {
@@ -303,6 +305,24 @@ export default function SundayLeagueTeamPortalPage() {
 
     void loadScheduleWeeks();
   }, []);
+
+  useEffect(() => {
+    if (!isEditing || !editSectionRef.current) return;
+
+    const frameId = requestAnimationFrame(() => {
+      const headerOffset = 96;
+      const targetTop = editSectionRef.current
+        ? editSectionRef.current.getBoundingClientRect().top + window.scrollY - headerOffset
+        : 0;
+
+      window.scrollTo({
+        top: Math.max(0, targetTop),
+        behavior: "smooth",
+      });
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [isEditing]);
 
   const historyRows = useMemo(() => buildTeamHistory(team), [team]);
   const establishedLabel = useMemo(() => getEstablishedLabel(team), [team]);
@@ -610,12 +630,9 @@ export default function SundayLeagueTeamPortalPage() {
       !form.captain_name.trim() ||
       !form.team_name.trim() ||
       !form.captain_phone.trim() ||
-      !form.captain_email.trim() ||
-      !form.primary_color.trim() ||
-      !form.secondary_color.trim() ||
-      !form.preferred_jersey_design.trim()
+      !form.captain_email.trim()
     ) {
-      setSaveState({ type: "error", message: "Complete all required captain, team, and jersey fields before saving." });
+      setSaveState({ type: "error", message: "Complete all required captain and team fields before saving." });
       return;
     }
 
@@ -654,11 +671,11 @@ export default function SundayLeagueTeamPortalPage() {
       captain_email: form.captain_email.trim(),
       captain_is_playing: form.captain_is_playing,
       preferred_jersey_colors: {
-        primary: form.primary_color.trim(),
-        secondary: form.secondary_color.trim(),
+        primary: form.primary_color.trim() || null,
+        secondary: form.secondary_color.trim() || null,
         accent: form.accent_color.trim() || null,
       },
-      preferred_jersey_design: form.preferred_jersey_design.trim(),
+      preferred_jersey_design: form.preferred_jersey_design.trim() || null,
       team_logo_url: teamLogoUrl,
       logo_description: form.logo_description.trim() || null,
       jersey_numbers: form.jersey_numbers.map((value) => value.trim()),
@@ -969,7 +986,104 @@ export default function SundayLeagueTeamPortalPage() {
                       </div>
                     )
                   ) : null}
-                  {isEditing && acceptedLeadershipCandidates.length > 0 ? (
+                  {rosterPlayers.length > 0 ? (
+                    <div className="sunday-league-team-board__roster">
+                      {rosterPlayers.map((player) => {
+                        const customFlagAsset = getCountryFlagAsset(player.countryCode);
+
+                        return (
+                          <article key={player.id} className="sunday-league-team-board__player-card">
+                          {player.role !== "player" ? (
+                            <span
+                              className="sunday-league-team-board__player-crown"
+                              role="img"
+                              aria-label={player.role === "captain" ? "Captain" : "Co-Captain"}
+                            >
+                              <Image src="/fifa-card/crown.png" alt="" width={56} height={56} loading="eager" />
+                            </span>
+                          ) : null}
+                          <div className="sunday-league-team-board__player-avatar-wrap">
+                            <div className="sunday-league-team-board__player-avatar">
+                              <Image
+                                src={player.avatarUrl ?? "/avatar-placeholder.svg"}
+                                alt={player.name}
+                                fill
+                                sizes="180px"
+                              />
+                            </div>
+                          </div>
+                          <div className="sunday-league-team-board__player-panel">
+                            <p className="sunday-league-team-board__player-name">{player.name}</p>
+                            <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
+                            <div className="sunday-league-team-board__player-row">
+                              {customFlagAsset ? (
+                                <span className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
+                                  <Image
+                                    src={customFlagAsset.src}
+                                    alt=""
+                                    width={customFlagAsset.width}
+                                    height={customFlagAsset.height}
+                                    className="sunday-league-team-board__player-flag-image"
+                                    style={{ width: "34px", height: "auto" }}
+                                  />
+                                </span>
+                              ) : countryCodeToFlag(player.countryCode) ? (
+                                <p className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
+                                  {countryCodeToFlag(player.countryCode)}
+                                </p>
+                              ) : (
+                                <span className="sunday-league-team-board__player-flag sunday-league-team-board__player-flag--empty" aria-hidden />
+                              )}
+                              <p className="sunday-league-team-board__player-number">#{player.jerseyNumber || "0"}</p>
+                              <div className="sunday-league-team-board__player-badge">
+                                <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="42px" />
+                              </div>
+                            </div>
+                            <div className="sunday-league-team-board__player-division">
+                              <Image
+                                src={getSundayLeagueDivisionLogoSrc(team.division as SundayLeagueDivision)}
+                                alt={`Division ${team.division}`}
+                                width={3141}
+                                height={949}
+                                className="sunday-league-team-board__player-division-image"
+                                style={{ width: "144px", height: "auto" }}
+                              />
+                            </div>
+                          </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="muted">No players have signed up for your roster yet.</p>
+                  )}
+                </section>
+
+                <section className="sunday-league-team-board__section">
+                  <h3>Schedule</h3>
+                  {scheduleWeeks.length === 0 ? (
+                    <p className="muted">No weekly schedule has been posted yet.</p>
+                  ) : (
+                    <p className="muted">Weekly field assignments and match times are posted on the Sunday League schedule page.</p>
+                  )}
+                </section>
+
+                <section className="sunday-league-team-board__section">
+                  <h3>History</h3>
+                  <div className="sunday-league-team-board__list">
+                    {historyRows.map((item) => (
+                      <div key={item} className="sunday-league-team-board__list-row">
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              </article>
+
+              {isEditing && form ? (
+                <article ref={editSectionRef} className="sunday-league-flow-summary__card">
+                  <h3>Edit Team</h3>
+                  {acceptedLeadershipCandidates.length > 0 ? (
                     <div className="sunday-league-stack">
                       <div>
                         <p className="eyebrow">Leadership</p>
@@ -1040,87 +1154,6 @@ export default function SundayLeagueTeamPortalPage() {
                       </div>
                     </div>
                   ) : null}
-                  {rosterPlayers.length > 0 ? (
-                    <div className="sunday-league-team-board__roster">
-                      {rosterPlayers.map((player) => (
-                        <article key={player.id} className="sunday-league-team-board__player-card">
-                          {player.role !== "player" ? (
-                            <span
-                              className="sunday-league-team-board__player-crown"
-                              role="img"
-                              aria-label={player.role === "captain" ? "Captain" : "Co-Captain"}
-                            >
-                              <Image src="/fifa-card/crown.png" alt="" width={56} height={56} />
-                            </span>
-                          ) : null}
-                          <div className="sunday-league-team-board__player-avatar-wrap">
-                            <div className="sunday-league-team-board__player-avatar">
-                              <Image
-                                src={player.avatarUrl ?? "/avatar-placeholder.svg"}
-                                alt={player.name}
-                                fill
-                                sizes="180px"
-                              />
-                            </div>
-                          </div>
-                          <div className="sunday-league-team-board__player-panel">
-                            <p className="sunday-league-team-board__player-name">{player.name}</p>
-                            <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
-                            <div className="sunday-league-team-board__player-row">
-                              {countryCodeToFlag(player.countryCode) ? (
-                                <p className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
-                                  {countryCodeToFlag(player.countryCode)}
-                                </p>
-                              ) : (
-                                <span className="sunday-league-team-board__player-flag sunday-league-team-board__player-flag--empty" aria-hidden />
-                              )}
-                              <p className="sunday-league-team-board__player-number">#{player.jerseyNumber || "0"}</p>
-                              <div className="sunday-league-team-board__player-badge">
-                                <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="42px" />
-                              </div>
-                            </div>
-                            <div className="sunday-league-team-board__player-division">
-                              <Image
-                                src={getSundayLeagueDivisionLogoSrc(team.division as SundayLeagueDivision)}
-                                alt={`Division ${team.division}`}
-                                width={144}
-                                height={42}
-                                className="sunday-league-team-board__player-division-image"
-                              />
-                            </div>
-                          </div>
-                        </article>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="muted">No players have signed up for your roster yet.</p>
-                  )}
-                </section>
-
-                <section className="sunday-league-team-board__section">
-                  <h3>Schedule</h3>
-                  {scheduleWeeks.length === 0 ? (
-                    <p className="muted">No weekly schedule has been posted yet.</p>
-                  ) : (
-                    <p className="muted">Weekly field assignments and match times are posted on the Sunday League schedule page.</p>
-                  )}
-                </section>
-
-                <section className="sunday-league-team-board__section">
-                  <h3>History</h3>
-                  <div className="sunday-league-team-board__list">
-                    {historyRows.map((item) => (
-                      <div key={item} className="sunday-league-team-board__list-row">
-                        <span>{item}</span>
-                      </div>
-                    ))}
-                  </div>
-                </section>
-              </article>
-
-              {isEditing && form ? (
-                <article className="sunday-league-flow-summary__card">
-                  <h3>Edit Team</h3>
                   <div className="sunday-league-team-form">
                     <div className="sunday-league-form-grid">
                       <label className="form-control">
@@ -1140,11 +1173,11 @@ export default function SundayLeagueTeamPortalPage() {
                         <input type="tel" value={form.captain_phone} onChange={(event) => updateForm("captain_phone", event.target.value)} required />
                       </label>
                       <label className="form-control">
-                        <span>Primary jersey</span>
+                        <span>Primary jersey (Optional)</span>
                         <input value={form.primary_color} onChange={(event) => updateForm("primary_color", event.target.value)} />
                       </label>
                       <label className="form-control">
-                        <span>Secondary jersey</span>
+                        <span>Secondary jersey (Optional)</span>
                         <input value={form.secondary_color} onChange={(event) => updateForm("secondary_color", event.target.value)} />
                       </label>
                       <label className="form-control">
@@ -1152,7 +1185,7 @@ export default function SundayLeagueTeamPortalPage() {
                         <input value={form.accent_color} onChange={(event) => updateForm("accent_color", event.target.value)} />
                       </label>
                       <label className="form-control sunday-league-form-grid__full">
-                        <span>Design/style</span>
+                        <span>Design/style (Optional)</span>
                         <input
                           value={form.preferred_jersey_design}
                           onChange={(event) => updateForm("preferred_jersey_design", event.target.value)}

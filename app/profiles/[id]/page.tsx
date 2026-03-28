@@ -75,6 +75,7 @@ export default function PublicProfilePage() {
   const params = useParams<{ id: string }>();
   const profileId = params?.id;
 
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState<ProfileWithAvatar | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [teams, setTeams] = useState<PublicSundayLeagueTeam[]>([]);
@@ -83,6 +84,17 @@ export default function PublicProfilePage() {
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(false);
+
+  useEffect(() => {
+    const loadSession = async () => {
+      if (!supabase) return;
+
+      const { data: sessionData } = await supabase.auth.getSession();
+      setSessionUserId(sessionData.session?.user.id ?? null);
+    };
+
+    void loadSession();
+  }, []);
 
   useEffect(() => {
     const load = async () => {
@@ -247,7 +259,14 @@ export default function PublicProfilePage() {
               </p>
             </div>
           </div>
-          <HistoryBackButton label="← Back" fallbackHref="/account" />
+          <div className="cta-row">
+            {sessionUserId && profileId && sessionUserId !== profileId ? (
+              <Link className="button ghost" href={`/account/inbox?tab=chats&chat=${profileId}`}>
+                Message
+              </Link>
+            ) : null}
+            <HistoryBackButton label="← Back" fallbackHref="/account" />
+          </div>
         </header>
 
         {status === "error" ? (
