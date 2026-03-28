@@ -17,6 +17,19 @@ create index if not exists user_direct_messages_sender_idx
 create index if not exists user_direct_messages_recipient_idx
   on public.user_direct_messages (recipient_user_id, created_at desc);
 
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public'
+      and tablename = 'user_direct_messages'
+  ) then
+    alter publication supabase_realtime add table public.user_direct_messages;
+  end if;
+end $$;
+
 alter table public.user_direct_messages enable row level security;
 
 drop policy if exists "Users can read their own direct messages" on public.user_direct_messages;

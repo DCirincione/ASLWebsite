@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
@@ -48,6 +48,17 @@ const formatInboxDate = (value?: string | null) => {
   return date.toLocaleString();
 };
 
+const getDateValue = (value?: string | null) => {
+  if (!value) return 0;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? 0 : date.getTime();
+};
+
+const upsertDirectMessage = (messages: UserDirectMessage[], nextMessage: UserDirectMessage) =>
+  [...messages.filter((message) => message.id !== nextMessage.id), nextMessage].sort(
+    (left, right) => getDateValue(left.created_at) - getDateValue(right.created_at),
+  );
+
 const isChatsTabValue = (value?: string | null): value is MessageCenterTab => value === "inbox" || value === "chats";
 
 function AccountInboxContent() {
@@ -71,6 +82,11 @@ function AccountInboxContent() {
   const [memberSearch, setMemberSearch] = useState("");
   const [memberSearchResults, setMemberSearchResults] = useState<ChatProfile[]>([]);
   const [memberSearchLoading, setMemberSearchLoading] = useState(false);
+  const chatProfilesRef = useRef<Record<string, ChatProfile>>({});
+
+  useEffect(() => {
+    chatProfilesRef.current = chatProfiles;
+  }, [chatProfiles]);
 
   const syncRouteState = useCallback(
     (tab: MessageCenterTab, chatUserId?: string | null) => {
@@ -108,6 +124,26 @@ function AccountInboxContent() {
     },
     [syncRouteState],
   );
+
+  const ensureChatProfile = useCallback(async (profileId: string) => {
+    const client = supabase;
+    if (!client || !profileId || chatProfilesRef.current[profileId]) {
+      return;
+    }
+
+    const { data, error: profileError } = await client
+      .from("profiles")
+      .select("id,name,avatar_url,sports")
+      .eq("id", profileId)
+      .maybeSingle();
+
+    if (profileError || !data) {
+      return;
+    }
+
+    const nextProfile = data as ChatProfile;
+    setChatProfiles((prev) => (prev[nextProfile.id] ? prev : { ...prev, [nextProfile.id]: nextProfile }));
+  }, []);
 
   const loadMessageCenter = useCallback(async () => {
     if (!supabase) {
@@ -276,6 +312,81 @@ function AccountInboxContent() {
 
     return () => window.clearTimeout(timeoutId);
   }, [loadMessageCenter]);
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client || !currentUserId) {
+      return;
+    }
+
+    const handleDirectMessageUpsert = (payload: { new: UserDirectMessage }) => {
+      const nextMessage = payload.new;
+      if (!nextMessage?.id) {
+        return;
+      }
+
+      setDirectMessages((prev) => upsertDirectMessage(prev, nextMessage));
+
+      const partnerId =
+        nextMessage.sender_user_id === currentUserId ? nextMessage.recipient_user_id : nextMessage.sender_user_id;
+
+      if (partnerId && !chatProfilesRef.current[partnerId]) {
+        void ensureChatProfile(partnerId);
+      }
+    };
+
+    const channel = client
+      .channel(`account-inbox-direct-messages:${currentUserId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "user_direct_messages",
+          filter: `recipient_user_id=eq.${currentUserId}`,
+        },
+        handleDirectMessageUpsert,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "user_direct_messages",
+          filter: `sender_user_id=eq.${currentUserId}`,
+        },
+        handleDirectMessageUpsert,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "user_direct_messages",
+          filter: `recipient_user_id=eq.${currentUserId}`,
+        },
+        handleDirectMessageUpsert,
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "user_direct_messages",
+          filter: `sender_user_id=eq.${currentUserId}`,
+        },
+        handleDirectMessageUpsert,
+      )
+      .subscribe((subscriptionStatus) => {
+        if (subscriptionStatus === "CHANNEL_ERROR") {
+          setChatError((prev) => prev ?? "Realtime chat updates are unavailable right now. Refresh to see new messages.");
+        }
+      });
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, [currentUserId, ensureChatProfile]);
 
   useEffect(() => {
     if (activeTab !== "chats" || selectedChatUserId || status !== "ready") {
@@ -454,7 +565,7 @@ function AccountInboxContent() {
       return;
     }
 
-    setDirectMessages((prev) => [...prev, data as UserDirectMessage]);
+    setDirectMessages((prev) => upsertDirectMessage(prev, data as UserDirectMessage));
     setChatDraft("");
     setSendingChat(false);
   };
