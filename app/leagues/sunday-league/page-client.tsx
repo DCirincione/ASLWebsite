@@ -213,6 +213,7 @@ type SundayLeaguePageClientProps = {
 export default function SundayLeaguePageClient({ initialSection = "overview" }: SundayLeaguePageClientProps) {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<SundayLeagueSection>(initialSection);
+  const [createTeamInfoOpen, setCreateTeamInfoOpen] = useState(false);
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
   const [selectedDivision, setSelectedDivision] = useState<SundayLeagueDivision>(1);
   const [overviewFlyer, setOverviewFlyer] = useState<string>("/sundayLeague/champs2025.jpeg");
@@ -235,6 +236,44 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     message: "",
     communications_opt_in: true,
   });
+
+  const openCreateTeamInstructions = () => {
+    setActiveSection("teams");
+    setCreateTeamOpen(false);
+    setCreateTeamInfoOpen(true);
+  };
+
+  const closeCreateTeamInstructions = () => {
+    setCreateTeamInfoOpen(false);
+  };
+
+  const continueCreateTeamFlow = async () => {
+    let nextUserId = userId;
+    let nextUserEmail = "";
+
+    if (!nextUserId && supabase) {
+      const { data: sessionData } = await supabase.auth.getSession();
+      nextUserId = sessionData.session?.user.id ?? null;
+      nextUserEmail = sessionData.session?.user.email ?? "";
+
+      if (nextUserId) {
+        setUserId(nextUserId);
+        setTeamForm((prev) => ({
+          ...prev,
+          captain_email: prev.captain_email || nextUserEmail || "",
+        }));
+      }
+    }
+
+    setCreateTeamInfoOpen(false);
+
+    if (!nextUserId) {
+      router.push("/account/create");
+      return;
+    }
+
+    setCreateTeamOpen(true);
+  };
 
   useEffect(() => {
     const normalize = (value?: string | null) => (value ?? "").trim().toLowerCase();
@@ -284,6 +323,32 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
     };
 
     void loadFlyer();
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const syncHashState = () => {
+      const hash = window.location.hash.replace(/^#/, "").trim().toLowerCase();
+
+      if (hash === "join-team") {
+        setActiveSection("teams");
+        return;
+      }
+
+      if (hash === "create-team") {
+        setActiveSection("teams");
+        setCreateTeamOpen(false);
+        setCreateTeamInfoOpen(true);
+      }
+    };
+
+    syncHashState();
+    window.addEventListener("hashchange", syncHashState);
+
+    return () => {
+      window.removeEventListener("hashchange", syncHashState);
+    };
   }, []);
 
   useEffect(() => {
@@ -799,11 +864,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                   className="button primary"
                   type="button"
                   onClick={() => {
-                    if (!userId) {
-                      router.push("/account/create");
-                      return;
-                    }
-                    setCreateTeamOpen(true);
+                    openCreateTeamInstructions();
                   }}
                 >
                   Create Team
@@ -1074,11 +1135,7 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
                     className="button ghost"
                     type="button"
                     onClick={() => {
-                      if (!userId) {
-                        router.push("/account/create");
-                        return;
-                      }
-                      setCreateTeamOpen(true);
+                      openCreateTeamInstructions();
                     }}
                   >
                     Create a Team
@@ -1122,6 +1179,58 @@ export default function SundayLeaguePageClient({ initialSection = "overview" }: 
             <div className="sunday-league-main__content">{renderContent()}</div>
           </div>
         </div>
+
+        {createTeamInfoOpen ? (
+          <div className="register-modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="sunday-league-create-info-title">
+            <div className="register-modal sunday-league-invite-modal sunday-league-create-info-modal">
+              <div className="register-modal__header">
+                <div className="sunday-league-stack">
+                  <p className="eyebrow">Sunday League</p>
+                  <h2 id="sunday-league-create-info-title">CREATE YOUR TEAM (IMPORTANT)</h2>
+                </div>
+                <button className="button ghost" type="button" onClick={closeCreateTeamInstructions}>
+                  Close
+                </button>
+              </div>
+
+              <div className="sunday-league-create-info-modal__body">
+                <div className="sunday-league-create-info-modal__section">
+                  <p>Only the Manager should create the team and complete this form.</p>
+                  <p>Once created, you can:</p>
+                  <ul className="sunday-league-create-info-modal__list">
+                    <li>Invite/accept/remove players</li>
+                    <li>Edit team info + logo</li>
+                    <li>Assign roles (Co-Captain)</li>
+                  </ul>
+                </div>
+
+                <div className="sunday-league-create-info-modal__section">
+                  <h3>TEAM HUB</h3>
+                  <p>You’ll have access to:</p>
+                  <ul className="sunday-league-create-info-modal__list">
+                    <li>Roster, schedule, stats, standings</li>
+                    <li>Team inbox/messages</li>
+                  </ul>
+                </div>
+
+                <div className="sunday-league-create-info-modal__section">
+                  <h3>IMPORTANT</h3>
+                  <p>All players must create an account and join your team on the site.</p>
+                  <p className="sunday-league-create-info-modal__closing">Get your team set up and ready. ⚽</p>
+                </div>
+              </div>
+
+              <div className="register-modal__footer">
+                <button className="button ghost" type="button" onClick={closeCreateTeamInstructions}>
+                  Cancel
+                </button>
+                <button className="button primary" type="button" onClick={() => void continueCreateTeamFlow()}>
+                  Accept and Continue
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {createTeamOpen ? (
           <div className="register-modal-backdrop" role="dialog" aria-modal="true">

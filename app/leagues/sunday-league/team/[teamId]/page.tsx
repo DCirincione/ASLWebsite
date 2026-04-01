@@ -56,6 +56,7 @@ type TeamPortalFormState = {
 
 type TeamRosterPlayer = {
   id: string;
+  profileId: string | null;
   name: string;
   position: string | null;
   avatarUrl: string | null;
@@ -188,6 +189,7 @@ export default function SundayLeagueTeamPortalPage() {
         const captainProfile = profileMap.get(nextTeam.user_id);
         nextRosterPlayers.push({
           id: nextTeam.user_id,
+          profileId: nextTeam.user_id,
           name: captainProfile?.name?.trim() || nextTeam.captain_name,
           position: Array.isArray(captainProfile?.positions) ? captainProfile.positions[0] ?? null : null,
           avatarUrl: captainProfile?.avatar_url ?? null,
@@ -203,6 +205,7 @@ export default function SundayLeagueTeamPortalPage() {
           const profile = profileMap.get(member.player_user_id as string);
           nextRosterPlayers.push({
             id: member.id,
+            profileId: member.player_user_id ?? null,
             name: profile?.name?.trim() || member.invite_name?.trim() || "Player",
             position: Array.isArray(profile?.positions) ? profile.positions[0] ?? null : null,
             avatarUrl: profile?.avatar_url ?? null,
@@ -504,6 +507,7 @@ export default function SundayLeagueTeamPortalPage() {
       const captainProfile = profileMap.get(nextTeam.user_id);
       nextRosterPlayers.push({
         id: nextTeam.user_id,
+        profileId: nextTeam.user_id,
         name: captainProfile?.name?.trim() || nextTeam.captain_name,
         position: Array.isArray(captainProfile?.positions) ? captainProfile.positions[0] ?? null : null,
         avatarUrl: captainProfile?.avatar_url ?? null,
@@ -519,6 +523,7 @@ export default function SundayLeagueTeamPortalPage() {
         const profile = profileMap.get(member.player_user_id as string);
         nextRosterPlayers.push({
           id: member.id,
+          profileId: member.player_user_id ?? null,
           name: profile?.name?.trim() || member.invite_name?.trim() || "Player",
           position: Array.isArray(profile?.positions) ? profile.positions[0] ?? null : null,
           avatarUrl: profile?.avatar_url ?? null,
@@ -1058,72 +1063,89 @@ export default function SundayLeagueTeamPortalPage() {
                       {rosterPlayers.map((player) => {
                         const customFlagAsset = getCountryFlagAsset(player.countryCode);
                         const playerName = formatSundayLeaguePlayerName(player.name);
-
-                        return (
-                          <article key={player.id} className="sunday-league-team-board__player-card">
-                          {player.role !== "player" ? (
-                            <span
-                              className="sunday-league-team-board__player-crown"
-                              role="img"
-                              aria-label={player.role === "captain" ? "Captain" : "Co-Captain"}
-                            >
-                              <Image src="/fifa-card/crown.png" alt="" width={56} height={56} loading="eager" />
-                            </span>
-                          ) : null}
-                          <div className="sunday-league-team-board__player-avatar-wrap">
-                            <div className="sunday-league-team-board__player-avatar">
-                              <Image
-                                src={player.avatarUrl ?? "/avatar-placeholder.svg"}
-                                alt={player.name}
-                                fill
-                                sizes="180px"
-                              />
-                            </div>
-                          </div>
-                          <div className="sunday-league-team-board__player-panel">
-                            <div className="sunday-league-team-board__player-identity">
-                              <p className="sunday-league-team-board__player-name">
-                                <span className="sunday-league-team-board__player-name-line">{playerName.topLine}</span>
-                                <span className="sunday-league-team-board__player-name-line">{playerName.bottomLine}</span>
-                              </p>
-                              <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
-                            </div>
-                            <div className="sunday-league-team-board__player-row">
-                              {customFlagAsset ? (
-                                <span className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
-                                  <Image
-                                    src={customFlagAsset.src}
-                                    alt=""
-                                    width={customFlagAsset.width}
-                                    height={customFlagAsset.height}
-                                    className="sunday-league-team-board__player-flag-image"
-                                    style={{ width: "34px", height: "auto" }}
-                                  />
-                                </span>
-                              ) : countryCodeToFlag(player.countryCode) ? (
-                                <p className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
-                                  {countryCodeToFlag(player.countryCode)}
-                                </p>
-                              ) : (
-                                <span className="sunday-league-team-board__player-flag sunday-league-team-board__player-flag--empty" aria-hidden />
-                              )}
-                              <p className="sunday-league-team-board__player-number">#{player.jerseyNumber || "0"}</p>
-                              <div className="sunday-league-team-board__player-badge">
-                                <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="42px" />
+                        const profileHref = player.profileId ? `/profiles/${player.profileId}` : null;
+                        const cardContent = (
+                          <>
+                            {player.role !== "player" ? (
+                              <span
+                                className="sunday-league-team-board__player-crown"
+                                role="img"
+                                aria-label={player.role === "captain" ? "Captain" : "Co-Captain"}
+                              >
+                                <Image src="/fifa-card/crown.png" alt="" width={56} height={56} loading="eager" />
+                              </span>
+                            ) : null}
+                            <div className="sunday-league-team-board__player-avatar-wrap">
+                              <div className="sunday-league-team-board__player-avatar">
+                                <Image
+                                  src={player.avatarUrl ?? "/avatar-placeholder.svg"}
+                                  alt={player.name}
+                                  fill
+                                  sizes="180px"
+                                />
                               </div>
                             </div>
-                            <div className="sunday-league-team-board__player-division">
-                              <Image
-                                src={getSundayLeagueDivisionLogoSrc(team.division as SundayLeagueDivision)}
-                                alt={`Division ${team.division}`}
-                                width={3141}
-                                height={949}
-                                className="sunday-league-team-board__player-division-image"
-                                style={{ width: "144px", height: "auto" }}
-                              />
+                            <div className="sunday-league-team-board__player-panel">
+                              <div className="sunday-league-team-board__player-identity">
+                                <p className="sunday-league-team-board__player-name">
+                                  <span className="sunday-league-team-board__player-name-line">{playerName.topLine}</span>
+                                  <span className="sunday-league-team-board__player-name-line">{playerName.bottomLine}</span>
+                                </p>
+                                <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
+                              </div>
+                              <div className="sunday-league-team-board__player-row">
+                                {customFlagAsset ? (
+                                  <span className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
+                                    <Image
+                                      src={customFlagAsset.src}
+                                      alt=""
+                                      width={customFlagAsset.width}
+                                      height={customFlagAsset.height}
+                                      className="sunday-league-team-board__player-flag-image"
+                                      style={{ width: "34px", height: "auto" }}
+                                    />
+                                  </span>
+                                ) : countryCodeToFlag(player.countryCode) ? (
+                                  <p className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>
+                                    {countryCodeToFlag(player.countryCode)}
+                                  </p>
+                                ) : (
+                                  <span className="sunday-league-team-board__player-flag sunday-league-team-board__player-flag--empty" aria-hidden />
+                                )}
+                                <p className="sunday-league-team-board__player-number">#{player.jerseyNumber || "0"}</p>
+                                <div className="sunday-league-team-board__player-badge">
+                                  <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="42px" />
+                                </div>
+                              </div>
+                              <div className="sunday-league-team-board__player-division">
+                                <Image
+                                  src={getSundayLeagueDivisionLogoSrc(team.division as SundayLeagueDivision)}
+                                  alt={`Division ${team.division}`}
+                                  width={3141}
+                                  height={949}
+                                  className="sunday-league-team-board__player-division-image"
+                                  style={{ width: "144px", height: "auto" }}
+                                />
+                              </div>
                             </div>
-                          </div>
-                          </article>
+                          </>
+                        );
+
+                        return (
+                          profileHref ? (
+                            <Link
+                              key={player.id}
+                              href={profileHref}
+                              className="sunday-league-team-board__player-card sunday-league-team-board__player-card--link"
+                              aria-label={`View ${player.name}'s profile`}
+                            >
+                              {cardContent}
+                            </Link>
+                          ) : (
+                            <article key={player.id} className="sunday-league-team-board__player-card">
+                              {cardContent}
+                            </article>
+                          )
                         );
                       })}
                     </div>

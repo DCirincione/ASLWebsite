@@ -1,6 +1,6 @@
 {
   "homeBanner": {
-    "enabled": true,
+    "enabled": false,
     "text": "Sign-ups for Aldrich Sunday League Are Open!",
     "buttonTarget": "event",
     "buttonEventId": "8ad9baff-5d65-4be1-8268-b51b8115ff5f",
