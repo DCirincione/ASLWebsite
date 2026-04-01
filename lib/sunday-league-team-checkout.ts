@@ -3,8 +3,6 @@ import type { JsonValue, SundayLeagueTeamInsert } from "@/lib/supabase/types";
 import type { SundayLeagueSignupForm } from "@/lib/sunday-league-signup-form";
 import type { SundayLeagueDivision } from "@/lib/sunday-league";
 
-export const SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS = 10000;
-export const SUNDAY_LEAGUE_DEPOSIT_CURRENCY = "USD";
 export const SUNDAY_LEAGUE_CHECKOUT_WINDOW_MS = 30 * 60 * 1000;
 
 export type SundayLeagueCheckoutFormValues = Record<string, string | boolean>;

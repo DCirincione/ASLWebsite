@@ -29,6 +29,7 @@ import {
 import {
   asTrimmedString,
 } from "@/lib/sunday-league-team-checkout";
+import { formatSundayLeagueDepositAmount } from "@/lib/sunday-league-settings-shared";
 import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
 import type { FriendRequest, SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
@@ -161,11 +162,13 @@ const rules = [
 type SundayLeaguePageClientProps = {
   initialSection?: SundayLeagueSection;
   signupForm: SundayLeagueSignupForm;
+  depositAmountCents: number;
 };
 
 export default function SundayLeaguePageClient({
   initialSection = "overview",
   signupForm,
+  depositAmountCents,
 }: SundayLeaguePageClientProps) {
   const router = useRouter();
   const [activeSection, setActiveSection] = useState<SundayLeagueSection>(initialSection);
@@ -192,6 +195,7 @@ export default function SundayLeaguePageClient({
     message: "",
     communications_opt_in: true,
   });
+  const depositAmountLabel = formatSundayLeagueDepositAmount(depositAmountCents);
 
   const openCreateTeamInstructions = () => {
     setActiveSection("teams");
@@ -804,7 +808,9 @@ export default function SundayLeaguePageClient({
             onChange={(event) => updateTeamForm(field.name, event.target.checked)}
           />
           <span>
-            {field.label}
+            {field.name === "agreement_deposit_required"
+              ? `I understand a ${depositAmountLabel} deposit is required to reserve my team's spot.`
+              : field.label}
             {requiredLabel}
           </span>
         </label>
@@ -1351,7 +1357,7 @@ export default function SundayLeaguePageClient({
                   <div className="sunday-league-panel-box sunday-league-panel-box--compact">
                     <h3>Create a Sunday League Team</h3>
                     <p>
-                      Only the team captain should complete this form. By creating a team, the captain is reserving a spot in the Aldrich Sunday League and agrees to submit the required $100 deposit. The remaining balance will be due on the first Sunday of the season. After the deposit is successfully paid and confirmed, the captain will gain access to the team portal, where they can manage their roster, invite players, and update team information.
+                      Only the team captain should complete this form. By creating a team, the captain is reserving a spot in the Aldrich Sunday League and agrees to submit the required {depositAmountLabel} deposit. The remaining balance will be due on the first Sunday of the season. After the deposit is successfully paid and confirmed, the captain will gain access to the team portal, where they can manage their roster, invite players, and update team information.
                     </p>
                     <p className="muted" style={{ marginBottom: 0 }}>
                       You are currently creating for Division {selectedDivision}.

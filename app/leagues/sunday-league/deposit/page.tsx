@@ -1,4 +1,5 @@
 import SundayLeagueDepositPageClient from "./page-client";
+import { readSundayLeagueSettings } from "@/lib/sunday-league-settings";
 
 export default async function SundayLeagueDepositPage({
   searchParams,
@@ -6,5 +7,12 @@ export default async function SundayLeagueDepositPage({
   searchParams: Promise<{ teamId?: string; draftId?: string }>;
 }) {
   const params = await searchParams;
-  return <SundayLeagueDepositPageClient teamId={params.teamId ?? null} draftId={params.draftId ?? null} />;
+  const sundayLeagueSettings = await readSundayLeagueSettings();
+  return (
+    <SundayLeagueDepositPageClient
+      teamId={params.teamId ?? null}
+      draftId={params.draftId ?? null}
+      depositAmountCents={sundayLeagueSettings.depositAmountCents}
+    />
+  );
 }

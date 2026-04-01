@@ -3,10 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getBearerToken, getSupabaseServiceRole, getSupabaseWithToken } from "@/lib/admin-route-auth";
 import { createSquarePaymentLink, getAppUrl, getSquareLocationId } from "@/lib/square";
 import { readSundayLeagueSignupForm } from "@/lib/sunday-league-signup-form-store";
+import { SUNDAY_LEAGUE_DEPOSIT_CURRENCY } from "@/lib/sunday-league-settings-shared";
+import { readSundayLeagueSettings } from "@/lib/sunday-league-settings";
 import {
   SUNDAY_LEAGUE_CHECKOUT_WINDOW_MS,
-  SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS,
-  SUNDAY_LEAGUE_DEPOSIT_CURRENCY,
   buildSundayLeagueTeamCheckoutPayload,
   isSundayLeagueDivision,
   sanitizeCheckoutFormValues,
@@ -134,7 +134,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "A valid division is required." }, { status: 400 });
     }
 
-    const signupForm = await readSundayLeagueSignupForm();
+    const [signupForm, sundayLeagueSettings] = await Promise.all([
+      readSundayLeagueSignupForm(),
+      readSundayLeagueSettings(),
+    ]);
     const values = sanitizeCheckoutFormValues(body.values);
     const uploadedFiles = sanitizeUploadedFileMap(body.uploadedFiles);
     const validationError = validateSundayLeagueCheckoutInput({
@@ -239,7 +242,7 @@ export async function POST(req: NextRequest) {
         division: body.division,
         slot_number: slotNumber,
         status: "pending",
-        amount_cents: SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS,
+        amount_cents: sundayLeagueSettings.depositAmountCents,
         currency: SUNDAY_LEAGUE_DEPOSIT_CURRENCY,
         team_payload: teamPayload,
       })
@@ -264,7 +267,7 @@ export async function POST(req: NextRequest) {
         quick_pay: {
           name: `ASL Sunday League Division ${body.division} Deposit - ${teamPayload.team_name}`,
           price_money: {
-            amount: SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS,
+            amount: sundayLeagueSettings.depositAmountCents,
             currency: SUNDAY_LEAGUE_DEPOSIT_CURRENCY,
           },
           location_id: squareLocationId,

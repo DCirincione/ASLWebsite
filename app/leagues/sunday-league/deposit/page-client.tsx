@@ -6,17 +6,23 @@ import { useEffect, useState } from "react";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { getSundayLeagueColor } from "@/lib/sunday-league";
+import { formatSundayLeagueDepositAmount } from "@/lib/sunday-league-settings-shared";
 import { supabase } from "@/lib/supabase/client";
 import type { SundayLeagueTeam } from "@/lib/supabase/types";
 
 type SundayLeagueDepositPageClientProps = {
   teamId: string | null;
   draftId: string | null;
+  depositAmountCents: number;
 };
 
 type DraftStatus = "loading" | "pending" | "paid" | "completed" | "failed" | "expired" | "error" | "no-session";
 
-export default function SundayLeagueDepositPageClient({ teamId, draftId }: SundayLeagueDepositPageClientProps) {
+export default function SundayLeagueDepositPageClient({
+  teamId,
+  draftId,
+  depositAmountCents,
+}: SundayLeagueDepositPageClientProps) {
   const router = useRouter();
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
   const [teamStatus, setTeamStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
@@ -142,9 +148,10 @@ export default function SundayLeagueDepositPageClient({ teamId, draftId }: Sunda
   }, [draftId, router]);
 
   const title = draftId ? "Confirming Your Deposit" : "Reserve Your Team Spot";
+  const depositAmountLabel = formatSundayLeagueDepositAmount(depositAmountCents);
   const intro = draftId
     ? "Square sent you back here after checkout. We are waiting for payment confirmation before creating your Sunday League team in Supabase."
-    : "A $100 deposit is required to hold your Sunday League slot. Connect your payment processor or hosted checkout link here when ready.";
+    : `${depositAmountLabel} is required to hold your Sunday League slot. Connect your payment processor or hosted checkout link here when ready.`;
 
   return (
     <PageShell>
@@ -176,7 +183,7 @@ export default function SundayLeagueDepositPageClient({ teamId, draftId }: Sunda
               </div>
               <div className="sunday-league-flow-summary__card">
                 <h3>What happens next</h3>
-                <p>1. Collect the $100 deposit through Square checkout.</p>
+                <p>1. Collect the {depositAmountLabel} deposit through Square checkout.</p>
                 <p>2. Confirm payment and create the team in Supabase.</p>
                 <p>3. Send the captain or co-captain into the roster portal.</p>
               </div>

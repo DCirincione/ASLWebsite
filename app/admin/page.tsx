@@ -19,6 +19,7 @@ import {
   type SundayLeagueSignupFieldEditor,
   type SundayLeagueSignupFieldType,
 } from "@/lib/sunday-league-signup-form";
+import { DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS, formatSundayLeagueDepositAmount } from "@/lib/sunday-league-settings-shared";
 import { parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Flyer, JsonValue, Sport, SundayLeagueScheduleWeek } from "@/lib/supabase/types";
@@ -321,9 +322,14 @@ export default function AdminPage() {
   const [scheduleWeeksError, setScheduleWeeksError] = useState<string | null>(null);
   const [scheduleWeeksStatus, setScheduleWeeksStatus] = useState<FormStatus>({ type: "idle" });
   const [sundayLeagueSignupStatus, setSundayLeagueSignupStatus] = useState<FormStatus>({ type: "idle" });
+  const [sundayLeagueSettingsStatus, setSundayLeagueSettingsStatus] = useState<FormStatus>({ type: "idle" });
   const [loadingSundayLeagueSignupForm, setLoadingSundayLeagueSignupForm] = useState(false);
+  const [loadingSundayLeagueSettings, setLoadingSundayLeagueSettings] = useState(false);
   const [sundayLeagueSignupFieldsVisible, setSundayLeagueSignupFieldsVisible] = useState(false);
   const [sundayLeagueSignupFields, setSundayLeagueSignupFields] = useState<SundayLeagueSignupFieldEditor[]>([]);
+  const [sundayLeagueSettingsForm, setSundayLeagueSettingsForm] = useState({
+    depositAmount: (DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS / 100).toFixed(2),
+  });
   const [showCreateScheduleWeekForm, setShowCreateScheduleWeekForm] = useState(false);
   const [scheduleWeekForm, setScheduleWeekForm] = useState<SundayLeagueScheduleFormState>(createEmptySundayLeagueScheduleForm());
   const [editingScheduleWeekId, setEditingScheduleWeekId] = useState<string | null>(null);
@@ -622,6 +628,34 @@ export default function AdminPage() {
       setSundayLeagueSignupStatus({ type: "error", message: "Could not load the Sunday League signup form." });
     } finally {
       setLoadingSundayLeagueSignupForm(false);
+    }
+  };
+
+  const loadSundayLeagueSettings = async () => {
+    setLoadingSundayLeagueSettings(true);
+    setSundayLeagueSettingsStatus({ type: "idle" });
+
+    try {
+      const response = await fetch("/api/admin/sunday-league-settings");
+      const json = await response.json();
+
+      if (!response.ok) {
+        setSundayLeagueSettingsStatus({ type: "error", message: json?.error ?? "Could not load Sunday League deposit settings." });
+        return;
+      }
+
+      const depositAmountCents =
+        typeof json?.settings?.depositAmountCents === "number"
+          ? json.settings.depositAmountCents
+          : DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS;
+
+      setSundayLeagueSettingsForm({
+        depositAmount: (depositAmountCents / 100).toFixed(2),
+      });
+    } catch {
+      setSundayLeagueSettingsStatus({ type: "error", message: "Could not load Sunday League deposit settings." });
+    } finally {
+      setLoadingSundayLeagueSettings(false);
     }
   };
 
@@ -2205,6 +2239,7 @@ export default function AdminPage() {
       void loadEvents();
     }
     if (module === "sundayLeague") {
+      void loadSundayLeagueSettings();
       void loadSundayLeagueSignupForm();
       void loadScheduleWeeks();
     }
@@ -2387,6 +2422,13 @@ export default function AdminPage() {
 
   const updateSiteSettings = <K extends keyof typeof siteSettingsForm>(key: K, value: (typeof siteSettingsForm)[K]) => {
     setSiteSettingsForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateSundayLeagueSettings = <K extends keyof typeof sundayLeagueSettingsForm>(
+    key: K,
+    value: (typeof sundayLeagueSettingsForm)[K],
+  ) => {
+    setSundayLeagueSettingsForm((prev) => ({ ...prev, [key]: value }));
   };
 
   const updateAnnouncementForm = <K extends keyof AnnouncementFormState>(key: K, value: AnnouncementFormState[K]) => {
@@ -3015,6 +3057,59 @@ export default function AdminPage() {
       setSiteSettingsStatus({ type: "success", message: "Home page banner settings updated." });
     } catch {
       setSiteSettingsStatus({ type: "error", message: "Could not update site settings." });
+    }
+  };
+
+  const handleSaveSundayLeagueSettings = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setSundayLeagueSettingsStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    const depositAmountValue = Number(sundayLeagueSettingsForm.depositAmount);
+    const depositAmountCents = Math.round(depositAmountValue * 100);
+
+    if (!Number.isFinite(depositAmountValue) || depositAmountCents <= 0) {
+      setSundayLeagueSettingsStatus({ type: "error", message: "Enter a deposit amount greater than $0.00." });
+      return;
+    }
+
+    setSundayLeagueSettingsStatus({ type: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/sunday-league-settings", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({ depositAmountCents }),
+      });
+      const json = await response.json();
+
+      if (!response.ok) {
+        setSundayLeagueSettingsStatus({ type: "error", message: json?.error ?? "Could not update Sunday League deposit settings." });
+        return;
+      }
+
+      const savedDepositAmountCents =
+        typeof json?.settings?.depositAmountCents === "number"
+          ? json.settings.depositAmountCents
+          : depositAmountCents;
+
+      setSundayLeagueSettingsForm({
+        depositAmount: (savedDepositAmountCents / 100).toFixed(2),
+      });
+      setSundayLeagueSettingsStatus({
+        type: "success",
+        message: `Sunday League deposit updated to ${formatSundayLeagueDepositAmount(savedDepositAmountCents)}.`,
+      });
+    } catch {
+      setSundayLeagueSettingsStatus({ type: "error", message: "Could not update Sunday League deposit settings." });
     }
   };
 
@@ -3691,6 +3786,48 @@ export default function AdminPage() {
                 <section className="account-card">
                   <h2>Sunday League</h2>
                   <p className="muted">Manage the public Create Team form and post weekly schedule text for Black Sheep Field and Magic Fountain Field.</p>
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Deposit Settings</h2>
+                      <p className="muted">Change the Square deposit amount for new Sunday League team checkouts.</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => void loadSundayLeagueSettings()} disabled={loadingSundayLeagueSettings}>
+                      {loadingSundayLeagueSettings ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  <form className="register-form" onSubmit={handleSaveSundayLeagueSettings}>
+                    <div className="form-control">
+                      <label htmlFor="sunday-league-deposit-amount">Deposit Amount (USD)</label>
+                      <input
+                        id="sunday-league-deposit-amount"
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        value={sundayLeagueSettingsForm.depositAmount}
+                        onChange={(e) => updateSundayLeagueSettings("depositAmount", e.target.value)}
+                        required
+                      />
+                      <p className="form-help muted">
+                        New Sunday League team reservations will charge{" "}
+                        {formatSundayLeagueDepositAmount(
+                          Math.max(1, Math.round(Number(sundayLeagueSettingsForm.depositAmount || "0") * 100)),
+                        )}.
+                      </p>
+                    </div>
+                    <div className="cta-row">
+                      <button className="button primary" type="submit" disabled={sundayLeagueSettingsStatus.type === "loading"}>
+                        {sundayLeagueSettingsStatus.type === "loading" ? "Saving..." : "Save Deposit Amount"}
+                      </button>
+                    </div>
+                  </form>
+                  {sundayLeagueSettingsStatus.message ? (
+                    <p className={`form-help ${sundayLeagueSettingsStatus.type === "error" ? "error" : "muted"}`}>
+                      {sundayLeagueSettingsStatus.message}
+                    </p>
+                  ) : null}
                 </section>
                 <section className="account-card">
                   <form className="register-form" onSubmit={handleSaveSundayLeagueSignupForm}>
