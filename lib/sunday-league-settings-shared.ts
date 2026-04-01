@@ -2,7 +2,7 @@ export type SundayLeagueSettings = {
   depositAmountCents: number;
 };
 
-export const DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS = 10000;
+export const DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS = 100;
 export const SUNDAY_LEAGUE_DEPOSIT_CURRENCY = "USD";
 
 export const formatSundayLeagueDepositAmount = (amountCents: number) =>
