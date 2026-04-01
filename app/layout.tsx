@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Script from "next/script";
 
-import { SITE_DESCRIPTION, SITE_NAME, SITE_SOCIALS, SITE_TITLE, SITE_URL } from "@/lib/site-metadata";
+import { SITE_ALTERNATE_NAMES, SITE_DESCRIPTION, SITE_NAME, SITE_SOCIALS, SITE_TITLE, SITE_URL } from "@/lib/site-metadata";
 
 import "./globals.css";
 
@@ -91,8 +91,14 @@ export const metadata: Metadata = {
         url: "/favicon.ico",
         sizes: "any",
       },
+      {
+        url: "/icon.png",
+        type: "image/png",
+        sizes: "512x512",
+      },
     ],
     shortcut: "/favicon.ico",
+    apple: "/icon.png",
   },
 };
 
@@ -109,7 +115,13 @@ export default function RootLayout({
         "@id": `${SITE_URL}/#organization`,
         name: SITE_NAME,
         url: SITE_URL,
-        logo: `${SITE_URL}/ASLLogo.png`,
+        alternateName: SITE_ALTERNATE_NAMES,
+        logo: {
+          "@type": "ImageObject",
+          url: `${SITE_URL}/ASLLogo.png`,
+          width: 2270,
+          height: 2587,
+        },
         sameAs: SITE_SOCIALS,
       },
       {
@@ -117,6 +129,7 @@ export default function RootLayout({
         "@id": `${SITE_URL}/#website`,
         url: SITE_URL,
         name: SITE_NAME,
+        alternateName: SITE_ALTERNATE_NAMES,
         description: SITE_DESCRIPTION,
         publisher: {
           "@id": `${SITE_URL}/#organization`,

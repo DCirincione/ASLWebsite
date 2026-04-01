@@ -1,8 +1,9 @@
-export const SITE_NAME = "Aldrich Sports";
+export const SITE_NAME = "Aldrich Sports League";
 export const SITE_URL = "https://aldrichsports.com";
 export const SITE_DESCRIPTION =
-  "Aldrich Sports hosts tournaments, leagues, and charity events for all ages. Explore upcoming events, sports programs, and community competition.";
-export const SITE_TITLE = "Aldrich Sports | Community Sports, Leagues, and Tournaments";
+  "Official home of Aldrich Sports League — leagues, tournaments, events, and community sports.";
+export const SITE_TITLE = "Aldrich Sports League | Community Sports, Leagues, and Tournaments";
+export const SITE_ALTERNATE_NAMES = ["Aldrich Sports", "aslwebsite.com"];
 export const SITE_SOCIALS = [
   "https://www.instagram.com/aldrichsportsleague/",
   "https://www.facebook.com/profile.php?id=61587240961647",
