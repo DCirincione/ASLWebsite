@@ -1,3 +1,7 @@
+import { unstable_noStore as noStore } from "next/cache";
+
+import { readSundayLeagueSignupForm } from "@/lib/sunday-league-signup-form-store";
+
 import SundayLeaguePageClient from "./page-client";
 
 type SundayLeagueSection = "overview" | "rules" | "teams" | "leaderboards" | "schedule" | "inquiries";
@@ -22,6 +26,9 @@ export default async function SundayLeaguePage({
 }: {
   searchParams: Promise<{ section?: string }>;
 }) {
+  noStore();
   const params = await searchParams;
-  return <SundayLeaguePageClient initialSection={normalizeSection(params.section)} />;
+  const signupForm = await readSundayLeagueSignupForm();
+
+  return <SundayLeaguePageClient initialSection={normalizeSection(params.section)} signupForm={signupForm} />;
 }

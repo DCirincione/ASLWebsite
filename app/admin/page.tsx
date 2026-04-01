@@ -11,6 +11,14 @@ import { parseAldrichCommunicationsPreferenceFromMessage } from "@/lib/aldrich-c
 import { createId } from "@/lib/create-id";
 import type { SignupMode } from "@/lib/event-signups";
 import { DEFAULT_HOME_BANNER_TEXT, HOME_BANNER_PAGE_OPTIONS, type HomeBannerButtonTarget } from "@/lib/home-banner";
+import {
+  buildSundayLeagueSignupForm,
+  createEmptySundayLeagueSignupFieldEditor,
+  parseSundayLeagueSignupEditorFields,
+  SUNDAY_LEAGUE_SIGNUP_FIELD_TYPE_OPTIONS,
+  type SundayLeagueSignupFieldEditor,
+  type SundayLeagueSignupFieldType,
+} from "@/lib/sunday-league-signup-form";
 import { parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Flyer, JsonValue, Sport, SundayLeagueScheduleWeek } from "@/lib/supabase/types";
@@ -312,12 +320,17 @@ export default function AdminPage() {
   const [loadingScheduleWeeks, setLoadingScheduleWeeks] = useState(false);
   const [scheduleWeeksError, setScheduleWeeksError] = useState<string | null>(null);
   const [scheduleWeeksStatus, setScheduleWeeksStatus] = useState<FormStatus>({ type: "idle" });
+  const [sundayLeagueSignupStatus, setSundayLeagueSignupStatus] = useState<FormStatus>({ type: "idle" });
+  const [loadingSundayLeagueSignupForm, setLoadingSundayLeagueSignupForm] = useState(false);
+  const [sundayLeagueSignupFieldsVisible, setSundayLeagueSignupFieldsVisible] = useState(false);
+  const [sundayLeagueSignupFields, setSundayLeagueSignupFields] = useState<SundayLeagueSignupFieldEditor[]>([]);
   const [showCreateScheduleWeekForm, setShowCreateScheduleWeekForm] = useState(false);
   const [scheduleWeekForm, setScheduleWeekForm] = useState<SundayLeagueScheduleFormState>(createEmptySundayLeagueScheduleForm());
   const [editingScheduleWeekId, setEditingScheduleWeekId] = useState<string | null>(null);
   const [editScheduleWeekForm, setEditScheduleWeekForm] = useState<SundayLeagueScheduleFormState>(createEmptySundayLeagueScheduleForm());
   const [savingScheduleWeekId, setSavingScheduleWeekId] = useState<string | null>(null);
   const [deletingScheduleWeekId, setDeletingScheduleWeekId] = useState<string | null>(null);
+  const [expandedScheduleWeekCards, setExpandedScheduleWeekCards] = useState<Record<string, boolean>>({});
   const [uploadingFlyerEventId, setUploadingFlyerEventId] = useState<string | null>(null);
   const [savingFlyerEventId, setSavingFlyerEventId] = useState<string | null>(null);
   const [deletingFlyerEventId, setDeletingFlyerEventId] = useState<string | null>(null);
@@ -454,7 +467,7 @@ export default function AdminPage() {
     {
       id: "sundayLeague",
       title: "Sunday League",
-      description: "Post weekly schedule text for both Sunday League fields.",
+      description: "Manage the Sunday League signup form and post weekly schedule text for both fields.",
       enabled: true,
     },
     {
@@ -573,6 +586,7 @@ export default function AdminPage() {
     if (!supabase) return;
     setLoadingScheduleWeeks(true);
     setScheduleWeeksError(null);
+    setExpandedScheduleWeekCards({});
 
     const { data, error } = await supabase
       .from("sunday_league_schedule_weeks")
@@ -587,6 +601,28 @@ export default function AdminPage() {
     }
 
     setLoadingScheduleWeeks(false);
+  };
+
+  const loadSundayLeagueSignupForm = async () => {
+    setLoadingSundayLeagueSignupForm(true);
+    setSundayLeagueSignupStatus({ type: "idle" });
+    setSundayLeagueSignupFieldsVisible(false);
+
+    try {
+      const response = await fetch("/api/admin/sunday-league-signup-form");
+      const json = await response.json();
+
+      if (!response.ok) {
+        setSundayLeagueSignupStatus({ type: "error", message: json?.error ?? "Could not load the Sunday League signup form." });
+        return;
+      }
+
+      setSundayLeagueSignupFields(parseSundayLeagueSignupEditorFields(json?.form));
+    } catch {
+      setSundayLeagueSignupStatus({ type: "error", message: "Could not load the Sunday League signup form." });
+    } finally {
+      setLoadingSundayLeagueSignupForm(false);
+    }
   };
 
   const loadCommunityArticles = async () => {
@@ -1068,6 +1104,7 @@ export default function AdminPage() {
 
   const startEditingScheduleWeek = (week: SundayLeagueScheduleWeek) => {
     setEditingScheduleWeekId(week.id);
+    setExpandedScheduleWeekCards((prev) => ({ ...prev, [week.id]: true }));
     setEditScheduleWeekForm({
       blackSheepField: week.black_sheep_field_schedule ?? "",
       magicFountainField: week.magic_fountain_field_schedule ?? "",
@@ -1078,6 +1115,10 @@ export default function AdminPage() {
   const cancelEditingScheduleWeek = () => {
     setEditingScheduleWeekId(null);
     resetEditScheduleWeekForm();
+  };
+
+  const toggleScheduleWeekCardExpanded = (weekId: string) => {
+    setExpandedScheduleWeekCards((prev) => ({ ...prev, [weekId]: !prev[weekId] }));
   };
 
   const updateEdit = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
@@ -1376,6 +1417,241 @@ export default function AdminPage() {
       )}
     </div>
     );
+  };
+
+  const updateSundayLeagueSignupField = (
+    fieldId: string,
+    key: keyof SundayLeagueSignupFieldEditor,
+    value: SundayLeagueSignupFieldEditor[keyof SundayLeagueSignupFieldEditor],
+  ) => {
+    setSundayLeagueSignupFields((prev) =>
+      prev.map((field) => (field.id === fieldId ? ({ ...field, [key]: value } as SundayLeagueSignupFieldEditor) : field)),
+    );
+  };
+
+  const addSundayLeagueSignupField = () => {
+    const nextField = createEmptySundayLeagueSignupFieldEditor();
+    setSundayLeagueSignupFieldsVisible(true);
+    setSundayLeagueSignupFields((prev) => [...prev, nextField]);
+  };
+
+  const toggleSundayLeagueSignupFieldExpanded = (fieldId: string) => {
+    setSundayLeagueSignupFields((prev) =>
+      prev.map((field) => (field.id === fieldId ? { ...field, expanded: !field.expanded } : field)),
+    );
+  };
+
+  const collapseSundayLeagueSignupField = (fieldId: string) => {
+    setSundayLeagueSignupFields((prev) =>
+      prev.map((field) => (field.id === fieldId ? { ...field, expanded: false } : field)),
+    );
+  };
+
+  const removeSundayLeagueSignupField = (fieldId: string) => {
+    setSundayLeagueSignupFields((prev) => prev.filter((field) => field.id !== fieldId));
+  };
+
+  const moveSundayLeagueSignupField = (fieldId: string, direction: -1 | 1) => {
+    setSundayLeagueSignupFields((prev) => {
+      const index = prev.findIndex((field) => field.id === fieldId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= prev.length) {
+        return prev;
+      }
+
+      const nextFields = [...prev];
+      const [field] = nextFields.splice(index, 1);
+      nextFields.splice(nextIndex, 0, field);
+      return nextFields;
+    });
+  };
+
+  const renderSundayLeagueSignupBuilder = () => {
+    const hasFields = sundayLeagueSignupFields.length > 0;
+
+    return (
+      <div style={{ display: "grid", gap: 12 }}>
+        <div className="account-card__header">
+          <div>
+            <h2>Signup Form Fields</h2>
+            <p className="muted">These fields power the public Create Team form on the Sunday League page.</p>
+          </div>
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => void loadSundayLeagueSignupForm()}
+            disabled={loadingSundayLeagueSignupForm}
+          >
+            {loadingSundayLeagueSignupForm ? "Refreshing..." : "Refresh"}
+          </button>
+        </div>
+
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => setSundayLeagueSignupFieldsVisible((prev) => !prev)}
+          >
+            {sundayLeagueSignupFieldsVisible ? "Collapse all" : "Expand all"}
+          </button>
+          <button className="button ghost" type="button" onClick={addSundayLeagueSignupField}>
+            Add field
+          </button>
+        </div>
+
+        {!sundayLeagueSignupFieldsVisible ? (
+          <p className="muted">
+            {hasFields
+              ? `${sundayLeagueSignupFields.length} signup field${sundayLeagueSignupFields.length === 1 ? "" : "s"} hidden.`
+              : "Signup fields are hidden."}
+          </p>
+        ) : sundayLeagueSignupFields.length === 0 ? (
+          <p className="muted">No signup fields yet.</p>
+        ) : (
+          sundayLeagueSignupFields.map((field, index) => (
+            <div key={field.id} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "grid", gap: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+                <div>
+                  <p className="list__title" style={{ margin: 0 }}>
+                    {field.label.trim() || `Field ${index + 1}`}
+                  </p>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>
+                    {field.name.trim() || slugifyFieldName(field.label) || "no_key"} • {field.type}{field.required ? " • required" : ""}
+                  </p>
+                </div>
+                {!field.expanded ? (
+                  <button className="button ghost" type="button" onClick={() => toggleSundayLeagueSignupFieldExpanded(field.id)}>
+                    Expand
+                  </button>
+                ) : null}
+              </div>
+
+              {field.expanded ? (
+                <>
+                  <div className="register-form-grid">
+                    <div className="form-control">
+                      <label htmlFor={`sunday-league-field-label-${field.id}`}>Field label</label>
+                      <input
+                        id={`sunday-league-field-label-${field.id}`}
+                        value={field.label}
+                        onChange={(e) => updateSundayLeagueSignupField(field.id, "label", e.target.value)}
+                        placeholder="Team name"
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor={`sunday-league-field-placeholder-${field.id}`}>Placeholder</label>
+                      <input
+                        id={`sunday-league-field-placeholder-${field.id}`}
+                        value={field.placeholder}
+                        onChange={(e) => updateSundayLeagueSignupField(field.id, "placeholder", e.target.value)}
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor={`sunday-league-field-type-${field.id}`}>Field type</label>
+                      <select
+                        id={`sunday-league-field-type-${field.id}`}
+                        value={field.type}
+                        onChange={(e) => updateSundayLeagueSignupField(field.id, "type", e.target.value as SundayLeagueSignupFieldType)}
+                      >
+                        {SUNDAY_LEAGUE_SIGNUP_FIELD_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        onChange={(e) => updateSundayLeagueSignupField(field.id, "required", e.target.checked)}
+                      />
+                      <span>Required field</span>
+                    </label>
+                  </div>
+
+                  {field.type === "select" ? (
+                    <div className="form-control">
+                      <label htmlFor={`sunday-league-field-options-${field.id}`}>Options</label>
+                      <textarea
+                        id={`sunday-league-field-options-${field.id}`}
+                        value={field.optionsText}
+                        onChange={(e) => updateSundayLeagueSignupField(field.id, "optionsText", e.target.value)}
+                        rows={4}
+                        placeholder={"Division 1\nDivision 2"}
+                      />
+                      <p className="form-help muted">One option per line.</p>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              <div className="cta-row">
+                {field.expanded ? (
+                  <button className="button primary" type="button" onClick={() => collapseSundayLeagueSignupField(field.id)}>
+                    Save field
+                  </button>
+                ) : null}
+                <button className="button ghost" type="button" onClick={() => moveSundayLeagueSignupField(field.id, -1)} disabled={index === 0}>
+                  Move up
+                </button>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => moveSundayLeagueSignupField(field.id, 1)}
+                  disabled={index === sundayLeagueSignupFields.length - 1}
+                >
+                  Move down
+                </button>
+                <button className="button ghost" type="button" onClick={() => removeSundayLeagueSignupField(field.id)}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    );
+  };
+
+  const handleSaveSundayLeagueSignupForm = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setSundayLeagueSignupStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    setSundayLeagueSignupStatus({ type: "loading" });
+
+    try {
+      const response = await fetch("/api/admin/sunday-league-signup-form", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          form: buildSundayLeagueSignupForm(sundayLeagueSignupFields),
+        }),
+      });
+      const json = await response.json();
+
+      if (!response.ok) {
+        setSundayLeagueSignupStatus({ type: "error", message: json?.error ?? "Could not update the Sunday League signup form." });
+        return;
+      }
+
+      setSundayLeagueSignupFields(parseSundayLeagueSignupEditorFields(json?.form));
+      setSundayLeagueSignupStatus({ type: "success", message: "Sunday League signup form updated." });
+    } catch {
+      setSundayLeagueSignupStatus({ type: "error", message: "Could not update the Sunday League signup form." });
+    }
   };
 
   const handleCreateEvent = async (event: FormEvent) => {
@@ -1929,6 +2205,7 @@ export default function AdminPage() {
       void loadEvents();
     }
     if (module === "sundayLeague") {
+      void loadSundayLeagueSignupForm();
       void loadScheduleWeeks();
     }
     if (module === "sports") {
@@ -3412,8 +3689,23 @@ export default function AdminPage() {
             {activeModule === "sundayLeague" ? (
               <>
                 <section className="account-card">
-                  <h2>Sunday League Schedule</h2>
-                  <p className="muted">Post weekly schedule text for Black Sheep Field and Magic Fountain Field.</p>
+                  <h2>Sunday League</h2>
+                  <p className="muted">Manage the public Create Team form and post weekly schedule text for Black Sheep Field and Magic Fountain Field.</p>
+                </section>
+                <section className="account-card">
+                  <form className="register-form" onSubmit={handleSaveSundayLeagueSignupForm}>
+                    {renderSundayLeagueSignupBuilder()}
+                    <div className="cta-row">
+                      <button className="button primary" type="submit" disabled={sundayLeagueSignupStatus.type === "loading"}>
+                        {sundayLeagueSignupStatus.type === "loading" ? "Saving..." : "Save Signup Form"}
+                      </button>
+                    </div>
+                  </form>
+                  {sundayLeagueSignupStatus.message ? (
+                    <p className={`form-help ${sundayLeagueSignupStatus.type === "error" ? "error" : "muted"}`}>
+                      {sundayLeagueSignupStatus.message}
+                    </p>
+                  ) : null}
                 </section>
                 <section className="account-card">
                   <div className="account-card__header">
@@ -3429,7 +3721,7 @@ export default function AdminPage() {
                   </div>
                   {showCreateScheduleWeekForm ? (
                     <form className="register-form" onSubmit={handleCreateScheduleWeek}>
-                      <div className="register-form-grid">
+                      <div className="register-form-grid sunday-league-schedule-grid">
                         <div className="form-control">
                           <label htmlFor="schedule-week-black-sheep">Black Sheep Field *</label>
                           <textarea
@@ -3480,14 +3772,25 @@ export default function AdminPage() {
                   {!loadingScheduleWeeks && scheduleWeeks.length === 0 ? <p className="muted">No schedule weeks saved yet.</p> : null}
                   {!loadingScheduleWeeks && scheduleWeeks.length > 0 ? (
                     <div className="event-list admin-scroll-panel">
-                      {scheduleWeeks.map((week) => (
-                        <article key={week.id} className="event-card-simple">
+                      {scheduleWeeks.map((week) => {
+                        const isExpanded = editingScheduleWeekId === week.id || Boolean(expandedScheduleWeekCards[week.id]);
+
+                        return (
+                        <article key={week.id} className="event-card-simple sunday-league-schedule-card">
                           <div className="event-card__header">
                             <h3>Week {week.week_number}</h3>
+                            <button
+                              className="button ghost"
+                              type="button"
+                              onClick={() => toggleScheduleWeekCardExpanded(week.id)}
+                              disabled={editingScheduleWeekId === week.id}
+                            >
+                              {isExpanded ? "Collapse" : "Expand"}
+                            </button>
                           </div>
-                          {editingScheduleWeekId === week.id ? (
-                            <div className="register-form" style={{ marginTop: 12 }}>
-                              <div className="register-form-grid">
+                          {isExpanded && editingScheduleWeekId === week.id ? (
+                            <div className="register-form" style={{ marginTop: 4 }}>
+                              <div className="register-form-grid sunday-league-schedule-grid">
                                 <div className="form-control">
                                   <label htmlFor={`edit-schedule-black-sheep-${week.id}`}>Black Sheep Field *</label>
                                   <textarea
@@ -3523,9 +3826,9 @@ export default function AdminPage() {
                                 </button>
                               </div>
                             </div>
-                          ) : (
+                          ) : isExpanded ? (
                             <>
-                              <div className="register-form-grid" style={{ marginTop: 12 }}>
+                              <div className="register-form-grid sunday-league-schedule-grid" style={{ marginTop: 0 }}>
                                 <div className="form-control">
                                   <label>Black Sheep Field</label>
                                   <textarea value={week.black_sheep_field_schedule} rows={8} readOnly />
@@ -3549,9 +3852,10 @@ export default function AdminPage() {
                                 </button>
                               </div>
                             </>
-                          )}
+                          ) : null}
                         </article>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : null}
                 </section>

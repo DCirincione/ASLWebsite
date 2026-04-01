@@ -3989,6 +3989,14 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   word-break: break-word;
 }
 
+.sunday-league-schedule-card {
+  gap: 6px;
+}
+
+.sunday-league-schedule-card .event-card__header {
+  margin-bottom: 0;
+}
+
 .contact-inbox-toolbar {
   display: grid;
   grid-template-columns: 1fr minmax(280px, 360px);
@@ -4522,6 +4530,20 @@ html[data-theme="dark"] .event-detail__media-empty {
   min-height: 3.85rem;
 }
 
+.register-form-grid.sunday-league-schedule-grid {
+  align-items: start;
+}
+
+.register-form-grid.sunday-league-schedule-grid > .form-control:not(.register-form-control--end) {
+  grid-template-rows: auto auto;
+}
+
+.register-form-grid.sunday-league-schedule-grid > .form-control:not(.register-form-control--end) > label {
+  min-height: 0;
+  align-items: flex-start;
+  margin-bottom: 2px;
+}
+
 .register-form-control--end {
   grid-column: 1 / -1;
 }
@@ -4643,6 +4665,10 @@ html[data-theme="dark"] .event-card-simple {
   background: #0f192d;
   border-color: #1f2a40;
   box-shadow: none;
+}
+
+html[data-theme="dark"] .sunday-league-schedule-grid > .form-control > label {
+  color: #e8edf7;
 }
 
 html[data-theme="dark"] .events-group {
