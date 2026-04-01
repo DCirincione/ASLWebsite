@@ -280,6 +280,66 @@ export type SundayLeagueTeamUpdate = {
   updated_at?: string | null;
 };
 
+export type SundayLeagueTeamCheckoutDraft = {
+  id: string;
+  user_id: string;
+  division: 1 | 2;
+  slot_number: number;
+  status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+  amount_cents: number;
+  currency: string;
+  team_payload?: JsonValue | null;
+  square_payment_link_id?: string | null;
+  square_checkout_url?: string | null;
+  square_order_id?: string | null;
+  square_payment_id?: string | null;
+  team_id?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+};
+
+export type SundayLeagueTeamCheckoutDraftInsert = {
+  id?: string;
+  user_id: string;
+  division: 1 | 2;
+  slot_number: number;
+  status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+  amount_cents: number;
+  currency: string;
+  team_payload?: JsonValue | null;
+  square_payment_link_id?: string | null;
+  square_checkout_url?: string | null;
+  square_order_id?: string | null;
+  square_payment_id?: string | null;
+  team_id?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+};
+
+export type SundayLeagueTeamCheckoutDraftUpdate = {
+  id?: string;
+  user_id?: string;
+  division?: 1 | 2;
+  slot_number?: number;
+  status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+  amount_cents?: number;
+  currency?: string;
+  team_payload?: JsonValue | null;
+  square_payment_link_id?: string | null;
+  square_checkout_url?: string | null;
+  square_order_id?: string | null;
+  square_payment_id?: string | null;
+  team_id?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+};
+
 export type SundayLeagueLeaderboard = {
   id: string;
   team_id: string;
@@ -752,6 +812,12 @@ export type Database = {
         Row: SundayLeagueTeam;
         Insert: SundayLeagueTeamInsert;
         Update: SundayLeagueTeamUpdate;
+        Relationships: [];
+      };
+      sunday_league_team_checkout_drafts: {
+        Row: SundayLeagueTeamCheckoutDraft;
+        Insert: SundayLeagueTeamCheckoutDraftInsert;
+        Update: SundayLeagueTeamCheckoutDraftUpdate;
         Relationships: [];
       };
       sunday_league_team_members: {

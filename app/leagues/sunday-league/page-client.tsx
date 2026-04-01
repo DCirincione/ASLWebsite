@@ -8,7 +8,6 @@ import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import {
-  ALDRICH_COMMUNICATIONS_KEY,
   ALDRICH_COMMUNICATIONS_LABEL,
   syncAldrichCommunicationsPreference,
 } from "@/lib/aldrich-communications";
@@ -27,9 +26,12 @@ import {
   isFriendRequestPairConstraintError,
   type SundayLeagueDivision,
 } from "@/lib/sunday-league";
+import {
+  asTrimmedString,
+} from "@/lib/sunday-league-team-checkout";
 import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
-import type { FriendRequest, JsonValue, SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
+import type { FriendRequest, SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
 type SundayLeagueSection = "overview" | "rules" | "teams" | "leaderboards" | "schedule" | "inquiries";
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -155,20 +157,6 @@ const rules = [
     ],
   },
 ];
-
-const asTrimmedString = (value: string | boolean | undefined) =>
-  typeof value === "string" ? value.trim() : typeof value === "boolean" ? (value ? "Yes" : "") : "";
-
-const asOptionalString = (value: JsonValue | undefined) =>
-  typeof value === "string" ? (value.trim() || null) : typeof value === "number" ? String(value) : null;
-
-const asBoolean = (value: JsonValue | undefined) => {
-  if (typeof value === "boolean") return value;
-  if (typeof value === "number") return value !== 0;
-  if (typeof value !== "string") return false;
-  const normalized = value.trim().toLowerCase();
-  return normalized === "true" || normalized === "yes" || normalized === "y" || normalized === "1" || normalized === "on";
-};
 
 type SundayLeaguePageClientProps = {
   initialSection?: SundayLeagueSection;
@@ -624,132 +612,71 @@ export default function SundayLeaguePageClient({
 
     setTeamStatus({ type: "loading" });
 
-    const preferredJerseyColors: {
-      primary: string | null;
-      secondary: string | null;
-      accent: string | null;
-    } = {
-      primary: null,
-      secondary: null,
-      accent: null,
-    };
-    const agreements: Record<string, JsonValue> = {
-      captain_confirmed: true,
-      deposit_required: true,
-      balance_due: true,
-      approval_not_guaranteed: true,
-      rules_accepted: true,
-    };
-    const customFields: Record<string, JsonValue> = {};
-    let captainIsPlaying = false;
-    let preferredJerseyDesign: string | null = null;
-    let teamLogoUrl: string | null = null;
-    let logoDescription: string | null = null;
+    const uploadedFiles: Record<string, string | null> = {};
     let communicationsOptIn = true;
 
     for (const field of signupForm.fields) {
-      let fieldValue: JsonValue = field.type === "checkbox" ? Boolean(teamForm[field.name]) : asTrimmedString(teamForm[field.name]);
-
-      if (field.type === "file") {
-        const file = teamFiles[field.name];
-        if (file) {
-          const uploadPath = `sunday-league/${userId}/${createId()}-${file.name}`;
-          const { data, error } = await client.storage.from("signups").upload(uploadPath, file, {
-            cacheControl: "3600",
-            upsert: false,
-          });
-
-          if (error) {
-            setTeamStatus({ type: "error", message: `${field.label} upload failed: ${error.message}` });
-            return;
-          }
-
-          fieldValue = data?.path ?? uploadPath;
-        } else {
-          fieldValue = null;
-        }
+      if (field.name === "communications_opt_in") {
+        communicationsOptIn = Boolean(teamForm[field.name]);
       }
 
-      switch (field.name) {
-        case "captain_is_playing":
-          captainIsPlaying = asBoolean(fieldValue);
-          break;
-        case "primary_color":
-          preferredJerseyColors.primary = asOptionalString(fieldValue);
-          break;
-        case "secondary_color":
-          preferredJerseyColors.secondary = asOptionalString(fieldValue);
-          break;
-        case "accent_color":
-          preferredJerseyColors.accent = asOptionalString(fieldValue);
-          break;
-        case "preferred_jersey_design":
-          preferredJerseyDesign = asOptionalString(fieldValue);
-          break;
-        case "team_logo_url":
-          teamLogoUrl = asOptionalString(fieldValue);
-          break;
-        case "logo_description":
-          logoDescription = asOptionalString(fieldValue);
-          break;
-        case "communications_opt_in":
-          communicationsOptIn = asBoolean(fieldValue);
-          break;
-        default:
-          if (field.name.startsWith("agreement_")) {
-            agreements[field.name.replace(/^agreement_/, "")] = asBoolean(fieldValue);
-          } else if (fieldValue !== "" && fieldValue !== null) {
-            customFields[field.name] = fieldValue;
-          }
-          break;
+      if (field.type !== "file") continue;
+
+      const file = teamFiles[field.name];
+      if (!file) {
+        uploadedFiles[field.name] = null;
+        continue;
       }
+
+      const uploadPath = `sunday-league/${userId}/${createId()}-${file.name}`;
+      const { data, error } = await client.storage.from("signups").upload(uploadPath, file, {
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+      if (error) {
+        setTeamStatus({ type: "error", message: `${field.label} upload failed: ${error.message}` });
+        return;
+      }
+
+      uploadedFiles[field.name] = data?.path ?? uploadPath;
     }
 
-    const jerseyNumbers = signupForm.fields
-      .filter((field) => /^jersey_number_\d+$/.test(field.name))
-      .sort((a, b) => Number(a.name.replace("jersey_number_", "")) - Number(b.name.replace("jersey_number_", "")))
-      .map((field) => asTrimmedString(teamForm[field.name]))
-      .filter(Boolean);
-
-    if (Object.keys(customFields).length > 0) {
-      agreements.custom_fields = customFields;
-    }
-
-    agreements[ALDRICH_COMMUNICATIONS_KEY] = communicationsOptIn;
-
-    const payload = {
-      user_id: userId,
-      division: selectedDivision,
-      slot_number: slotNumber,
-      captain_name: captainName,
-      captain_phone: captainPhone,
-      captain_email: captainEmail,
-      captain_is_playing: captainIsPlaying,
-      team_name: teamName,
-      preferred_jersey_colors: preferredJerseyColors,
-      preferred_jersey_design: preferredJerseyDesign,
-      team_logo_url: teamLogoUrl,
-      logo_description: logoDescription,
-      jersey_numbers: jerseyNumbers,
-      agreements,
-      deposit_status: "pending" as const,
-      team_status: "pending" as const,
-    };
-
-    const { data, error } = await client.from("sunday_league_teams").insert(payload).select("*").single();
-
-    if (error || !data) {
-      setTeamStatus({ type: "error", message: error?.message ?? "Could not create your team." });
+    const { data: sessionData } = await client.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? null;
+    if (!accessToken) {
+      setTeamStatus({ type: "error", message: "Sign in again to continue." });
       return;
     }
 
-    const nextTeam = data as SundayLeagueTeam;
+    const response = await fetch("/api/sunday-league/team-checkout", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        division: selectedDivision,
+        values: teamForm,
+        uploadedFiles,
+      }),
+    });
+
+    const json = (await response.json().catch(() => null)) as
+      | {
+          error?: string;
+          checkoutUrl?: string;
+        }
+      | null;
+
+    if (!response.ok || !json?.checkoutUrl) {
+      setTeamStatus({ type: "error", message: json?.error ?? "Could not start the Sunday League checkout." });
+      return;
+    }
+
     void syncAldrichCommunicationsPreference(client, communicationsOptIn);
-    setTeams((prev) => [...prev, nextTeam].sort((a, b) => (a.division - b.division) || (a.slot_number - b.slot_number)));
-    setTeamStatus({ type: "success", message: "Team created. Opening your team portal." });
-    setTeamForm(createSundayLeagueSignupFormValues(signupForm));
-    setTeamFiles({});
-    router.push(`/leagues/sunday-league/team/${nextTeam.id}`);
+    setTeamStatus({ type: "success", message: "Opening secure checkout..." });
+    window.location.assign(json.checkoutUrl);
   };
 
   const handleRequestToJoin = async (team: SundayLeagueTeam) => {
@@ -1424,7 +1351,7 @@ export default function SundayLeaguePageClient({
                   <div className="sunday-league-panel-box sunday-league-panel-box--compact">
                     <h3>Create a Sunday League Team</h3>
                     <p>
-                      Only the team captain should complete this form. By creating a team, the captain is reserving a spot in the Aldrich Sunday League and agrees to submit the required $100 deposit. The remaining balance will be due on the first Sunday of the season. After this form is submitted, the captain will gain access to the team portal, where they can manage their roster, invite players, and update team information.
+                      Only the team captain should complete this form. By creating a team, the captain is reserving a spot in the Aldrich Sunday League and agrees to submit the required $100 deposit. The remaining balance will be due on the first Sunday of the season. After the deposit is successfully paid and confirmed, the captain will gain access to the team portal, where they can manage their roster, invite players, and update team information.
                     </p>
                     <p className="muted" style={{ marginBottom: 0 }}>
                       You are currently creating for Division {selectedDivision}.
@@ -1449,7 +1376,7 @@ export default function SundayLeaguePageClient({
                       <p className={`form-help ${teamStatus.type === "error" ? "error" : "muted"}`}>{teamStatus.message}</p>
                     ) : null}
                     <button className="button primary" type="submit" disabled={teamStatus.type === "loading"}>
-                      {teamStatus.type === "loading" ? "Creating team..." : "Create Team"}
+                      {teamStatus.type === "loading" ? "Opening checkout..." : "Create Team"}
                     </button>
                   </div>
                 </form>
