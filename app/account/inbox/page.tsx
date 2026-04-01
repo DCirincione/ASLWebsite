@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
@@ -41,6 +41,14 @@ type ConversationSummary = {
   unreadCount: number;
 };
 
+type DirectMessagesApiPayload = {
+  messages?: UserDirectMessage[];
+  message?: UserDirectMessage;
+  updatedIds?: string[];
+  readAt?: string;
+  error?: string;
+};
+
 const formatInboxDate = (value?: string | null) => {
   if (!value) return "Unknown date";
   const date = new Date(value);
@@ -60,6 +68,63 @@ const upsertDirectMessage = (messages: UserDirectMessage[], nextMessage: UserDir
   );
 
 const isChatsTabValue = (value?: string | null): value is MessageCenterTab => value === "inbox" || value === "chats";
+
+const getAuthorizedApiHeaders = (accessToken: string) => ({
+  Authorization: `Bearer ${accessToken}`,
+  "Content-Type": "application/json",
+});
+
+const readDirectMessagesApiPayload = async (response: Response) => {
+  const payload = (await response.json().catch(() => null)) as DirectMessagesApiPayload | null;
+  return payload ?? {};
+};
+
+const fetchDirectMessagesFromApi = async (accessToken: string) => {
+  const response = await fetch("/api/direct-messages", {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+    cache: "no-store",
+  });
+  const payload = await readDirectMessagesApiPayload(response);
+
+  return {
+    ok: response.ok,
+    error: response.ok ? null : payload.error ?? "Could not load your chats.",
+    messages: payload.messages ?? [],
+  };
+};
+
+const sendDirectMessageThroughApi = async (accessToken: string, recipientUserId: string, message: string) => {
+  const response = await fetch("/api/direct-messages", {
+    method: "POST",
+    headers: getAuthorizedApiHeaders(accessToken),
+    body: JSON.stringify({ recipientUserId, message }),
+  });
+  const payload = await readDirectMessagesApiPayload(response);
+
+  return {
+    ok: response.ok,
+    error: response.ok ? null : payload.error ?? "Could not send the message.",
+    message: payload.message ?? null,
+  };
+};
+
+const markDirectMessagesReadThroughApi = async (accessToken: string, messageIds: string[], readAt: string) => {
+  const response = await fetch("/api/direct-messages", {
+    method: "PATCH",
+    headers: getAuthorizedApiHeaders(accessToken),
+    body: JSON.stringify({ messageIds, readAt }),
+  });
+  const payload = await readDirectMessagesApiPayload(response);
+
+  return {
+    ok: response.ok,
+    error: response.ok ? null : payload.error ?? "Could not mark chat messages as read.",
+    updatedIds: payload.updatedIds ?? [],
+    readAt: payload.readAt ?? readAt,
+  };
+};
 
 function AccountInboxContent() {
   const router = useRouter();
@@ -82,11 +147,6 @@ function AccountInboxContent() {
   const [memberSearch, setMemberSearch] = useState("");
   const [memberSearchResults, setMemberSearchResults] = useState<ChatProfile[]>([]);
   const [memberSearchLoading, setMemberSearchLoading] = useState(false);
-  const chatProfilesRef = useRef<Record<string, ChatProfile>>({});
-
-  useEffect(() => {
-    chatProfilesRef.current = chatProfiles;
-  }, [chatProfiles]);
 
   const syncRouteState = useCallback(
     (tab: MessageCenterTab, chatUserId?: string | null) => {
@@ -125,25 +185,61 @@ function AccountInboxContent() {
     [syncRouteState],
   );
 
-  const ensureChatProfile = useCallback(async (profileId: string) => {
-    const client = supabase;
-    if (!client || !profileId || chatProfilesRef.current[profileId]) {
-      return;
-    }
+  const loadDirectMessagesState = useCallback(
+    async (accessToken: string, userId: string, requestedChatUserId?: string | null) => {
+      const client = supabase;
+      if (!client) {
+        return {
+          nextDirectMessages: [] as UserDirectMessage[],
+          nextChatProfiles: {} as Record<string, ChatProfile>,
+          nextChatError: "Supabase is not configured.",
+        };
+      }
 
-    const { data, error: profileError } = await client
-      .from("profiles")
-      .select("id,name,avatar_url,sports")
-      .eq("id", profileId)
-      .maybeSingle();
+      const directMessagesResponse = await fetchDirectMessagesFromApi(accessToken);
+      const nextDirectMessages = directMessagesResponse.ok ? directMessagesResponse.messages : [];
+      let nextChatError: string | null = directMessagesResponse.ok
+        ? null
+        : isMissingDirectMessagesTableError(directMessagesResponse.error)
+          ? "Direct messages are not set up yet. Run the direct messages setup in Supabase first."
+          : directMessagesResponse.error ?? "Could not load your chats.";
 
-    if (profileError || !data) {
-      return;
-    }
+      const partnerIds = Array.from(
+        new Set(
+          nextDirectMessages.flatMap((message) =>
+            message.sender_user_id === userId ? [message.recipient_user_id] : [message.sender_user_id],
+          ),
+        ),
+      );
 
-    const nextProfile = data as ChatProfile;
-    setChatProfiles((prev) => (prev[nextProfile.id] ? prev : { ...prev, [nextProfile.id]: nextProfile }));
-  }, []);
+      if (requestedChatUserId && requestedChatUserId !== userId) {
+        partnerIds.push(requestedChatUserId);
+      }
+
+      const uniquePartnerIds = Array.from(new Set(partnerIds.filter(Boolean)));
+      let nextChatProfiles: Record<string, ChatProfile> = {};
+
+      if (uniquePartnerIds.length > 0) {
+        const { data: partnerProfiles, error: partnerProfilesError } = await client
+          .from("profiles")
+          .select("id,name,avatar_url,sports")
+          .in("id", uniquePartnerIds);
+
+        if (partnerProfilesError) {
+          nextChatError = partnerProfilesError.message ?? nextChatError ?? "Could not load chat members.";
+        } else {
+          nextChatProfiles = (partnerProfiles ?? []).reduce<Record<string, ChatProfile>>((acc, profile) => {
+            const nextProfile = profile as ChatProfile;
+            acc[nextProfile.id] = nextProfile;
+            return acc;
+          }, {});
+        }
+      }
+
+      return { nextDirectMessages, nextChatProfiles, nextChatError };
+    },
+    [],
+  );
 
   const loadMessageCenter = useCallback(async () => {
     if (!supabase) {
@@ -166,6 +262,7 @@ function AccountInboxContent() {
     const session = sessionData.session;
     const userId = session?.user.id ?? null;
     const userEmail = session?.user.email?.trim().toLowerCase() ?? null;
+    const accessToken = session?.access_token ?? null;
 
     setCurrentUserId(userId);
 
@@ -178,7 +275,18 @@ function AccountInboxContent() {
       return;
     }
 
-    const [announcementResponse, membershipResponse, inviteResponse, directMessagesResponse] = await Promise.all([
+    if (!accessToken) {
+      setAnnouncements([]);
+      setPendingInvites([]);
+      setDirectMessages([]);
+      setChatProfiles({});
+      setStatus("error");
+      setError("Sign in again to view your inbox.");
+      setChatError("Sign in again to view your chats.");
+      return;
+    }
+
+    const [announcementResponse, membershipResponse, inviteResponse, directMessagesState] = await Promise.all([
       supabase
         .from("user_inbox_messages")
         .select("*")
@@ -193,11 +301,7 @@ function AccountInboxContent() {
             .eq("source", "captain_invite")
             .eq("status", "pending")
         : Promise.resolve({ data: [], error: null }),
-      supabase
-        .from("user_direct_messages")
-        .select("*")
-        .or(`sender_user_id.eq.${userId},recipient_user_id.eq.${userId}`)
-        .order("created_at", { ascending: true }),
+      loadDirectMessagesState(accessToken, userId, requestedChatUserId),
     ]);
 
     let nextInboxError: string | null = null;
@@ -241,47 +345,8 @@ function AccountInboxContent() {
       }
     }
 
-    const nextDirectMessages = directMessagesResponse.error
-      ? []
-      : ((directMessagesResponse.data ?? []) as UserDirectMessage[]);
-
-    if (directMessagesResponse.error) {
-      nextChatError = isMissingDirectMessagesTableError(directMessagesResponse.error.message)
-        ? "Direct messages are not set up yet. Run data/user-direct-messages.sql in Supabase first."
-        : directMessagesResponse.error.message ?? "Could not load your chats.";
-    }
-
-    const partnerIds = Array.from(
-      new Set(
-        nextDirectMessages.flatMap((message) =>
-          message.sender_user_id === userId ? [message.recipient_user_id] : [message.sender_user_id],
-        ),
-      ),
-    );
-
-    if (requestedChatUserId && requestedChatUserId !== userId) {
-      partnerIds.push(requestedChatUserId);
-    }
-
-    const uniquePartnerIds = Array.from(new Set(partnerIds.filter(Boolean)));
-    let nextChatProfiles: Record<string, ChatProfile> = {};
-
-    if (uniquePartnerIds.length > 0) {
-      const { data: partnerProfiles, error: partnerProfilesError } = await supabase
-        .from("profiles")
-        .select("id,name,avatar_url,sports")
-        .in("id", uniquePartnerIds);
-
-      if (partnerProfilesError) {
-        nextChatError = partnerProfilesError.message ?? nextChatError ?? "Could not load chat members.";
-      } else {
-        nextChatProfiles = (partnerProfiles ?? []).reduce<Record<string, ChatProfile>>((acc, profile) => {
-          const nextProfile = profile as ChatProfile;
-          acc[nextProfile.id] = nextProfile;
-          return acc;
-        }, {});
-      }
-    }
+    const { nextDirectMessages, nextChatProfiles, nextChatError: directMessagesError } = directMessagesState;
+    nextChatError = directMessagesError;
 
     setAnnouncements(nextAnnouncements);
     setPendingInvites(
@@ -295,7 +360,22 @@ function AccountInboxContent() {
     setError(nextInboxError);
     setChatError(nextChatError);
     setStatus("ready");
-  }, [searchParams]);
+  }, [loadDirectMessagesState, searchParams]);
+
+  const refreshDirectMessages = useCallback(
+    async (userId: string, accessToken: string, requestedChatUserId?: string | null) => {
+      const { nextDirectMessages, nextChatProfiles, nextChatError } = await loadDirectMessagesState(
+        accessToken,
+        userId,
+        requestedChatUserId,
+      );
+
+      setDirectMessages(nextDirectMessages);
+      setChatProfiles(nextChatProfiles);
+      setChatError(nextChatError);
+    },
+    [loadDirectMessagesState],
+  );
 
   useEffect(() => {
     const requestedTab = searchParams.get("tab");
@@ -319,20 +399,14 @@ function AccountInboxContent() {
       return;
     }
 
-    const handleDirectMessageUpsert = (payload: { new: UserDirectMessage }) => {
-      const nextMessage = payload.new;
-      if (!nextMessage?.id) {
+    const refreshFromRealtime = async () => {
+      const { data: sessionData } = await client.auth.getSession();
+      const accessToken = sessionData.session?.access_token ?? null;
+      if (!accessToken) {
         return;
       }
 
-      setDirectMessages((prev) => upsertDirectMessage(prev, nextMessage));
-
-      const partnerId =
-        nextMessage.sender_user_id === currentUserId ? nextMessage.recipient_user_id : nextMessage.sender_user_id;
-
-      if (partnerId && !chatProfilesRef.current[partnerId]) {
-        void ensureChatProfile(partnerId);
-      }
+      await refreshDirectMessages(currentUserId, accessToken, selectedChatUserId);
     };
 
     const channel = client
@@ -345,7 +419,7 @@ function AccountInboxContent() {
           table: "user_direct_messages",
           filter: `recipient_user_id=eq.${currentUserId}`,
         },
-        handleDirectMessageUpsert,
+        () => void refreshFromRealtime(),
       )
       .on(
         "postgres_changes",
@@ -355,7 +429,7 @@ function AccountInboxContent() {
           table: "user_direct_messages",
           filter: `sender_user_id=eq.${currentUserId}`,
         },
-        handleDirectMessageUpsert,
+        () => void refreshFromRealtime(),
       )
       .on(
         "postgres_changes",
@@ -365,7 +439,7 @@ function AccountInboxContent() {
           table: "user_direct_messages",
           filter: `recipient_user_id=eq.${currentUserId}`,
         },
-        handleDirectMessageUpsert,
+        () => void refreshFromRealtime(),
       )
       .on(
         "postgres_changes",
@@ -375,7 +449,7 @@ function AccountInboxContent() {
           table: "user_direct_messages",
           filter: `sender_user_id=eq.${currentUserId}`,
         },
-        handleDirectMessageUpsert,
+        () => void refreshFromRealtime(),
       )
       .subscribe((subscriptionStatus) => {
         if (subscriptionStatus === "CHANNEL_ERROR") {
@@ -386,7 +460,7 @@ function AccountInboxContent() {
     return () => {
       void client.removeChannel(channel);
     };
-  }, [currentUserId, ensureChatProfile]);
+  }, [currentUserId, refreshDirectMessages, selectedChatUserId]);
 
   useEffect(() => {
     if (activeTab !== "chats" || selectedChatUserId || status !== "ready") {
@@ -429,22 +503,23 @@ function AccountInboxContent() {
 
     const markRead = async () => {
       setMarkingConversationId(selectedChatUserId);
-      const { error: updateError } = await client
-        .from("user_direct_messages")
-        .update({
-          is_read: true,
-          read_at: readAt,
-        })
-        .in("id", unreadIds)
-        .eq("recipient_user_id", currentUserId);
+      const { data: sessionData } = await client.auth.getSession();
+      const accessToken = sessionData.session?.access_token ?? null;
+      if (!accessToken) {
+        setChatError("Sign in again to update your chats.");
+        setMarkingConversationId(null);
+        return;
+      }
 
-      if (updateError) {
-        setChatError(updateError.message ?? "Could not mark chat messages as read.");
+      const updateResponse = await markDirectMessagesReadThroughApi(accessToken, unreadIds, readAt);
+
+      if (!updateResponse.ok) {
+        setChatError(updateResponse.error ?? "Could not mark chat messages as read.");
       } else {
         setDirectMessages((prev) =>
           prev.map((message) =>
-            unreadIds.includes(message.id)
-              ? { ...message, is_read: true, read_at: readAt }
+            updateResponse.updatedIds.includes(message.id)
+              ? { ...message, is_read: true, read_at: updateResponse.readAt }
               : message,
           ),
         );
@@ -543,29 +618,27 @@ function AccountInboxContent() {
     if (!message) return;
 
     setSendingChat(true);
-    const { data, error: insertError } = await supabase
-      .from("user_direct_messages")
-      .insert({
-        sender_user_id: currentUserId,
-        recipient_user_id: selectedChatUserId,
-        message,
-        is_read: false,
-        read_at: null,
-      })
-      .select("*")
-      .single();
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? null;
+    if (!accessToken) {
+      setChatError("Sign in again to send messages.");
+      setSendingChat(false);
+      return;
+    }
 
-    if (insertError || !data) {
+    const sendResponse = await sendDirectMessageThroughApi(accessToken, selectedChatUserId, message);
+
+    if (!sendResponse.ok || !sendResponse.message) {
       setChatError(
-        isMissingDirectMessagesTableError(insertError?.message)
-          ? "Direct messages are not set up yet. Run data/user-direct-messages.sql in Supabase first."
-          : insertError?.message ?? "Could not send the message.",
+        isMissingDirectMessagesTableError(sendResponse.error)
+          ? "Direct messages are not set up yet. Run the direct messages setup in Supabase first."
+          : sendResponse.error ?? "Could not send the message.",
       );
       setSendingChat(false);
       return;
     }
 
-    setDirectMessages((prev) => upsertDirectMessage(prev, data as UserDirectMessage));
+    setDirectMessages((prev) => upsertDirectMessage(prev, sendResponse.message as UserDirectMessage));
     setChatDraft("");
     setSendingChat(false);
   };
