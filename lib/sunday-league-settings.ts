@@ -1,11 +1,9 @@
 import "server-only";
 
-import { promises as fs } from "fs";
-import path from "path";
-
+import { getSupabaseServiceRole } from "@/lib/admin-route-auth";
 import { DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS, type SundayLeagueSettings } from "@/lib/sunday-league-settings-shared";
 
-const sundayLeagueSettingsFilePath = path.join(process.cwd(), "data", "sunday-league-settings.json");
+const SUNDAY_LEAGUE_SETTINGS_KEY = "sunday_league";
 
 const normalizeDepositAmountCents = (value: unknown) => {
   const numericValue =
@@ -26,17 +24,51 @@ const normalizeSundayLeagueSettings = (value?: Partial<SundayLeagueSettings> | n
 });
 
 export const readSundayLeagueSettings = async (): Promise<SundayLeagueSettings> => {
+  const supabase = getSupabaseServiceRole();
+  if (!supabase) return normalizeSundayLeagueSettings();
+
   try {
-    const raw = await fs.readFile(sundayLeagueSettingsFilePath, "utf8");
-    return normalizeSundayLeagueSettings(JSON.parse(raw) as Partial<SundayLeagueSettings>);
+    const { data, error } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", SUNDAY_LEAGUE_SETTINGS_KEY)
+      .maybeSingle();
+
+    if (error) {
+      return normalizeSundayLeagueSettings();
+    }
+
+    const value =
+      data?.value && typeof data.value === "object" && !Array.isArray(data.value)
+        ? (data.value as Partial<SundayLeagueSettings>)
+        : null;
+
+    return normalizeSundayLeagueSettings(value);
   } catch {
     return normalizeSundayLeagueSettings();
   }
 };
 
 export const writeSundayLeagueSettings = async (value: SundayLeagueSettings): Promise<SundayLeagueSettings> => {
+  const supabase = getSupabaseServiceRole();
+  if (!supabase) {
+    throw new Error("Supabase service role is not configured.");
+  }
+
   const next = normalizeSundayLeagueSettings(value);
-  await fs.mkdir(path.dirname(sundayLeagueSettingsFilePath), { recursive: true });
-  await fs.writeFile(sundayLeagueSettingsFilePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+
+  const { error } = await supabase.from("app_settings").upsert(
+    {
+      key: SUNDAY_LEAGUE_SETTINGS_KEY,
+      value: next,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "key" },
+  );
+
+  if (error) {
+    throw error;
+  }
+
   return next;
 };
