@@ -3149,9 +3149,44 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
 }
 
 .account-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   border: 1px solid var(--border);
   border-radius: 16px;
   padding: 18px;
+}
+
+.account-header > div {
+  display: grid;
+  gap: 10px;
+}
+
+.account-header h1,
+.account-header p {
+  margin: 0;
+}
+
+.account-header--compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px 14px;
+  padding: 14px 18px;
+}
+
+.account-header--compact > div {
+  gap: 4px;
+}
+
+.account-header--compact h1 {
+  line-height: 1;
+}
+
+.account-header--compact .button {
+  align-self: start;
 }
 
 .account-header__info {
@@ -3252,6 +3287,16 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   flex-wrap: wrap;
 }
 
+.account-chat-sidebar__header h2,
+.account-chat-panel__header h2,
+.account-chat-empty h2,
+.account-chat-search .muted,
+.account-chat-sidebar > .muted,
+.account-chat-panel__person p,
+.account-chat-empty .muted {
+  margin: 0;
+}
+
 .account-chat-conversation-list {
   display: grid;
   gap: 10px;
@@ -3349,7 +3394,7 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-height: 320px;
+  min-height: 220px;
   max-height: 520px;
   overflow-y: auto;
   padding: 4px;
@@ -3414,14 +3459,18 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
 
 .account-chat-empty {
   display: grid;
-  gap: 8px;
-  min-height: 320px;
-  align-content: center;
+  gap: 12px;
+  min-height: 220px;
+  align-content: start;
   justify-items: start;
 }
 
 @media (max-width: 640px) {
   .account-inbox-invite {
+    grid-template-columns: 1fr;
+  }
+
+  .account-header--compact {
     grid-template-columns: 1fr;
   }
 }

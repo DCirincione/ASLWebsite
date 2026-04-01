@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
@@ -144,9 +144,11 @@ function AccountInboxContent() {
   const [selectedChatUserId, setSelectedChatUserId] = useState<string | null>(null);
   const [chatDraft, setChatDraft] = useState("");
   const [sendingChat, setSendingChat] = useState(false);
+  const [showChatStarter, setShowChatStarter] = useState(false);
   const [memberSearch, setMemberSearch] = useState("");
   const [memberSearchResults, setMemberSearchResults] = useState<ChatProfile[]>([]);
   const [memberSearchLoading, setMemberSearchLoading] = useState(false);
+  const memberSearchInputRef = useRef<HTMLInputElement | null>(null);
 
   const syncRouteState = useCallback(
     (tab: MessageCenterTab, chatUserId?: string | null) => {
@@ -184,6 +186,17 @@ function AccountInboxContent() {
     },
     [syncRouteState],
   );
+
+  const openChatStarter = useCallback(() => {
+    setShowChatStarter(true);
+  }, []);
+
+  const closeChatStarter = useCallback(() => {
+    setShowChatStarter(false);
+    setMemberSearch("");
+    setMemberSearchResults([]);
+    setMemberSearchLoading(false);
+  }, []);
 
   const loadDirectMessagesState = useCallback(
     async (accessToken: string, userId: string, requestedChatUserId?: string | null) => {
@@ -384,6 +397,18 @@ function AccountInboxContent() {
     setActiveTab(nextTab);
     setSelectedChatUserId(requestedChatUserId);
   }, [searchParams]);
+
+  useEffect(() => {
+    if (activeTab !== "chats" || !showChatStarter) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      memberSearchInputRef.current?.focus();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [activeTab, showChatStarter]);
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => {
@@ -606,8 +631,7 @@ function AccountInboxContent() {
 
   const handleStartConversation = (profile: ChatProfile) => {
     setChatProfiles((prev) => ({ ...prev, [profile.id]: profile }));
-    setMemberSearch("");
-    setMemberSearchResults([]);
+    closeChatStarter();
     openChat(profile.id);
   };
 
@@ -730,7 +754,7 @@ function AccountInboxContent() {
         <div className="account-body shell">
           <HistoryBackButton label="← Back" fallbackHref="/account" />
 
-          <header className="account-header">
+          <header className="account-header account-header--compact">
             <div>
               <p className="eyebrow">Account</p>
               <h1>Inbox</h1>
@@ -830,47 +854,60 @@ function AccountInboxContent() {
             {status === "ready" && activeTab === "chats" ? (
               <>
                 {chatError ? <p className="form-help error">{chatError}</p> : null}
-                <div className="account-chat-search">
-                  <label className="sr-only" htmlFor="member-chat-search">
-                    Search members to message
-                  </label>
-                  <div className="search-panel__input">
-                    <input
-                      id="member-chat-search"
-                      value={memberSearch}
-                      onChange={(event) => setMemberSearch(event.target.value)}
-                      placeholder="Search members by name"
-                      autoComplete="off"
-                    />
-                  </div>
-                  {memberSearch.trim() ? (
-                    <div className="admin-recipient-option-list">
-                      {memberSearchLoading ? <p className="muted">Searching members...</p> : null}
-                      {!memberSearchLoading && memberSearchResults.length === 0 ? (
-                        <p className="muted">No members match that search.</p>
-                      ) : null}
-                      {!memberSearchLoading &&
-                        memberSearchResults.map((profile) => (
-                          <button
-                            key={profile.id}
-                            className="admin-recipient-option"
-                            type="button"
-                            onClick={() => handleStartConversation(profile)}
-                          >
-                            <strong>{profile.name}</strong>
-                            <span>{Array.isArray(profile.sports) && profile.sports.length > 0 ? profile.sports.join(", ") : "Member"}</span>
-                          </button>
-                        ))}
-                    </div>
-                  ) : null}
-                </div>
-
                 <div className="account-chat-layout">
                   <div className="account-chat-sidebar">
                     <div className="account-chat-sidebar__header">
-                      <h2>Conversations</h2>
-                      <p className="muted">Open a chat or start one from a profile.</p>
+                      <div>
+                        <h2>Conversations</h2>
+                        <p className="muted">Open a chat or start a new one.</p>
+                      </div>
+                      <button
+                        className={`button ${showChatStarter ? "ghost" : "primary"}`}
+                        type="button"
+                        onClick={showChatStarter ? closeChatStarter : openChatStarter}
+                      >
+                        {showChatStarter ? "Close search" : "Start a chat"}
+                      </button>
                     </div>
+                    {showChatStarter ? (
+                      <div className="account-chat-search">
+                        <label className="sr-only" htmlFor="member-chat-search">
+                          Search members to message
+                        </label>
+                        <div className="search-panel__input">
+                          <input
+                            ref={memberSearchInputRef}
+                            id="member-chat-search"
+                            value={memberSearch}
+                            onChange={(event) => setMemberSearch(event.target.value)}
+                            placeholder="Search members by name"
+                            autoComplete="off"
+                          />
+                        </div>
+                        {memberSearch.trim() ? (
+                          <div className="admin-recipient-option-list">
+                            {memberSearchLoading ? <p className="muted">Searching members...</p> : null}
+                            {!memberSearchLoading && memberSearchResults.length === 0 ? (
+                              <p className="muted">No members match that search.</p>
+                            ) : null}
+                            {!memberSearchLoading &&
+                              memberSearchResults.map((profile) => (
+                                <button
+                                  key={profile.id}
+                                  className="admin-recipient-option"
+                                  type="button"
+                                  onClick={() => handleStartConversation(profile)}
+                                >
+                                  <strong>{profile.name}</strong>
+                                  <span>{Array.isArray(profile.sports) && profile.sports.length > 0 ? profile.sports.join(", ") : "Member"}</span>
+                                </button>
+                              ))}
+                          </div>
+                        ) : (
+                          <p className="muted">Search for a member to start a conversation.</p>
+                        )}
+                      </div>
+                    ) : null}
                     {conversationSummaries.length === 0 ? (
                       <p className="muted">No chats yet.</p>
                     ) : (
@@ -955,6 +992,12 @@ function AccountInboxContent() {
                           <textarea
                             value={chatDraft}
                             onChange={(event) => setChatDraft(event.target.value)}
+                            onKeyDown={(event) => {
+                              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                                event.preventDefault();
+                                void handleSendChat();
+                              }
+                            }}
                             rows={4}
                             placeholder={`Message ${selectedChatProfile.name}...`}
                           />
@@ -973,7 +1016,10 @@ function AccountInboxContent() {
                     ) : (
                       <div className="account-chat-empty">
                         <h2>Start a chat</h2>
-                        <p className="muted">Choose a conversation from the left or search for a member above.</p>
+                        <p className="muted">Choose a conversation from the left or start a new one.</p>
+                        <button className="button primary" type="button" onClick={openChatStarter}>
+                          Start a chat
+                        </button>
                       </div>
                     )}
                   </div>
