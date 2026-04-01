@@ -18,6 +18,7 @@ import {
   getSignupSuccessMessage,
   isWaitlistEvent,
 } from "@/lib/event-signups";
+import { formatEventPaymentAmount } from "@/lib/event-payments";
 import { supabase } from "@/lib/supabase/client";
 import type { JsonValue } from "@/lib/supabase/types";
 
@@ -51,6 +52,8 @@ type EventRegistration = {
   waiver_url?: string | null;
   allow_multiple_registrations?: boolean | null;
   registration_limit?: number | null;
+  payment_required?: boolean | null;
+  payment_amount_cents?: number | null;
 };
 
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -191,7 +194,7 @@ export function RegistrationModal({
 
       const { data: eventRow, error: eventError } = await client
         .from("events")
-        .select("id,title,signup_mode,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit")
+        .select("id,title,signup_mode,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit,payment_required,payment_amount_cents")
         .eq("id", eventId)
         .maybeSingle();
 
@@ -250,6 +253,11 @@ export function RegistrationModal({
 
   const waiverRequired = Boolean(eventConfig?.waiver_url || schemaRequiresWaiver(eventConfig?.registration_schema));
   const waitlistMode = isWaitlistEvent(eventConfig);
+  const paymentRequired = mode === "create" && !waitlistMode && Boolean(eventConfig?.payment_required && (eventConfig.payment_amount_cents ?? 0) > 0);
+  const paymentAmountLabel =
+    paymentRequired && eventConfig?.payment_amount_cents
+      ? formatEventPaymentAmount(eventConfig.payment_amount_cents)
+      : null;
 
   const validate = useMemo(() => {
     return () => {
@@ -393,6 +401,46 @@ export function RegistrationModal({
       waiver_accepted_at: values.waiver_accepted ? new Date().toISOString() : null,
     };
 
+    if (paymentRequired && mode === "create") {
+      const { data: sessionData } = await client.auth.getSession();
+      const accessToken = sessionData.session?.access_token ?? null;
+      if (!accessToken) {
+        router.push("/account/create");
+        return;
+      }
+
+      const response = await fetch("/api/events/checkout", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          eventId: eventConfig.id,
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          answers: payload.answers,
+          attachments: payload.attachments,
+          waiverAccepted: payload.waiver_accepted,
+        }),
+      });
+      const json = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            checkoutUrl?: string;
+          }
+        | null;
+
+      if (!response.ok || !json?.checkoutUrl) {
+        setStatus({ type: "error", message: json?.error ?? "Could not start the payment checkout." });
+        return;
+      }
+
+      window.location.assign(json.checkoutUrl);
+      return;
+    }
+
     const { error } =
       mode === "edit" && submissionId
         ? await client.from("event_submissions").update(payload).eq("id", submissionId).eq("user_id", userId)
@@ -428,6 +476,7 @@ export function RegistrationModal({
         <div className="register-modal__meta">
           <span className="pill pill--muted">Secure form</span>
           <span className="muted">All required fields are marked with *</span>
+          {paymentAmountLabel ? <span className="pill pill--muted">{paymentAmountLabel} payment required</span> : null}
         </div>
 
         {loadingEvent ? <p className="muted">Loading form…</p> : null}
@@ -439,6 +488,11 @@ export function RegistrationModal({
 
         {!loadingEvent && eventConfig ? (
           <form className="register-form" onSubmit={handleSubmit}>
+            {paymentAmountLabel ? (
+              <p className="muted">
+                After you submit this form, you will be redirected to Square to pay {paymentAmountLabel}. Your registration is only saved after payment is confirmed.
+              </p>
+            ) : null}
             <div className="register-form-grid">
               <div className="form-control">
                 <label htmlFor="field-name">
@@ -659,10 +713,14 @@ export function RegistrationModal({
                   {status.type === "loading"
                     ? mode === "edit"
                       ? "Saving..."
-                      : "Submitting..."
+                      : paymentRequired
+                        ? "Redirecting..."
+                        : "Submitting..."
                     : mode === "edit"
                       ? "Save changes"
-                      : "Submit registration"}
+                      : paymentRequired
+                        ? "Continue to payment"
+                        : "Submit registration"}
                 </button>
               </div>
             </div>

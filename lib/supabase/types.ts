@@ -125,6 +125,8 @@ export type Event = {
   waiver_url?: string | null;
   allow_multiple_registrations?: boolean | null;
   registration_limit?: number | null;
+  payment_required?: boolean | null;
+  payment_amount_cents?: number | null;
 };
 
 export type EventInsert = {
@@ -146,6 +148,8 @@ export type EventInsert = {
   waiver_url?: string | null;
   allow_multiple_registrations?: boolean | null;
   registration_limit?: number | null;
+  payment_required?: boolean | null;
+  payment_amount_cents?: number | null;
 };
 
 export type EventUpdate = {
@@ -167,6 +171,8 @@ export type EventUpdate = {
   waiver_url?: string | null;
   allow_multiple_registrations?: boolean | null;
   registration_limit?: number | null;
+  payment_required?: boolean | null;
+  payment_amount_cents?: number | null;
 };
 
 export type EventSubmission = {
@@ -212,6 +218,63 @@ export type EventSubmissionUpdate = {
   waiver_accepted_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+export type EventCheckoutDraft = {
+  id: string;
+  user_id: string;
+  event_id: string;
+  status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+  amount_cents: number;
+  currency: string;
+  submission_payload?: JsonValue | null;
+  square_payment_link_id?: string | null;
+  square_checkout_url?: string | null;
+  square_order_id?: string | null;
+  square_payment_id?: string | null;
+  submission_id?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+};
+
+export type EventCheckoutDraftInsert = {
+  id?: string;
+  user_id: string;
+  event_id: string;
+  status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+  amount_cents: number;
+  currency: string;
+  submission_payload?: JsonValue | null;
+  square_payment_link_id?: string | null;
+  square_checkout_url?: string | null;
+  square_order_id?: string | null;
+  square_payment_id?: string | null;
+  submission_id?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+};
+
+export type EventCheckoutDraftUpdate = {
+  id?: string;
+  user_id?: string;
+  event_id?: string;
+  status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+  amount_cents?: number;
+  currency?: string;
+  submission_payload?: JsonValue | null;
+  square_payment_link_id?: string | null;
+  square_checkout_url?: string | null;
+  square_order_id?: string | null;
+  square_payment_id?: string | null;
+  submission_id?: string | null;
+  error_message?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
 };
 
 export type SundayLeagueTeam = {
@@ -806,6 +869,12 @@ export type Database = {
         Row: EventSubmission;
         Insert: EventSubmissionInsert;
         Update: EventSubmissionUpdate;
+        Relationships: [];
+      };
+      event_checkout_drafts: {
+        Row: EventCheckoutDraft;
+        Insert: EventCheckoutDraftInsert;
+        Update: EventCheckoutDraftUpdate;
         Relationships: [];
       };
       sunday_league_teams: {

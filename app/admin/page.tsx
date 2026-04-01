@@ -9,6 +9,7 @@ import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { INBOX_ANNOUNCEMENT_AUDIENCE_OPTIONS, type InboxAnnouncementAudience } from "@/lib/inbox";
 import { parseAldrichCommunicationsPreferenceFromMessage } from "@/lib/aldrich-communications";
 import { createId } from "@/lib/create-id";
+import { formatEventPaymentAmount } from "@/lib/event-payments";
 import type { SignupMode } from "@/lib/event-signups";
 import { DEFAULT_HOME_BANNER_TEXT, HOME_BANNER_PAGE_OPTIONS, type HomeBannerButtonTarget } from "@/lib/home-banner";
 import {
@@ -63,6 +64,8 @@ type EventFormState = {
   registration_enabled: boolean;
   waiver_url: string;
   registration_limit: string;
+  payment_required: boolean;
+  payment_amount: string;
   require_waiver: boolean;
   registration_fields: RegistrationFieldEditor[];
 };
@@ -436,6 +439,8 @@ export default function AdminPage() {
     registration_enabled: false,
     waiver_url: "",
     registration_limit: "",
+    payment_required: false,
+    payment_amount: "",
     require_waiver: false,
     registration_fields: [],
   });
@@ -453,6 +458,8 @@ export default function AdminPage() {
     registration_enabled: false,
     waiver_url: "",
     registration_limit: "",
+    payment_required: false,
+    payment_amount: "",
     require_waiver: false,
     registration_fields: [],
   });
@@ -526,7 +533,7 @@ export default function AdminPage() {
     setEventsError(null);
     const { data, error } = await supabase
       .from("events")
-      .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,registration_enabled,waiver_url,allow_multiple_registrations,registration_limit,registration_schema")
+      .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,registration_enabled,waiver_url,allow_multiple_registrations,registration_limit,registration_schema,payment_required,payment_amount_cents")
       .order("start_date", { ascending: true, nullsFirst: false });
 
     if (!error && data) {
@@ -1042,6 +1049,8 @@ export default function AdminPage() {
       registration_enabled: false,
       waiver_url: "",
       registration_limit: "",
+      payment_required: false,
+      payment_amount: "",
       require_waiver: false,
       registration_fields: [],
     });
@@ -1115,6 +1124,8 @@ export default function AdminPage() {
       registration_enabled: Boolean(event.registration_enabled),
       waiver_url: event.waiver_url ?? "",
       registration_limit: event.registration_limit?.toString() ?? "",
+      payment_required: Boolean(event.payment_required),
+      payment_amount: event.payment_amount_cents ? (event.payment_amount_cents / 100).toFixed(2) : "",
       require_waiver: registrationState.require_waiver,
       registration_fields: registrationState.registration_fields,
     });
@@ -1700,8 +1711,15 @@ export default function AdminPage() {
       return;
     }
 
-    setFormStatus({ type: "loading" });
     const isWaitlist = form.signup_mode === "waitlist";
+    const paymentAmountValue = Number(form.payment_amount);
+    const paymentAmountCents = Math.round(paymentAmountValue * 100);
+    if (!isWaitlist && form.payment_required && (!Number.isFinite(paymentAmountValue) || paymentAmountCents <= 0)) {
+      setFormStatus({ type: "error", message: "Enter a payment amount greater than $0.00 when payment is required." });
+      return;
+    }
+
+    setFormStatus({ type: "loading" });
     const registrationSchema = buildRegistrationSchema({
       ...form,
       require_waiver: isWaitlist ? false : form.require_waiver,
@@ -1721,6 +1739,8 @@ export default function AdminPage() {
       waiver_url: isWaitlist ? null : form.waiver_url.trim() || null,
       allow_multiple_registrations: false,
       registration_limit: isWaitlist ? null : form.registration_limit.trim() ? Number(form.registration_limit) : null,
+      payment_required: isWaitlist ? false : form.payment_required,
+      payment_amount_cents: isWaitlist || !form.payment_required ? null : paymentAmountCents,
       registration_schema: registrationSchema,
     };
 
@@ -1802,8 +1822,15 @@ export default function AdminPage() {
       return;
     }
 
-    setSavingEditId(eventId);
     const isWaitlist = editForm.signup_mode === "waitlist";
+    const paymentAmountValue = Number(editForm.payment_amount);
+    const paymentAmountCents = Math.round(paymentAmountValue * 100);
+    if (!isWaitlist && editForm.payment_required && (!Number.isFinite(paymentAmountValue) || paymentAmountCents <= 0)) {
+      setFormStatus({ type: "error", message: "Enter a payment amount greater than $0.00 when payment is required." });
+      return;
+    }
+
+    setSavingEditId(eventId);
     const registrationSchema = buildRegistrationSchema({
       ...editForm,
       require_waiver: isWaitlist ? false : editForm.require_waiver,
@@ -1823,6 +1850,8 @@ export default function AdminPage() {
       waiver_url: isWaitlist ? null : editForm.waiver_url.trim() || null,
       allow_multiple_registrations: false,
       registration_limit: isWaitlist ? null : editForm.registration_limit.trim() ? Number(editForm.registration_limit) : null,
+      payment_required: isWaitlist ? false : editForm.payment_required,
+      payment_amount_cents: isWaitlist || !editForm.payment_required ? null : paymentAmountCents,
       registration_schema: registrationSchema,
     };
 
@@ -3540,6 +3569,18 @@ export default function AdminPage() {
                         disabled={form.signup_mode === "waitlist"}
                       />
                     </div>
+                    <div className="form-control">
+                      <label htmlFor="event-payment-amount">Payment amount (USD)</label>
+                      <input
+                        id="event-payment-amount"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={form.payment_amount}
+                        onChange={(e) => update("payment_amount", e.target.value)}
+                        disabled={form.signup_mode === "waitlist" || !form.payment_required}
+                      />
+                    </div>
                   </div>
                   <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
                     <label className="checkbox-label">
@@ -3551,8 +3592,19 @@ export default function AdminPage() {
                       <span>Accept signups</span>
                     </label>
                   </div>
+                  <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={form.payment_required}
+                        onChange={(e) => update("payment_required", e.target.checked)}
+                        disabled={form.signup_mode === "waitlist"}
+                      />
+                      <span>Require payment before registration is created</span>
+                    </label>
+                  </div>
                   {form.signup_mode === "waitlist" ? (
-                    <p className="muted">Waitlist events can still collect custom questions. Waivers and registration limits stay disabled.</p>
+                    <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
                   ) : null}
                   {renderRegistrationBuilder("create", form)}
                   <div className="cta-row">
@@ -3601,6 +3653,9 @@ export default function AdminPage() {
                         </p>
                         <p className="muted">
                           Signup status: {event.registration_enabled ? "Open" : "Closed"}
+                        </p>
+                        <p className="muted">
+                          Payment: {event.payment_required && event.payment_amount_cents ? `${formatEventPaymentAmount(event.payment_amount_cents)} required` : "No payment"}
                         </p>
                       </div>
                       <div className="cta-row">
@@ -3744,6 +3799,18 @@ export default function AdminPage() {
                                 disabled={editForm.signup_mode === "waitlist"}
                               />
                             </div>
+                            <div className="form-control">
+                              <label htmlFor={`edit-payment-amount-${event.id}`}>Payment amount (USD)</label>
+                              <input
+                                id={`edit-payment-amount-${event.id}`}
+                                type="number"
+                                min="0.01"
+                                step="0.01"
+                                value={editForm.payment_amount}
+                                onChange={(e) => updateEdit("payment_amount", e.target.value)}
+                                disabled={editForm.signup_mode === "waitlist" || !editForm.payment_required}
+                              />
+                            </div>
                           </div>
                           <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
                             <label className="checkbox-label">
@@ -3755,8 +3822,19 @@ export default function AdminPage() {
                               <span>Accept signups</span>
                             </label>
                           </div>
+                          <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+                            <label className="checkbox-label">
+                              <input
+                                type="checkbox"
+                                checked={editForm.payment_required}
+                                onChange={(e) => updateEdit("payment_required", e.target.checked)}
+                                disabled={editForm.signup_mode === "waitlist"}
+                              />
+                              <span>Require payment before registration is created</span>
+                            </label>
+                          </div>
                           {editForm.signup_mode === "waitlist" ? (
-                            <p className="muted">Waitlist events can still collect custom questions. Waivers and registration limits stay disabled.</p>
+                            <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
                           ) : null}
                           {renderRegistrationBuilder("edit", editForm)}
                           <div className="cta-row">
