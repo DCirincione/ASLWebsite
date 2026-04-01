@@ -16,7 +16,7 @@ import {
 } from "@/lib/aldrich-communications";
 import { countryCodeToFlag, getCountryFlagAsset, getCountryNameFromCode } from "@/lib/countries";
 import { createId } from "@/lib/create-id";
-import { getSundayLeagueColor, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
+import { formatSundayLeaguePlayerName, getSundayLeagueColor, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
 import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
@@ -1057,6 +1057,7 @@ export default function SundayLeagueTeamPortalPage() {
                     <div className="sunday-league-team-board__roster">
                       {rosterPlayers.map((player) => {
                         const customFlagAsset = getCountryFlagAsset(player.countryCode);
+                        const playerName = formatSundayLeaguePlayerName(player.name);
 
                         return (
                           <article key={player.id} className="sunday-league-team-board__player-card">
@@ -1080,8 +1081,13 @@ export default function SundayLeagueTeamPortalPage() {
                             </div>
                           </div>
                           <div className="sunday-league-team-board__player-panel">
-                            <p className="sunday-league-team-board__player-name">{player.name}</p>
-                            <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
+                            <div className="sunday-league-team-board__player-identity">
+                              <p className="sunday-league-team-board__player-name">
+                                <span className="sunday-league-team-board__player-name-line">{playerName.topLine}</span>
+                                <span className="sunday-league-team-board__player-name-line">{playerName.bottomLine}</span>
+                              </p>
+                              <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
+                            </div>
                             <div className="sunday-league-team-board__player-row">
                               {customFlagAsset ? (
                                 <span className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>

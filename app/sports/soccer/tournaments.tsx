@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { sanitizeSportImageUrl } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type { Soccer } from "@/lib/supabase/types";
 
@@ -20,11 +21,11 @@ const fallbackTournaments: SoccerCard[] = [
     cta_label: "View details",
     cta_url: "/events",
     level: "Open / Coed",
-    image_url: "/forever5/newman5.png",
+    image_url: "/sundayLeague/champs2025.jpeg",
   },
 ];
 
-const imageFallbacks = ["/forever5/newman5.png", "/PickleTourneyCourt6.png"];
+const imageFallbacks = ["/sundayLeague/champs2025.jpeg", "/sports_images/soccer/soccerLogo.png"];
 
 export function SoccerTournaments() {
   const [items, setItems] = useState<SoccerCard[]>(fallbackTournaments);
@@ -42,7 +43,7 @@ export function SoccerTournaments() {
       if (!error && data) {
         const mapped = (data as Soccer[]).map((row, idx) => ({
           ...row,
-          image: row.image_url || imageFallbacks[idx % imageFallbacks.length],
+          image: sanitizeSportImageUrl(row.image_url) || imageFallbacks[idx % imageFallbacks.length],
         }));
         setItems(mapped.length > 0 ? mapped : fallbackTournaments);
       }

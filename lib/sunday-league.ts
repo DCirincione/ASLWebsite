@@ -16,7 +16,23 @@ export const SUNDAY_LEAGUE_DIVISIONS: Array<{ value: SundayLeagueDivision; label
 ];
 
 export const getSundayLeagueDivisionLogoSrc = (division: SundayLeagueDivision) =>
-  division === 1 ? "/divisions/Division1BlackSheepNew.png" : "/divisions/Division2MagicNew.png";
+  division === 1 ? "/conferences/Conference1LogoSundayLeague.png" : "/conferences/Conference2LogoSundayLeague.png";
+
+export const formatSundayLeaguePlayerName = (value?: string | null) => {
+  const parts = value?.trim().split(/\s+/).filter(Boolean) ?? [];
+
+  if (parts.length <= 1) {
+    return {
+      topLine: parts[0] ?? "",
+      bottomLine: "",
+    };
+  }
+
+  return {
+    topLine: parts.slice(0, -1).join(" "),
+    bottomLine: parts[parts.length - 1] ?? "",
+  };
+};
 
 const normalizeValue = (value?: string | null) => value?.trim().toLowerCase() ?? "";
 

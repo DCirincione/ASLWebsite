@@ -8,7 +8,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { countryCodeToFlag, getCountryFlagAsset, getCountryNameFromCode } from "@/lib/countries";
-import { getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
+import { formatSundayLeaguePlayerName, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
 import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
@@ -462,6 +462,7 @@ export default function SundayLeaguePublicTeamPage() {
                     <div className="sunday-league-team-board__roster">
                       {rosterPlayers.map((player) => {
                         const customFlagAsset = getCountryFlagAsset(player.countryCode);
+                        const playerName = formatSundayLeaguePlayerName(player.name);
 
                         return (
                           <article key={player.id} className="sunday-league-team-board__player-card">
@@ -485,8 +486,13 @@ export default function SundayLeaguePublicTeamPage() {
                             </div>
                           </div>
                           <div className="sunday-league-team-board__player-panel">
-                            <p className="sunday-league-team-board__player-name">{player.name}</p>
-                            <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
+                            <div className="sunday-league-team-board__player-identity">
+                              <p className="sunday-league-team-board__player-name">
+                                <span className="sunday-league-team-board__player-name-line">{playerName.topLine}</span>
+                                <span className="sunday-league-team-board__player-name-line">{playerName.bottomLine}</span>
+                              </p>
+                              <p className="sunday-league-team-board__player-position">{player.position ?? "Player"}</p>
+                            </div>
                             <div className="sunday-league-team-board__player-row">
                               {customFlagAsset ? (
                                 <span className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(player.countryCode) ?? undefined}>

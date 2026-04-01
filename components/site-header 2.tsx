@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { CSSProperties, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
+import { MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { AccountSignupForm } from "./account-signup-form";
 import { AccountSigninForm } from "./account-signin-form";
@@ -24,8 +24,6 @@ export function SiteHeader() {
   const [profileRole, setProfileRole] = useState<string | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
-  const [headerHeight, setHeaderHeight] = useState(96);
-  const headerRef = useRef<HTMLElement | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   const closeAccountModal = useCallback(() => setIsAccountOpen(false), []);
@@ -84,42 +82,14 @@ export function SiteHeader() {
 
     document.addEventListener("keydown", handleKeyDown);
 
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [closeAccountModal, isAccountOpen]);
-
-  useEffect(() => {
-    if (!isMobileNavOpen) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsMobileNavOpen(false);
-      }
-    };
-
-    document.addEventListener("keydown", handleKeyDown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isMobileNavOpen]);
-
-  useEffect(() => {
-    const shouldLockPage = isAccountOpen || isMobileNavOpen;
-    if (!shouldLockPage) {
-      return;
-    }
-
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
 
     return () => {
+      document.removeEventListener("keydown", handleKeyDown);
       document.body.style.overflow = previousOverflow;
     };
-  }, [isAccountOpen, isMobileNavOpen]);
+  }, [closeAccountModal, isAccountOpen]);
 
   const handleOverlayClick = (event: MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget) {
@@ -161,35 +131,11 @@ export function SiteHeader() {
     return () => window.removeEventListener("resize", handleResize);
   }, [isMobileNavOpen]);
 
-  useEffect(() => {
-    const header = headerRef.current;
-    if (!header) return;
-
-    const updateHeaderHeight = () => {
-      setHeaderHeight(Math.max(64, Math.ceil(header.getBoundingClientRect().height)));
-    };
-
-    updateHeaderHeight();
-
-    if (typeof ResizeObserver !== "undefined") {
-      const observer = new ResizeObserver(() => updateHeaderHeight());
-      observer.observe(header);
-      return () => observer.disconnect();
-    }
-
-    window.addEventListener("resize", updateHeaderHeight);
-    return () => window.removeEventListener("resize", updateHeaderHeight);
-  }, []);
-
   const canAccessAdmin = profileRole === "admin" || profileRole === "owner";
 
   return (
     <>
-      <header
-        ref={headerRef}
-        className="site-header"
-        style={{ "--site-header-height": `${headerHeight}px` } as CSSProperties}
-      >
+      <header className="site-header">
         <div className="shell site-header__inner">
           <Link href="/" className="logo">
             <div className="logo__image logo__image--header" aria-hidden>
@@ -229,9 +175,6 @@ export function SiteHeader() {
                     <div className="nav__mobile-submenu">
                       <Link href="/account#profile" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
                         My Profile
-                      </Link>
-                      <Link href="/account/inbox" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
-                        Inbox
                       </Link>
                       <Link href="/account/settings" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
                         Settings
@@ -278,9 +221,6 @@ export function SiteHeader() {
                   <div className="header-menu" role="menu">
                     <Link href="/account#profile" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                       My Profile
-                    </Link>
-                    <Link href="/account/inbox" role="menuitem" onClick={() => setIsMenuOpen(false)}>
-                      Inbox
                     </Link>
                     {canAccessAdmin ? (
                       <Link href="/admin" role="menuitem" onClick={() => setIsMenuOpen(false)}>

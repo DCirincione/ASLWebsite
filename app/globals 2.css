@@ -352,7 +352,7 @@ html[data-theme="dark"] .font-controls__value {
 .site-header {
   position: sticky;
   top: 0;
-  z-index: 40;
+  z-index: 10;
   backdrop-filter: blur(12px);
   background: rgba(255, 255, 255, 0.9);
   border-bottom: 1px solid var(--border);
@@ -488,22 +488,17 @@ html[data-theme="dark"] .font-controls__value {
 
   .nav {
     position: absolute;
-    top: calc(var(--site-header-height, 96px) - 1px);
-    left: 16px;
-    right: 16px;
+    top: 64px;
+    left: 0;
+    right: 0;
     background: #0f192d;
-    border: 1px solid var(--border);
-    padding: 20px 16px calc(24px + env(safe-area-inset-bottom, 0px));
+    border-bottom: 1px solid var(--border);
+    padding: 12px 16px;
     display: none;
     flex-direction: column;
     align-items: flex-start;
-    justify-content: flex-start;
     gap: 10px;
-    z-index: 45;
-    max-height: calc(100dvh - var(--site-header-height, 96px) - 16px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    box-shadow: 0 24px 48px rgba(2, 6, 23, 0.36);
+    z-index: 20;
   }
 
   .nav--open {
@@ -569,7 +564,7 @@ html[data-theme="dark"] .font-controls__value {
   .mobile-nav-toggle {
     display: inline-flex;
     margin-left: auto;
-    z-index: 46;
+    z-index: 21;
   }
 
   /* hide desktop nav/header items by default on mobile */
@@ -1966,21 +1961,13 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(248, 250, 252, 0.16);
-  border: 1px solid rgba(248, 250, 252, 0.24);
-  color: #f8fafc;
+  background: #dc2626;
+  color: #ffffff;
   font-size: 0.72rem;
   font-weight: 800;
   line-height: 1;
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
-  pointer-events: none;
-}
-
-.sunday-league-team-board__action-badge--unread {
-  background: #dc2626;
-  border-color: #ef4444;
-  color: #ffffff;
   box-shadow: 0 8px 18px rgba(127, 29, 29, 0.28);
+  pointer-events: none;
 }
 
 .sunday-league-team-board__section h3 {
@@ -2017,10 +2004,8 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 .sunday-league-team-board__player-card {
   width: 220px;
   display: grid;
-  grid-template-rows: auto 1fr;
   gap: 14px;
   position: relative;
-  align-self: stretch;
   padding: 14px 14px 16px;
   border-radius: 30px;
   background: linear-gradient(180deg, #171717, #121212);
@@ -2077,12 +2062,6 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   min-width: 0;
 }
 
-.sunday-league-team-board__player-identity {
-  display: grid;
-  gap: 6px;
-  align-content: start;
-}
-
 .sunday-league-team-board__player-name,
 .sunday-league-team-board__player-position,
 .sunday-league-team-board__player-number {
@@ -2097,19 +2076,7 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   font-size: 0.9rem;
   line-height: 1.0;
   letter-spacing: -0.02em;
-  min-height: 2.12em;
-  display: grid;
-  grid-template-rows: repeat(2, 1em);
-  align-content: center;
-  justify-items: center;
-  row-gap: 0.12em;
   text-align: center;
-}
-
-.sunday-league-team-board__player-name-line {
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
 .sunday-league-team-board__player-position {
@@ -3127,242 +3094,6 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   padding: 18px;
 }
 
-.account-inbox-invite {
-  display: grid;
-  grid-template-columns: 72px minmax(0, 1fr);
-  gap: 14px;
-  align-items: flex-start;
-}
-
-.account-inbox-invite__logo {
-  position: relative;
-  width: 72px;
-  height: 72px;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: #ffffff;
-}
-
-.account-inbox-invite__content {
-  display: grid;
-  gap: 12px;
-}
-
-.account-chat-search {
-  display: grid;
-  gap: 12px;
-}
-
-.account-chat-layout {
-  display: grid;
-  grid-template-columns: minmax(260px, 320px) minmax(0, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.account-chat-sidebar,
-.account-chat-panel {
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: rgba(248, 250, 252, 0.82);
-}
-
-.account-chat-sidebar {
-  display: grid;
-  gap: 14px;
-  padding: 16px;
-}
-
-.account-chat-sidebar__header,
-.account-chat-panel__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.account-chat-conversation-list {
-  display: grid;
-  gap: 10px;
-}
-
-.account-chat-conversation {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-  width: 100%;
-  padding: 12px;
-  border-radius: 16px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  background: #ffffff;
-  text-align: left;
-  font: inherit;
-  color: #0f172a;
-  cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    box-shadow 0.15s ease,
-    transform 0.15s ease;
-}
-
-.account-chat-conversation:hover,
-.account-chat-conversation.is-active {
-  border-color: rgba(233, 93, 42, 0.35);
-  box-shadow: 0 14px 30px rgba(233, 93, 42, 0.12);
-  transform: translateY(-1px);
-}
-
-.account-chat-conversation__avatar,
-.account-chat-panel__avatar {
-  overflow: hidden;
-  border-radius: 50%;
-  border: 1px solid var(--border);
-  background: #ffffff;
-}
-
-.account-chat-conversation__avatar {
-  width: 48px;
-  height: 48px;
-}
-
-.account-chat-panel__avatar {
-  width: 56px;
-  height: 56px;
-}
-
-.account-chat-conversation__avatar img,
-.account-chat-panel__avatar img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-.account-chat-conversation__body {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-}
-
-.account-chat-conversation__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.account-chat-conversation__body .muted {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.account-chat-panel {
-  display: grid;
-  gap: 14px;
-  padding: 16px;
-}
-
-.account-chat-panel__person {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.account-chat-panel__person h2 {
-  margin: 0 0 4px;
-}
-
-.account-chat-thread {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-height: 320px;
-  max-height: 520px;
-  overflow-y: auto;
-  padding: 4px;
-}
-
-.account-chat-bubble {
-  display: grid;
-  gap: 6px;
-  align-self: flex-start;
-  max-width: min(82%, 560px);
-  padding: 12px 14px;
-  border-radius: 18px 18px 18px 6px;
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
-}
-
-.account-chat-bubble.is-own {
-  align-self: flex-end;
-  background: linear-gradient(135deg, #e95d2a, #f58142);
-  color: #ffffff;
-  border-color: rgba(233, 93, 42, 0.4);
-  border-radius: 18px 18px 6px 18px;
-}
-
-.account-chat-bubble p {
-  margin: 0;
-  white-space: pre-wrap;
-}
-
-.account-chat-bubble span {
-  font-size: 0.78rem;
-  opacity: 0.72;
-}
-
-.account-chat-bubble.is-own span {
-  opacity: 0.84;
-}
-
-.account-chat-composer {
-  display: grid;
-  gap: 12px;
-}
-
-.account-chat-composer textarea {
-  width: 100%;
-  min-height: 120px;
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 12px 14px;
-  font: inherit;
-  color: #0f172a;
-  background: #ffffff;
-  resize: vertical;
-}
-
-.account-chat-composer textarea:focus {
-  outline: none;
-  border-color: rgba(233, 93, 42, 0.5);
-  box-shadow: 0 0 0 3px rgba(233, 93, 42, 0.12);
-}
-
-.account-chat-empty {
-  display: grid;
-  gap: 8px;
-  min-height: 320px;
-  align-content: center;
-  justify-items: start;
-}
-
-@media (max-width: 640px) {
-  .account-inbox-invite {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 900px) {
-  .account-chat-layout {
-    grid-template-columns: 1fr;
-  }
-}
-
 .account-tabs-card {
   display: grid;
   gap: 18px;
@@ -3407,52 +3138,6 @@ html[data-theme="dark"] .account-tabs__button.is-active {
   background: #e8edf7;
   border-color: #e8edf7;
   color: #0b1224;
-}
-
-html[data-theme="dark"] .account-chat-sidebar,
-html[data-theme="dark"] .account-chat-panel {
-  background: rgba(15, 23, 42, 0.88);
-  border-color: #1f2a40;
-}
-
-html[data-theme="dark"] .account-chat-conversation {
-  background: rgba(15, 23, 42, 0.92);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: #e8edf7;
-}
-
-html[data-theme="dark"] .account-chat-conversation:hover,
-html[data-theme="dark"] .account-chat-conversation.is-active {
-  border-color: rgba(240, 111, 58, 0.35);
-  box-shadow: 0 14px 28px rgba(240, 111, 58, 0.16);
-}
-
-html[data-theme="dark"] .account-chat-conversation__avatar,
-html[data-theme="dark"] .account-chat-panel__avatar,
-html[data-theme="dark"] .account-chat-bubble {
-  border-color: rgba(255, 255, 255, 0.08);
-}
-
-html[data-theme="dark"] .account-chat-bubble {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e8edf7;
-  box-shadow: none;
-}
-
-html[data-theme="dark"] .account-chat-bubble.is-own {
-  background: linear-gradient(135deg, #f06f3a, #ff9258);
-  color: #0b1020;
-}
-
-html[data-theme="dark"] .account-chat-composer textarea {
-  background: rgba(15, 23, 42, 0.92);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: #e8edf7;
-}
-
-html[data-theme="dark"] .account-chat-composer textarea:focus {
-  border-color: rgba(240, 111, 58, 0.45);
-  box-shadow: 0 0 0 3px rgba(240, 111, 58, 0.16);
 }
 
 .account-card__header {
@@ -3813,10 +3498,6 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea::placeholder {
   color: #94a3b8;
 }
 
-html[data-theme="dark"] .sunday-league-inquiries__form .checkbox-label {
-  color: #e8edf7;
-}
-
 html[data-theme="dark"] .sunday-league-inquiries__form input:focus,
 html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   border-color: rgba(233, 93, 42, 0.6);
@@ -3902,8 +3583,8 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
 }
 
 .contact-message-card {
-  padding: 10px 12px;
-  gap: 4px;
+  padding: 12px 14px;
+  gap: 6px;
 }
 
 .contact-message-card.is-unread {
@@ -3915,14 +3596,12 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   align-items: flex-start;
 }
 
-.contact-message-card .event-card__header h2,
 .contact-message-card .event-card__header h3 {
-  margin: 0;
   font-size: 1rem;
 }
 
 .contact-message-card .event-card__meta {
-  gap: 0;
+  gap: 2px;
 }
 
 .contact-message-card__preview {
@@ -5155,13 +4834,6 @@ html[data-theme="dark"] .account-form textarea {
   background: rgba(255, 255, 255, 0.06);
   border-color: #1f2a40;
   color: #e8edf7;
-  color-scheme: dark;
-}
-
-html[data-theme="dark"] .account-form select option,
-html[data-theme="dark"] .account-form select optgroup {
-  background: #0f192d;
-  color: #e8edf7;
 }
 
 html[data-theme="dark"] .account-form input::placeholder,
@@ -5453,7 +5125,7 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
   padding-right: 8px;
   scroll-snap-type: y mandatory;
   scrollbar-width: thin;
-  scrollbar-color: rgba(148, 163, 184, 0.72) rgba(15, 23, 42, 0.68);
+  scrollbar-color: rgba(244, 183, 138, 0.5) rgba(255, 255, 255, 0.06);
 }
 
 .community-sponsors-carousel__track::-webkit-scrollbar {
@@ -5462,14 +5134,12 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
 
 .community-sponsors-carousel__track::-webkit-scrollbar-track {
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.72);
-  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.74);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .community-sponsors-carousel__track::-webkit-scrollbar-thumb {
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(100, 116, 139, 0.96), rgba(71, 85, 105, 0.96));
-  box-shadow: inset 0 0 0 1px rgba(148, 163, 184, 0.22);
+  background: rgba(244, 183, 138, 0.52);
 }
 
 .community-sponsors-carousel__track::after {
@@ -5493,7 +5163,7 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
   justify-items: center;
   align-content: center;
   gap: 8px;
-  color: rgba(203, 213, 225, 0.9);
+  color: rgba(244, 183, 138, 0.9);
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -5504,7 +5174,7 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
   width: 1px;
   height: 34px;
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0.86), rgba(148, 163, 184, 0.1));
+  background: linear-gradient(180deg, rgba(244, 183, 138, 0.12), rgba(244, 183, 138, 0.9), rgba(244, 183, 138, 0.12));
 }
 
 .community-sponsors-carousel__cue-arrow {
@@ -5725,8 +5395,7 @@ html[data-theme="dark"] .account-form__link-action:hover:not(:disabled) {
   }
 
   .nav {
-    left: 16px;
-    right: 16px;
+    top: 158px;
   }
 
   .section {
@@ -5944,57 +5613,6 @@ html[data-theme="dark"] .submission-review__attachments {
   box-shadow: 0 0 0 3px rgba(233, 93, 42, 0.14);
 }
 
-.admin-recipient-picker {
-  display: grid;
-  gap: 16px;
-}
-
-.admin-recipient-pill-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.admin-recipient-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(233, 93, 42, 0.24);
-  background: rgba(233, 93, 42, 0.08);
-  color: #9a3412;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.admin-recipient-option-list {
-  display: grid;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.admin-recipient-option {
-  width: 100%;
-  display: grid;
-  gap: 4px;
-  padding: 12px 14px;
-  border-radius: 14px;
-  border: 1px solid rgba(15, 23, 42, 0.1);
-  background: rgba(248, 250, 252, 0.95);
-  color: #0f172a;
-  text-align: left;
-  font: inherit;
-  cursor: pointer;
-}
-
-.admin-recipient-option span {
-  color: #475569;
-  font-size: 0.92rem;
-}
-
 .admin-flyer-details-field textarea {
   width: 100%;
   border: 1px solid var(--border);
@@ -6072,22 +5690,6 @@ html[data-theme="dark"] .admin-user-search input::placeholder {
 html[data-theme="dark"] .admin-user-search input:focus {
   border-color: rgba(240, 111, 58, 0.5);
   box-shadow: 0 0 0 3px rgba(240, 111, 58, 0.16);
-}
-
-html[data-theme="dark"] .admin-recipient-pill {
-  border-color: rgba(240, 111, 58, 0.28);
-  background: rgba(240, 111, 58, 0.14);
-  color: #ffd2bf;
-}
-
-html[data-theme="dark"] .admin-recipient-option {
-  background: rgba(15, 23, 42, 0.92);
-  border-color: rgba(255, 255, 255, 0.08);
-  color: #e8edf7;
-}
-
-html[data-theme="dark"] .admin-recipient-option span {
-  color: #aebbd1;
 }
 
 html[data-theme="dark"] .admin-flyer-details-field textarea {

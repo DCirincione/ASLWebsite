@@ -17,6 +17,25 @@ export const normalizeSportSlug = (sport?: SportSlugSource | null) => {
   return slugifySportValue(sport.title?.trim() || sport.slug?.trim() || "");
 };
 
+const RETIRED_SPORT_IMAGE_PATHS = new Set([
+  "/baseball/champst2025.jpeg",
+  "/basketball/champst2025.jpeg",
+  "/football/flag.jpg",
+  "/golf/golf.jpg",
+  "/golf/minigolf.jpg",
+  "/PickleTourneyCourt6.png",
+  "/run/runclub.jpg",
+  "/forever5/newman5.png",
+]);
+
+export const sanitizeSportImageUrl = (value?: string | null) => {
+  const normalizedValue = value?.trim();
+  if (!normalizedValue || RETIRED_SPORT_IMAGE_PATHS.has(normalizedValue)) {
+    return undefined;
+  }
+  return normalizedValue;
+};
+
 export const parseSportSectionHeaders = (value?: string[] | null) =>
   Array.isArray(value) ? value.map((entry) => entry.trim()).filter(Boolean) : [];
 

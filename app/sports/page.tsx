@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
-import { normalizeSportSlug, slugifySportValue } from "@/lib/sports";
+import { normalizeSportSlug, sanitizeSportImageUrl, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type { Sport } from "@/lib/supabase/types";
 
@@ -24,29 +24,32 @@ const sportRouteBySlug: Record<string, string> = {
   "youth-soccer": "youth-soccer",
 };
 
+const defaultSportCardImage = "/Hero.jpg";
+const soccerSportCardImage = "/sports_images/soccer/soccerLogo.png";
+
 const fallbackSports: SportCard[] = [
-  { id: "baseball", slug: "baseball", title: "Baseball", players_per_team: 9, gender: "open", short_description: "Diamond leagues, tourneys, and skills.", image_url: "/baseball/champst2025.jpeg" },
-  { id: "basketball", slug: "basketball", title: "Basketball", players_per_team: 5, gender: "open", short_description: "5v5 leagues, 3v3 nights, clinics.", image_url: "/basketball/champst2025.jpeg" },
-  { id: "flag-football", slug: "flag-football", title: "Flag Football", players_per_team: 7, gender: "coed", short_description: "Non-contact leagues and tourneys.", image_url: "/football/flag.jpg" },
-  { id: "golf", slug: "golf", title: "Golf", players_per_team: 4, gender: "open", short_description: "Scrambles, outings, and skins.", image_url: "/golf/golf.jpg" },
-  { id: "mini-golf", slug: "mini-golf", title: "Mini-Golf", players_per_team: 4, gender: "open", short_description: "Casual putt-putt meetups.", image_url: "/golf/minigolf.jpg" },
-  { id: "pickleball", slug: "pickleball", title: "Pickleball", players_per_team: 2, gender: "coed", short_description: "Leagues, ladders, and tournaments.", image_url: "/PickleTourneyCourt6.png" },
-  { id: "run-club", slug: "run-club", title: "Run Club", players_per_team: 1, gender: "open", short_description: "Group runs and race prep.", image_url: "/run/runclub.jpg" },
-  { id: "soccer", slug: "soccer", title: "Soccer", players_per_team: 11, gender: "open", short_description: "Leagues, pickup, and cups.", image_url: "/forever5/newman5.png" },
-  { id: "youth-soccer", slug: "youth-soccer", title: "Youth Soccer", players_per_team: 7, gender: "coed", short_description: "Small-sided youth play.", image_url: "/forever5/newman5.png" },
+  { id: "baseball", slug: "baseball", title: "Baseball", players_per_team: 9, gender: "open", short_description: "Diamond leagues, tourneys, and skills.", image_url: defaultSportCardImage },
+  { id: "basketball", slug: "basketball", title: "Basketball", players_per_team: 5, gender: "open", short_description: "5v5 leagues, 3v3 nights, clinics.", image_url: defaultSportCardImage },
+  { id: "flag-football", slug: "flag-football", title: "Flag Football", players_per_team: 7, gender: "coed", short_description: "Non-contact leagues and tourneys.", image_url: defaultSportCardImage },
+  { id: "golf", slug: "golf", title: "Golf", players_per_team: 4, gender: "open", short_description: "Scrambles, outings, and skins.", image_url: defaultSportCardImage },
+  { id: "mini-golf", slug: "mini-golf", title: "Mini-Golf", players_per_team: 4, gender: "open", short_description: "Casual putt-putt meetups.", image_url: defaultSportCardImage },
+  { id: "pickleball", slug: "pickleball", title: "Pickleball", players_per_team: 2, gender: "coed", short_description: "Leagues, ladders, and tournaments.", image_url: defaultSportCardImage },
+  { id: "run-club", slug: "run-club", title: "Run Club", players_per_team: 1, gender: "open", short_description: "Group runs and race prep.", image_url: defaultSportCardImage },
+  { id: "soccer", slug: "soccer", title: "Soccer", players_per_team: 11, gender: "open", short_description: "Leagues, pickup, and cups.", image_url: soccerSportCardImage },
+  { id: "youth-soccer", slug: "youth-soccer", title: "Youth Soccer", players_per_team: 7, gender: "coed", short_description: "Small-sided youth play.", image_url: soccerSportCardImage },
 ];
 
 const fallbackSportImages: Record<string, string> = {
-  baseball: "/baseball/champst2025.jpeg",
-  basketball: "/basketball/champst2025.jpeg",
-  esports: "/esports/esports.jpg",
-  "flag-football": "/football/flag.jpg",
-  golf: "/golf/golf.jpg",
-  "mini-golf": "/golf/minigolf.jpg",
-  pickleball: "/PickleTourneyCourt6.png",
-  "run-club": "/run/runclub.jpg",
-  soccer: "/forever5/newman5.png",
-  "youth-soccer": "/forever5/newman5.png",
+  baseball: defaultSportCardImage,
+  basketball: defaultSportCardImage,
+  esports: defaultSportCardImage,
+  "flag-football": defaultSportCardImage,
+  golf: defaultSportCardImage,
+  "mini-golf": defaultSportCardImage,
+  pickleball: defaultSportCardImage,
+  "run-club": defaultSportCardImage,
+  soccer: soccerSportCardImage,
+  "youth-soccer": soccerSportCardImage,
 };
 
 const activityLabels: Record<string, string> = {
@@ -63,7 +66,10 @@ const activityLabels: Record<string, string> = {
 };
 
 const getSportImageUrl = (sport: Pick<SportCard, "image_url" | "slug" | "title">) =>
-  sport.image_url || fallbackSportImages[sport.slug] || fallbackSportImages[slugifySportValue(sport.title ?? "")] || undefined;
+  sanitizeSportImageUrl(sport.image_url) ||
+  fallbackSportImages[sport.slug] ||
+  fallbackSportImages[slugifySportValue(sport.title ?? "")] ||
+  undefined;
 
 export default function SportsPage() {
   const [sports, setSports] = useState<SportCard[]>(fallbackSports);
