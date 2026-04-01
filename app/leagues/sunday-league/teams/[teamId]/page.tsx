@@ -8,9 +8,15 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { countryCodeToFlag, getCountryFlagAsset, getCountryNameFromCode } from "@/lib/countries";
-import { formatSundayLeaguePlayerName, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
+import {
+  findPendingFriendRequestBetweenUsers,
+  formatSundayLeaguePlayerName,
+  getSundayLeagueDivisionLogoSrc,
+  isFriendRequestPairConstraintError,
+  type SundayLeagueDivision,
+} from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
-import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
+import type { FriendRequest, SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
 type TeamRosterPlayer = {
   id: string;
@@ -280,6 +286,27 @@ export default function SundayLeaguePublicTeamPage() {
 
     setJoinState({ type: "loading" });
 
+    const { data: existingFriendRequests, error: friendRequestError } = await supabase
+      .from("friend_requests")
+      .select("id,sender_id,receiver_id,status")
+      .or(`and(sender_id.eq.${currentUserId},receiver_id.eq.${team.user_id}),and(sender_id.eq.${team.user_id},receiver_id.eq.${currentUserId})`);
+
+    if (!friendRequestError) {
+      const pendingFriendRequest = findPendingFriendRequestBetweenUsers(
+        existingFriendRequests as FriendRequest[] | null,
+        currentUserId,
+        team.user_id,
+      );
+
+      if (pendingFriendRequest) {
+        setJoinState({
+          type: "error",
+          message: "There is already a pending friend request between you and this captain. Use the team join request only, not both at once.",
+        });
+        return;
+      }
+    }
+
     const existingMembership = membershipByTeamId.get(team.id) ?? null;
     const payload = {
       team_id: team.id,
@@ -304,7 +331,12 @@ export default function SundayLeaguePublicTeamPage() {
           .single();
 
     if (response.error || !response.data) {
-      setJoinState({ type: "error", message: response.error?.message ?? "Could not send your join request." });
+      setJoinState({
+        type: "error",
+        message: isFriendRequestPairConstraintError(response.error?.message)
+          ? "A friend request already exists between you and this captain. Use the team join request only, not both at once."
+          : response.error?.message ?? "Could not send your join request.",
+      });
       return;
     }
 

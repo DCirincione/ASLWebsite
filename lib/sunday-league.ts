@@ -1,4 +1,4 @@
-import type { Event, JsonValue, SundayLeagueTeam } from "@/lib/supabase/types";
+import type { Event, FriendRequest, JsonValue, SundayLeagueTeam } from "@/lib/supabase/types";
 
 type SundayLeagueEventLike = Pick<Event, "title" | "description" | "registration_program_slug" | "sport_slug">;
 export type SundayLeagueDivision = 1 | 2;
@@ -33,6 +33,21 @@ export const formatSundayLeaguePlayerName = (value?: string | null) => {
     bottomLine: parts[parts.length - 1] ?? "",
   };
 };
+
+export const findPendingFriendRequestBetweenUsers = (
+  requests: FriendRequest[] | null | undefined,
+  firstUserId: string,
+  secondUserId: string,
+) =>
+  requests?.find(
+    (request) =>
+      request.status === "pending" &&
+      ((request.sender_id === firstUserId && request.receiver_id === secondUserId) ||
+        (request.sender_id === secondUserId && request.receiver_id === firstUserId)),
+  ) ?? null;
+
+export const isFriendRequestPairConstraintError = (message?: string | null) =>
+  (message ?? "").includes("uq_friend_requests_pair");
 
 const normalizeValue = (value?: string | null) => value?.trim().toLowerCase() ?? "";
 
