@@ -2,7 +2,7 @@ export type Profile = {
   id: string;
   name: string;
   age: string | null;
-  role?: "player" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
   suspension_reason?: string | null;
@@ -20,7 +20,7 @@ export type ProfileInsert = {
   id?: string;
   name: string;
   age?: string | null;
-  role?: "player" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
   suspension_reason?: string | null;
@@ -38,7 +38,7 @@ export type ProfileUpdate = {
   id?: string;
   name?: string;
   age?: string | null;
-  role?: "player" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
   suspension_reason?: string | null;
@@ -118,6 +118,7 @@ export type Event = {
   image_url?: string | null;
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
+  sport_id?: string | null;
   sport_slug?: string | null;
   rules_url?: string | null;
   registration_enabled?: boolean | null;
@@ -127,6 +128,12 @@ export type Event = {
   registration_limit?: number | null;
   payment_required?: boolean | null;
   payment_amount_cents?: number | null;
+  created_by_user_id?: string | null;
+  approved_by_user_id?: string | null;
+  approval_status?: "approved" | "pending_approval" | "changes_requested" | null;
+  approval_notes?: string | null;
+  submitted_for_approval_at?: string | null;
+  approved_at?: string | null;
 };
 
 export type EventInsert = {
@@ -142,6 +149,7 @@ export type EventInsert = {
   image_url?: string | null;
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
+  sport_id?: string | null;
   sport_slug?: string | null;
   registration_enabled?: boolean | null;
   registration_schema?: JsonValue | null;
@@ -150,6 +158,12 @@ export type EventInsert = {
   registration_limit?: number | null;
   payment_required?: boolean | null;
   payment_amount_cents?: number | null;
+  created_by_user_id?: string | null;
+  approved_by_user_id?: string | null;
+  approval_status?: "approved" | "pending_approval" | "changes_requested" | null;
+  approval_notes?: string | null;
+  submitted_for_approval_at?: string | null;
+  approved_at?: string | null;
 };
 
 export type EventUpdate = {
@@ -165,6 +179,7 @@ export type EventUpdate = {
   image_url?: string | null;
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
+  sport_id?: string | null;
   sport_slug?: string | null;
   registration_enabled?: boolean | null;
   registration_schema?: JsonValue | null;
@@ -173,6 +188,12 @@ export type EventUpdate = {
   registration_limit?: number | null;
   payment_required?: boolean | null;
   payment_amount_cents?: number | null;
+  created_by_user_id?: string | null;
+  approved_by_user_id?: string | null;
+  approval_status?: "approved" | "pending_approval" | "changes_requested" | null;
+  approval_notes?: string | null;
+  submitted_for_approval_at?: string | null;
+  approved_at?: string | null;
 };
 
 export type EventSubmission = {

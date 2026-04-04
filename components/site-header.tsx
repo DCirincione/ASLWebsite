@@ -6,7 +6,9 @@ import { CSSProperties, MouseEvent, useCallback, useEffect, useRef, useState } f
 
 import { AccountSignupForm } from "./account-signup-form";
 import { AccountSigninForm } from "./account-signin-form";
+import { canAccessAdminDashboard, isPartnerRole } from "@/lib/event-approval";
 import { supabase } from "@/lib/supabase/client";
+import type { Profile } from "@/lib/supabase/types";
 
 const links = [
   { href: "/", label: "Home" },
@@ -21,7 +23,7 @@ export function SiteHeader() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authMode, setAuthMode] = useState<"signup" | "signin">("signup");
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [profileRole, setProfileRole] = useState<string | null>(null);
+  const [profileRole, setProfileRole] = useState<Profile["role"] | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(96);
@@ -45,7 +47,7 @@ export function SiteHeader() {
         .eq("id", uid)
         .maybeSingle();
       setAvatarUrl(profile?.avatar_url ?? null);
-      setProfileRole(profile?.role ?? null);
+      setProfileRole((profile?.role as Profile["role"] | null | undefined) ?? null);
     };
 
     client.auth.getSession().then(async ({ data }) => {
@@ -181,7 +183,8 @@ export function SiteHeader() {
     return () => window.removeEventListener("resize", updateHeaderHeight);
   }, []);
 
-  const canAccessAdmin = profileRole === "admin" || profileRole === "owner";
+  const canAccessAdmin = canAccessAdminDashboard(profileRole);
+  const navLinks = isPartnerRole(profileRole) ? [...links, { href: "/partner", label: "Partner Portal" }] : links;
 
   return (
     <>
@@ -206,7 +209,7 @@ export function SiteHeader() {
             <span aria-hidden>{isMobileNavOpen ? "✕" : "☰"}</span>
           </button>
           <nav className={`nav ${isMobileNavOpen ? "nav--open" : ""}`} aria-label="Main navigation">
-            {links.map((link) => (
+            {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
@@ -236,6 +239,11 @@ export function SiteHeader() {
                       <Link href="/account/settings" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
                         Settings
                       </Link>
+                      {isPartnerRole(profileRole) ? (
+                        <Link href="/partner" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
+                          Partner Portal
+                        </Link>
+                      ) : null}
                       {canAccessAdmin ? (
                         <Link href="/admin" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
                           Admin Dashboard
@@ -282,6 +290,11 @@ export function SiteHeader() {
                     <Link href="/account/inbox" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                       Inbox
                     </Link>
+                    {isPartnerRole(profileRole) ? (
+                      <Link href="/partner" role="menuitem" onClick={() => setIsMenuOpen(false)}>
+                        Partner Portal
+                      </Link>
+                    ) : null}
                     {canAccessAdmin ? (
                       <Link href="/admin" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                         Admin Dashboard

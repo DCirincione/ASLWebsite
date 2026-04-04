@@ -133,12 +133,16 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
       const titleKey = normalize(event.title);
       const slugCandidates = toFlyerCandidates(event.registration_program_slug);
 
-      const match =
-        rows.find((row) => row.event_id === event.id) ||
-        rows.find((row) => slugCandidates.includes(normalize(row.flyer_name))) ||
-        rows.find((row) => normalize(row.flyer_name) === slugKey) ||
-        rows.find((row) => normalize(row.flyer_name) === titleKey) ||
-        null;
+      const directMatch = rows.find((row) => row.event_id === event.id) || null;
+      const legacyRows = rows.filter((row) => !row.event_id);
+      const allowLegacyMatch = event.host_type !== "partner";
+      const legacyMatch = allowLegacyMatch
+        ? legacyRows.find((row) => slugCandidates.includes(normalize(row.flyer_name))) ||
+          legacyRows.find((row) => normalize(row.flyer_name) === slugKey) ||
+          legacyRows.find((row) => normalize(row.flyer_name) === titleKey) ||
+          null
+        : null;
+      const match = directMatch || legacyMatch;
 
       const matchedFlyerImage = match?.flyer_image_url?.trim() || match?.image_url?.trim() || null;
 

@@ -9,6 +9,7 @@ import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { getCountryNameFromCode } from "@/lib/countries";
+import { filterVisiblePublicEvents } from "@/lib/event-approval";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Profile, SundayLeagueTeam } from "@/lib/supabase/types";
@@ -24,7 +25,7 @@ type FriendSummary = { id: string; name: string; avatar_url?: string | null };
 type PublicSundayLeagueTeam = Pick<SundayLeagueTeam, "id" | "team_name" | "team_logo_url">;
 type PublicRegisteredEvent = Pick<
   Event,
-  "id" | "title" | "start_date" | "end_date" | "time_info" | "location" | "description"
+  "id" | "title" | "start_date" | "end_date" | "time_info" | "location" | "description" | "host_type" | "approval_status"
 >;
 
 const fallbackProfile: ProfileWithAvatar = {
@@ -167,7 +168,7 @@ export default function PublicProfilePage() {
 
       const { data: events, error: eventsError } = await client
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status")
         .in("id", uniqueEventIds);
 
       if (eventsError || !events) {
@@ -176,9 +177,7 @@ export default function PublicProfilePage() {
         return;
       }
 
-      const eventsById = new Map(
-        (events as PublicRegisteredEvent[]).map((event) => [event.id, event])
-      );
+      const eventsById = new Map(filterVisiblePublicEvents(events as PublicRegisteredEvent[]).map((event) => [event.id, event]));
       const orderedEvents: PublicRegisteredEvent[] = [];
       const seenEventIds = new Set<string>();
 

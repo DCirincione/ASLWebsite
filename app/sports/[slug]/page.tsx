@@ -11,6 +11,7 @@ import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { SportEventCard } from "@/components/sport-event-card";
+import { filterVisiblePublicEvents } from "@/lib/event-approval";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import { getEventSectionLabel, normalizeSportSlug, parseSportSectionHeaders, slugifySportValue, sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
@@ -69,7 +70,7 @@ export default function DynamicSportPage() {
         supabase.from("sports").select("*").order("title", { ascending: true }),
         supabase
           .from("events")
-          .select("id,title,start_date,end_date,time_info,location,description,signup_mode,registration_program_slug,image_url,registration_enabled")
+          .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled")
           .order("start_date", { ascending: true, nullsFirst: false }),
       ]);
 
@@ -91,8 +92,8 @@ export default function DynamicSportPage() {
       }
 
       const sportSlug = normalizeSportSlug(matchedSport);
-      const matchedEvents = ((eventsData ?? []) as Event[])
-        .filter((event) => sportMatchesEvent(event, sportSlug))
+      const matchedEvents = filterVisiblePublicEvents((eventsData ?? []) as Event[])
+        .filter((event) => sportMatchesEvent(event, sportSlug, (sportsData ?? []) as Sport[]))
         .map((event) => ({
           ...event,
           image: event.image_url || undefined,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getBearerToken, getSupabaseServiceRole, getSupabaseWithToken } from "@/lib/admin-route-auth";
+import { isPublicEventVisible } from "@/lib/event-approval";
 import { EVENT_CHECKOUT_WINDOW_MS, EVENT_PAYMENT_CURRENCY } from "@/lib/event-payments";
 import { createSquarePaymentLink, getAppUrl, getSquareLocationId } from "@/lib/square";
 import type {
@@ -242,7 +243,7 @@ export async function POST(req: NextRequest) {
 
     const { data: eventRow, error: eventError } = await serviceClient
       .from("events")
-      .select("id,title,signup_mode,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit,payment_required,payment_amount_cents")
+      .select("id,title,host_type,approval_status,signup_mode,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit,payment_required,payment_amount_cents")
       .eq("id", eventId)
       .maybeSingle();
 
@@ -251,6 +252,9 @@ export async function POST(req: NextRequest) {
     }
 
     const eventConfig = eventRow as Event;
+    if (!isPublicEventVisible(eventConfig)) {
+      return NextResponse.json({ error: "Registration is not available for this event yet." }, { status: 404 });
+    }
     if (!eventConfig.registration_enabled) {
       return NextResponse.json({ error: "Registration is not enabled for this event." }, { status: 400 });
     }

@@ -11,6 +11,7 @@ import {
   getSignupUnavailableLabel,
   getSignupUnavailableMessage,
 } from "@/lib/event-signups";
+import { filterVisiblePublicEvents } from "@/lib/event-approval";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
@@ -24,6 +25,7 @@ type HomeEvent = {
   location?: string | null;
   description?: string | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
+  approval_status?: "approved" | "pending_approval" | "changes_requested" | null;
   image_url?: string | null;
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
@@ -106,12 +108,12 @@ export function HomeUpcomingEvents() {
       setLoading(true);
       const { data, error } = await supabase
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,registration_enabled")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,image_url,signup_mode,registration_program_slug,registration_enabled")
         .order("start_date", { ascending: true, nullsFirst: false })
-        .limit(4);
+        .limit(12);
 
       if (!error && data && data.length > 0) {
-        setEvents(data as HomeEvent[]);
+        setEvents(filterVisiblePublicEvents(data as HomeEvent[]).slice(0, 4));
       }
       setLoading(false);
     };

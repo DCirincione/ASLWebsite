@@ -10,10 +10,12 @@ import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { SportEventCard } from "@/components/sport-event-card";
+import { filterVisiblePublicEvents } from "@/lib/event-approval";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
+import { sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
-import type { Event } from "@/lib/supabase/types";
+import type { Event, Sport } from "@/lib/supabase/types";
 
 type SportEvent = Event & { image?: string };
 
@@ -30,13 +32,18 @@ export default function GolfPage() {
     const loadEvents = async () => {
       if (!supabase) return;
       setLoadingEvents(true);
-      const { data, error } = await supabase
-        .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,signup_mode,registration_program_slug,image_url,registration_enabled")
-        .order("start_date", { ascending: true, nullsFirst: false });
+      const [{ data, error }, { data: sportsData, error: sportsError }] = await Promise.all([
+        supabase
+          .from("events")
+          .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled")
+          .order("start_date", { ascending: true, nullsFirst: false }),
+        supabase.from("sports").select("id,title").order("title", { ascending: true }),
+      ]);
 
-      if (!error && data) {
-        const golfOnly = (data as Event[]).filter((row) =>
+      if (!error && !sportsError && data) {
+        const sports = (sportsData ?? []) as Sport[];
+        const golfOnly = filterVisiblePublicEvents(data as Event[]).filter((row) =>
+          sportMatchesEvent(row, "golf", sports) &&
           (row.registration_program_slug ?? "").trim().toLowerCase().startsWith("golf-tournament")
         );
         const mapped = golfOnly.map((row) => ({

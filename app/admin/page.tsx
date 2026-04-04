@@ -13,6 +13,7 @@ import {
   ALDRICH_COMMUNICATIONS_LABEL,
   parseAldrichCommunicationsPreferenceFromMessage,
 } from "@/lib/aldrich-communications";
+import { canAccessAdminDashboard, formatApprovalStatusLabel } from "@/lib/event-approval";
 import { createId } from "@/lib/create-id";
 import { formatEventPaymentAmount } from "@/lib/event-payments";
 import type { SignupMode } from "@/lib/event-signups";
@@ -26,7 +27,7 @@ import {
   type SundayLeagueSignupFieldType,
 } from "@/lib/sunday-league-signup-form";
 import { DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS, formatSundayLeagueDepositAmount } from "@/lib/sunday-league-settings-shared";
-import { parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
+import { getEventProgramSlugOptions, parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type {
   Event,
@@ -74,6 +75,7 @@ type EventFormState = {
   image_url: string;
   signup_mode: SignupMode;
   registration_program_slug: string;
+  sport_id: string;
   registration_enabled: boolean;
   waiver_url: string;
   registration_limit: string;
@@ -143,7 +145,7 @@ type ContactMessage = {
 type UserDirectoryRecord = {
   id: string;
   name: string;
-  role?: "player" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "admin" | "owner" | null;
   age?: string | null;
   sports?: string[] | null;
   suspended?: boolean | null;
@@ -151,7 +153,7 @@ type UserDirectoryRecord = {
   suspension_reason?: string | null;
   created_at?: string | null;
 };
-type UserRole = "player" | "admin" | "owner";
+type UserRole = "player" | "partner" | "admin" | "owner";
 type UserManageForm = {
   role: UserRole;
   status: "active" | "suspended";
@@ -469,12 +471,14 @@ export default function AdminPage() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [currentUserRole, setCurrentUserRole] = useState<UserRole | null>(null);
   const [events, setEvents] = useState<Event[]>([]);
+  const [eventOwnerNames, setEventOwnerNames] = useState<Record<string, string>>({});
   const [sports, setSports] = useState<Sport[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [loadingSports, setLoadingSports] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [deletingSportId, setDeletingSportId] = useState<string | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
+  const [savingPartnerApprovalId, setSavingPartnerApprovalId] = useState<string | null>(null);
   const [savingSportEditId, setSavingSportEditId] = useState<string | null>(null);
   const [uploadingCreateImage, setUploadingCreateImage] = useState(false);
   const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
@@ -497,6 +501,7 @@ export default function AdminPage() {
   const [siteSettingsStatus, setSiteSettingsStatus] = useState<FormStatus>({ type: "idle" });
   const [announcementStatus, setAnnouncementStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
+  const [partnerApprovalNotes, setPartnerApprovalNotes] = useState<Record<string, string>>({});
   const [sportsError, setSportsError] = useState<string | null>(null);
   const [flyers, setFlyers] = useState<Flyer[]>([]);
   const [loadingFlyers, setLoadingFlyers] = useState(false);
@@ -618,6 +623,7 @@ export default function AdminPage() {
     image_url: "",
     signup_mode: "registration",
     registration_program_slug: "",
+    sport_id: "",
     registration_enabled: false,
     waiver_url: "",
     registration_limit: "",
@@ -637,6 +643,7 @@ export default function AdminPage() {
     image_url: "",
     signup_mode: "registration",
     registration_program_slug: "",
+    sport_id: "",
     registration_enabled: false,
     waiver_url: "",
     registration_limit: "",
@@ -715,13 +722,34 @@ export default function AdminPage() {
     setEventsError(null);
     const { data, error } = await supabase
       .from("events")
-      .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,registration_enabled,waiver_url,allow_multiple_registrations,registration_limit,registration_schema,payment_required,payment_amount_cents")
+      .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,waiver_url,allow_multiple_registrations,registration_limit,registration_schema,payment_required,payment_amount_cents,created_by_user_id,approved_by_user_id,approval_status,approval_notes,submitted_for_approval_at,approved_at")
       .order("start_date", { ascending: true, nullsFirst: false });
 
     if (!error && data) {
       setEvents(data as Event[]);
+      const ownerIds = Array.from(
+        new Set((data as Event[]).map((event) => event.created_by_user_id).filter((value): value is string => Boolean(value)))
+      );
+      const nextPartnerApprovalNotes: Record<string, string> = {};
+      for (const event of data as Event[]) {
+        nextPartnerApprovalNotes[event.id] = event.approval_notes ?? "";
+      }
+      setPartnerApprovalNotes(nextPartnerApprovalNotes);
+
+      if (ownerIds.length > 0) {
+        const { data: ownerProfiles } = await supabase.from("profiles").select("id,name").in("id", ownerIds);
+        const nextOwnerNames: Record<string, string> = {};
+        for (const ownerProfile of ownerProfiles ?? []) {
+          nextOwnerNames[ownerProfile.id] = ownerProfile.name ?? "Partner";
+        }
+        setEventOwnerNames(nextOwnerNames);
+      } else {
+        setEventOwnerNames({});
+      }
     } else {
       setEvents([]);
+      setEventOwnerNames({});
+      setPartnerApprovalNotes({});
       setEventsError(error?.message ?? "Could not load events.");
     }
     setLoadingEvents(false);
@@ -1338,7 +1366,7 @@ export default function AdminPage() {
 
       const role = (profile?.role ?? null) as UserRole | null;
       setCurrentUserRole(role);
-      if (role === "admin" || role === "owner") {
+      if (canAccessAdminDashboard(role)) {
         setStatus("allowed");
         return;
       }
@@ -1366,6 +1394,20 @@ export default function AdminPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateFormSportId = (sportId: string) => {
+    setForm((prev) => {
+      const nextSport = sports.find((sport) => sport.id === sportId) ?? null;
+      const nextOptions = getEventProgramSlugOptions(nextSport);
+      const currentValueStillValid = nextOptions.some((option) => option.value === prev.registration_program_slug);
+
+      return {
+        ...prev,
+        sport_id: sportId,
+        registration_program_slug: currentValueStillValid ? prev.registration_program_slug : (nextOptions[0]?.value ?? ""),
+      };
+    });
+  };
+
   const updateSport = <K extends keyof SportFormState>(key: K, value: SportFormState[K]) => {
     setSportForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -1382,6 +1424,7 @@ export default function AdminPage() {
       image_url: "",
       signup_mode: "registration",
       registration_program_slug: "",
+      sport_id: "",
       registration_enabled: false,
       waiver_url: "",
       registration_limit: "",
@@ -1457,6 +1500,7 @@ export default function AdminPage() {
       image_url: event.image_url ?? "",
       signup_mode: event.signup_mode === "waitlist" ? "waitlist" : "registration",
       registration_program_slug: event.registration_program_slug ?? "",
+      sport_id: event.sport_id ?? "",
       registration_enabled: Boolean(event.registration_enabled),
       waiver_url: event.waiver_url ?? "",
       registration_limit: event.registration_limit?.toString() ?? "",
@@ -1504,6 +1548,20 @@ export default function AdminPage() {
 
   const updateEdit = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setEditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateEditSportId = (sportId: string) => {
+    setEditForm((prev) => {
+      const nextSport = sports.find((sport) => sport.id === sportId) ?? null;
+      const nextOptions = getEventProgramSlugOptions(nextSport);
+      const currentValueStillValid = nextOptions.some((option) => option.value === prev.registration_program_slug);
+
+      return {
+        ...prev,
+        sport_id: sportId,
+        registration_program_slug: currentValueStillValid ? prev.registration_program_slug : (nextOptions[0]?.value ?? ""),
+      };
+    });
   };
 
   const updateEditSport = <K extends keyof SportFormState>(key: K, value: SportFormState[K]) => {
@@ -2058,6 +2116,7 @@ export default function AdminPage() {
       image_url: form.image_url.trim() || null,
       signup_mode: form.signup_mode,
       registration_program_slug: form.registration_program_slug.trim() || null,
+      sport_id: form.sport_id || null,
       registration_enabled: form.registration_enabled,
       waiver_url: isWaitlist ? null : form.waiver_url.trim() || null,
       allow_multiple_registrations: false,
@@ -2065,6 +2124,9 @@ export default function AdminPage() {
       payment_required: isWaitlist ? false : form.payment_required,
       payment_amount_cents: isWaitlist || !form.payment_required ? null : paymentAmountCents,
       registration_schema: registrationSchema,
+      approval_status: "approved" as const,
+      approved_at: new Date().toISOString(),
+      approved_by_user_id: currentUserId,
     };
 
     const { error } = await supabase.from("events").insert(payload);
@@ -2154,6 +2216,7 @@ export default function AdminPage() {
     }
 
     setSavingEditId(eventId);
+    const currentEvent = events.find((event) => event.id === eventId);
     const registrationSchema = buildRegistrationSchema({
       ...editForm,
       require_waiver: isWaitlist ? false : editForm.require_waiver,
@@ -2169,6 +2232,7 @@ export default function AdminPage() {
       image_url: editForm.image_url.trim() || null,
       signup_mode: editForm.signup_mode,
       registration_program_slug: editForm.registration_program_slug.trim() || null,
+      sport_id: editForm.sport_id || null,
       registration_enabled: editForm.registration_enabled,
       waiver_url: isWaitlist ? null : editForm.waiver_url.trim() || null,
       allow_multiple_registrations: false,
@@ -2176,6 +2240,17 @@ export default function AdminPage() {
       payment_required: isWaitlist ? false : editForm.payment_required,
       payment_amount_cents: isWaitlist || !editForm.payment_required ? null : paymentAmountCents,
       registration_schema: registrationSchema,
+      approval_status: currentEvent?.host_type === "partner" ? currentEvent.approval_status ?? "pending_approval" : "approved",
+      approval_notes: currentEvent?.host_type === "partner" ? currentEvent.approval_notes ?? null : null,
+      created_by_user_id: currentEvent?.created_by_user_id ?? null,
+      approved_at:
+        currentEvent?.host_type === "partner"
+          ? currentEvent.approved_at ?? null
+          : currentEvent?.approved_at ?? new Date().toISOString(),
+      approved_by_user_id:
+        currentEvent?.host_type === "partner"
+          ? currentEvent.approved_by_user_id ?? null
+          : currentEvent?.approved_by_user_id ?? currentUserId,
     };
 
     const { error } = await supabase.from("events").update(payload).eq("id", eventId);
@@ -2589,6 +2664,7 @@ export default function AdminPage() {
     setActiveModule(module);
     if (module === "events") {
       void loadEvents();
+      void loadSports();
     }
     if (module === "sundayLeague") {
       void loadSundayLeagueSettings();
@@ -2818,6 +2894,49 @@ export default function AdminPage() {
     if (!supabase) return null;
     const { data: sessionData } = await supabase.auth.getSession();
     return sessionData.session?.access_token ?? null;
+  };
+
+  const savePartnerApproval = async (eventId: string, approvalStatus: "approved" | "changes_requested") => {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setFormStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    setSavingPartnerApprovalId(eventId);
+    setFormStatus({ type: "idle" });
+
+    try {
+      const response = await fetch(`/api/admin/partner-events/${eventId}/approval`, {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          status: approvalStatus,
+          notes: partnerApprovalNotes[eventId] ?? "",
+        }),
+      });
+
+      const json = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(json?.error ?? "Could not update partner approval.");
+      }
+
+      setFormStatus({
+        type: "success",
+        message: approvalStatus === "approved" ? "Partner event approved." : "Changes requested for partner event.",
+      });
+      await loadEvents();
+    } catch (error) {
+      setFormStatus({
+        type: "error",
+        message: error instanceof Error ? error.message : "Could not update partner approval.",
+      });
+    } finally {
+      setSavingPartnerApprovalId(null);
+    }
   };
 
   const handleCreateCommunitySponsor = async (event: FormEvent) => {
@@ -3867,12 +3986,35 @@ export default function AdminPage() {
                       </select>
                     </div>
                     <div className="form-control">
-                      <label htmlFor="event-program-slug">Registration program slug</label>
-                      <input
+                      <label htmlFor="event-sport">Sport page</label>
+                      <select
+                        id="event-sport"
+                        value={form.sport_id}
+                        onChange={(e) => updateFormSportId(e.target.value)}
+                      >
+                        <option value="">Not linked to a sport page</option>
+                        {sports.map((sport) => (
+                          <option key={sport.id} value={sport.id}>
+                            {sport.title}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor="event-program-slug">Event type</label>
+                      <select
                         id="event-program-slug"
                         value={form.registration_program_slug}
                         onChange={(e) => update("registration_program_slug", e.target.value)}
-                      />
+                        disabled={!form.sport_id}
+                      >
+                        <option value="">{form.sport_id ? "Select an event type" : "Select a sport page first"}</option>
+                        {getEventProgramSlugOptions(sports.find((sport) => sport.id === form.sport_id) ?? null).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
                     </div>
                     <div className="form-control">
                       <label htmlFor="event-waiver-url">Waiver URL</label>
@@ -3968,10 +4110,24 @@ export default function AdminPage() {
                         <h3>{event.title}</h3>
                       </div>
                       <div className="event-card__meta">
+                        <p className="muted">Host: {event.host_type ?? "Unspecified"}</p>
+                        {event.host_type === "partner" ? (
+                          <p className="muted">
+                            Approval: {formatApprovalStatusLabel(event.approval_status)}
+                          </p>
+                        ) : null}
                         <p className="muted">Date: {dateLabel(event.start_date, event.end_date)}</p>
                         {event.location ? <p className="muted">Location: {event.location}</p> : null}
                         {event.registration_program_slug ? (
-                          <p className="muted">Program: {event.registration_program_slug}</p>
+                          <p className="muted">Event type: {event.registration_program_slug}</p>
+                        ) : null}
+                        {event.sport_id ? (
+                          <p className="muted">Sport: {sports.find((sport) => sport.id === event.sport_id)?.title ?? event.sport_id}</p>
+                        ) : null}
+                        {event.host_type === "partner" && event.created_by_user_id ? (
+                          <p className="muted">
+                            Partner: {eventOwnerNames[event.created_by_user_id] ?? event.created_by_user_id}
+                          </p>
                         ) : null}
                         <p className="muted">
                           Signup mode: {event.signup_mode === "waitlist" ? "Waitlist / interest" : "Registration"}
@@ -3983,6 +4139,44 @@ export default function AdminPage() {
                           Payment: {event.payment_required && event.payment_amount_cents ? `${formatEventPaymentAmount(event.payment_amount_cents)} required` : "No payment"}
                         </p>
                       </div>
+                      {event.description ? <p className="muted">{event.description}</p> : null}
+                      {event.host_type === "partner" ? (
+                        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+                          <div className="form-control">
+                            <label htmlFor={`partner-approval-notes-${event.id}`}>Owner notes</label>
+                            <textarea
+                              id={`partner-approval-notes-${event.id}`}
+                              value={partnerApprovalNotes[event.id] ?? ""}
+                              onChange={(e) =>
+                                setPartnerApprovalNotes((prev) => ({
+                                  ...prev,
+                                  [event.id]: e.target.value,
+                                }))
+                              }
+                              rows={4}
+                              placeholder="Add approval notes or requested edits for the partner."
+                            />
+                          </div>
+                          <div className="cta-row">
+                            <button
+                              className="button primary"
+                              type="button"
+                              onClick={() => void savePartnerApproval(event.id, "approved")}
+                              disabled={savingPartnerApprovalId === event.id}
+                            >
+                              {savingPartnerApprovalId === event.id ? "Saving..." : "Approve & Publish"}
+                            </button>
+                            <button
+                              className="button ghost"
+                              type="button"
+                              onClick={() => void savePartnerApproval(event.id, "changes_requested")}
+                              disabled={savingPartnerApprovalId === event.id}
+                            >
+                              Request Changes
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="cta-row">
                         <button
                           className="button ghost"
@@ -4097,12 +4291,35 @@ export default function AdminPage() {
                               </select>
                             </div>
                             <div className="form-control">
-                              <label htmlFor={`edit-slug-${event.id}`}>Registration program slug</label>
-                              <input
+                              <label htmlFor={`edit-sport-${event.id}`}>Sport page</label>
+                              <select
+                                id={`edit-sport-${event.id}`}
+                                value={editForm.sport_id}
+                                onChange={(e) => updateEditSportId(e.target.value)}
+                              >
+                                <option value="">Not linked to a sport page</option>
+                                {sports.map((sport) => (
+                                  <option key={sport.id} value={sport.id}>
+                                    {sport.title}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <div className="form-control">
+                              <label htmlFor={`edit-slug-${event.id}`}>Event type</label>
+                              <select
                                 id={`edit-slug-${event.id}`}
                                 value={editForm.registration_program_slug}
                                 onChange={(e) => updateEdit("registration_program_slug", e.target.value)}
-                              />
+                                disabled={!editForm.sport_id}
+                              >
+                                <option value="">{editForm.sport_id ? "Select an event type" : "Select a sport page first"}</option>
+                                {getEventProgramSlugOptions(sports.find((sport) => sport.id === editForm.sport_id) ?? null).map((option) => (
+                                  <option key={option.value} value={option.value}>
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </select>
                             </div>
                             <div className="form-control">
                               <label htmlFor={`edit-waiver-url-${event.id}`}>Waiver URL</label>
@@ -5711,6 +5928,13 @@ export default function AdminPage() {
                               onClick={() => setManageForm((prev) => ({ ...prev, role: "player" }))}
                             >
                               Player
+                            </button>
+                            <button
+                              type="button"
+                              className={`button ${manageForm.role === "partner" ? "primary" : "ghost"}`}
+                              onClick={() => setManageForm((prev) => ({ ...prev, role: "partner" }))}
+                            >
+                              Partner
                             </button>
                             <button
                               type="button"

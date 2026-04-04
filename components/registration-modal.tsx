@@ -18,6 +18,7 @@ import {
   getSignupSuccessMessage,
   isWaitlistEvent,
 } from "@/lib/event-signups";
+import { isPublicEventVisible } from "@/lib/event-approval";
 import { formatEventPaymentAmount } from "@/lib/event-payments";
 import { supabase } from "@/lib/supabase/client";
 import type { JsonValue } from "@/lib/supabase/types";
@@ -46,6 +47,8 @@ type RegistrationFormValues = Record<string, RegistrationFormValue>;
 type EventRegistration = {
   id: string;
   title: string;
+  host_type?: "aldrich" | "featured" | "partner" | "other" | null;
+  approval_status?: "approved" | "pending_approval" | "changes_requested" | null;
   signup_mode?: "registration" | "waitlist" | null;
   registration_enabled?: boolean | null;
   registration_schema?: JsonValue | null;
@@ -194,7 +197,7 @@ export function RegistrationModal({
 
       const { data: eventRow, error: eventError } = await client
         .from("events")
-        .select("id,title,signup_mode,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit,payment_required,payment_amount_cents")
+        .select("id,title,host_type,approval_status,signup_mode,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit,payment_required,payment_amount_cents")
         .eq("id", eventId)
         .maybeSingle();
 
@@ -206,6 +209,12 @@ export function RegistrationModal({
 
       if (!eventRow.registration_enabled) {
         setStatus({ type: "error", message: "Registration is not enabled for this event." });
+        setLoadingEvent(false);
+        return;
+      }
+
+      if (!isPublicEventVisible(eventRow)) {
+        setStatus({ type: "error", message: "Registration is not available for this event yet." });
         setLoadingEvent(false);
         return;
       }
