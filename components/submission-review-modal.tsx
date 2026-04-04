@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { supabase } from "@/lib/supabase/client";
 import type { JsonValue } from "@/lib/supabase/types";
@@ -11,6 +11,7 @@ type SubmissionReview = {
   name: string;
   email: string;
   phone?: string | null;
+  paymentSummary?: string | null;
   answers?: Record<string, JsonValue | undefined> | null;
   attachments?: string[] | null;
   waiverAccepted?: boolean | null;
@@ -66,9 +67,13 @@ const filenameFromPath = (path: string) => {
   return parts[parts.length - 1] || path;
 };
 
+const isAbsoluteUrl = (value: string) => /^https?:\/\//i.test(value);
+
 export function SubmissionReviewModal({ open, submission, onEdit, onClose }: SubmissionReviewModalProps) {
   const [resolvedAttachments, setResolvedAttachments] = useState<ResolvedAttachment[]>([]);
-  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [resolvedAttachmentsKey, setResolvedAttachmentsKey] = useState("");
+  const attachmentPaths = useMemo(() => submission?.attachments ?? [], [submission?.attachments]);
+  const attachmentKey = open ? attachmentPaths.join("|") : "";
 
   useEffect(() => {
     if (!open) return;
@@ -80,29 +85,23 @@ export function SubmissionReviewModal({ open, submission, onEdit, onClose }: Sub
   }, [open, onClose]);
 
   useEffect(() => {
-    if (!open || !submission?.attachments?.length) {
-      setResolvedAttachments([]);
-      setLoadingAttachments(false);
-      return;
-    }
-    if (!supabase) {
-      setResolvedAttachments(
-        submission.attachments.map((path) => ({
-          path,
-          filename: filenameFromPath(path),
-          url: null,
-        }))
-      );
-      setLoadingAttachments(false);
+    if (!open || attachmentPaths.length === 0 || !supabase) {
       return;
     }
     const client = supabase;
 
     let cancelled = false;
     const loadAttachments = async () => {
-      setLoadingAttachments(true);
       const resolved = await Promise.all(
-        submission.attachments!.map(async (path) => {
+        attachmentPaths.map(async (path) => {
+          if (isAbsoluteUrl(path)) {
+            return {
+              path,
+              filename: filenameFromPath(path),
+              url: path,
+            };
+          }
+
           const { data, error } = await client.storage.from("signups").createSignedUrl(path, 60 * 60);
           return {
             path,
@@ -114,18 +113,31 @@ export function SubmissionReviewModal({ open, submission, onEdit, onClose }: Sub
 
       if (cancelled) return;
       setResolvedAttachments(resolved);
-      setLoadingAttachments(false);
+      setResolvedAttachmentsKey(attachmentKey);
     };
 
     void loadAttachments();
     return () => {
       cancelled = true;
     };
-  }, [open, submission]);
+  }, [attachmentKey, attachmentPaths, open]);
 
   if (!open || !submission) return null;
 
   const answerEntries = Object.entries(submission.answers ?? {}).filter(([, value]) => value !== undefined);
+  const visibleResolvedAttachments =
+    attachmentPaths.length === 0
+      ? []
+      : !supabase
+        ? attachmentPaths.map((path) => ({
+            path,
+            filename: filenameFromPath(path),
+            url: isAbsoluteUrl(path) ? path : null,
+          }))
+        : resolvedAttachmentsKey === attachmentKey
+          ? resolvedAttachments
+          : [];
+  const showAttachmentLoading = Boolean(supabase) && attachmentPaths.length > 0 && resolvedAttachmentsKey !== attachmentKey;
 
   return (
     <div
@@ -158,6 +170,7 @@ export function SubmissionReviewModal({ open, submission, onEdit, onClose }: Sub
           <span className="pill pill--muted">{submission.name}</span>
           <span className="pill pill--muted">{submission.email}</span>
           {submission.phone ? <span className="pill pill--muted">{submission.phone}</span> : null}
+          {submission.paymentSummary ? <span className="pill pill--muted">{submission.paymentSummary}</span> : null}
           <span className="pill pill--muted">Waiver: {submission.waiverAccepted ? "Accepted" : "Not required"}</span>
         </div>
 
@@ -188,11 +201,11 @@ export function SubmissionReviewModal({ open, submission, onEdit, onClose }: Sub
 
           <section className="event-detail__list">
             <h4>Attachments</h4>
-            {loadingAttachments ? (
+            {showAttachmentLoading ? (
               <p className="muted">Loading attachments...</p>
-            ) : resolvedAttachments.length > 0 ? (
+            ) : visibleResolvedAttachments.length > 0 ? (
               <ul className="submission-review__attachments">
-                {resolvedAttachments.map((attachment) => (
+                {visibleResolvedAttachments.map((attachment) => (
                   <li key={attachment.path} className="submission-review__attachment-item">
                     <span>{attachment.filename}</span>
                     <div className="submission-review__attachment-actions">

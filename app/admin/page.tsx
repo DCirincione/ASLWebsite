@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 
@@ -7,7 +8,11 @@ import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { INBOX_ANNOUNCEMENT_AUDIENCE_OPTIONS, type InboxAnnouncementAudience } from "@/lib/inbox";
-import { parseAldrichCommunicationsPreferenceFromMessage } from "@/lib/aldrich-communications";
+import {
+  ALDRICH_COMMUNICATIONS_KEY,
+  ALDRICH_COMMUNICATIONS_LABEL,
+  parseAldrichCommunicationsPreferenceFromMessage,
+} from "@/lib/aldrich-communications";
 import { createId } from "@/lib/create-id";
 import { formatEventPaymentAmount } from "@/lib/event-payments";
 import type { SignupMode } from "@/lib/event-signups";
@@ -23,7 +28,15 @@ import {
 import { DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS, formatSundayLeagueDepositAmount } from "@/lib/sunday-league-settings-shared";
 import { parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
-import type { Event, Flyer, JsonValue, Sport, SundayLeagueScheduleWeek } from "@/lib/supabase/types";
+import type {
+  Event,
+  Flyer,
+  JsonValue,
+  Sport,
+  SundayLeagueScheduleWeek,
+  SundayLeagueTeam,
+  SundayLeagueTeamCheckoutDraft,
+} from "@/lib/supabase/types";
 
 type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type FormStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -113,6 +126,9 @@ type RegistrationRecord = {
   event_id: string;
   event_title: string;
   signup_mode: SignupMode;
+  paid_amount_cents?: number | null;
+  type_label: string;
+  registration_name?: string | null;
 };
 type ContactMessage = {
   id: string;
@@ -147,6 +163,172 @@ type AnnouncementFormState = {
   title: string;
   message: string;
   recipientIds: string[];
+};
+
+const isJsonRecord = (value: unknown): value is Record<string, JsonValue | undefined> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const getJsonRecord = (value: JsonValue | null | undefined) => (isJsonRecord(value) ? value : null);
+
+const appendSundayLeagueAnswer = (
+  answers: Record<string, JsonValue | undefined>,
+  label: string,
+  value: JsonValue | undefined | null
+) => {
+  if (value == null) return;
+  if (typeof value === "string" && !value.trim()) return;
+  if (Array.isArray(value) && value.length === 0) return;
+  answers[label] = value;
+};
+
+const normalizeMatchValue = (value?: string | null) => value?.trim().toLowerCase() || "";
+
+const getRecordTimestamp = (value?: string | null) => {
+  if (!value) return 0;
+  const timestamp = new Date(value).getTime();
+  return Number.isFinite(timestamp) ? timestamp : 0;
+};
+
+const getSundayLeagueDraftMatchScore = (
+  team: SundayLeagueTeam,
+  draft: Pick<SundayLeagueTeamCheckoutDraft, "team_id" | "user_id" | "division" | "slot_number" | "team_payload">
+) => {
+  if (draft.team_id === team.id) return 1000;
+
+  const payload = getJsonRecord((draft.team_payload as JsonValue | undefined) ?? null);
+  const payloadTeamName = normalizeMatchValue(typeof payload?.team_name === "string" ? payload.team_name : null);
+  const payloadCaptainEmail = normalizeMatchValue(typeof payload?.captain_email === "string" ? payload.captain_email : null);
+  const payloadCaptainPhone = normalizeMatchValue(typeof payload?.captain_phone === "string" ? payload.captain_phone : null);
+  const payloadCaptainName = normalizeMatchValue(typeof payload?.captain_name === "string" ? payload.captain_name : null);
+
+  const teamName = normalizeMatchValue(team.team_name);
+  const captainEmail = normalizeMatchValue(team.captain_email);
+  const captainPhone = normalizeMatchValue(team.captain_phone);
+  const captainName = normalizeMatchValue(team.captain_name);
+
+  const sameUser = draft.user_id === team.user_id;
+  const sameDivision = draft.division === team.division;
+  const sameSlot = draft.slot_number === team.slot_number;
+  const sameTeamName = payloadTeamName && payloadTeamName === teamName;
+  const sameCaptainEmail = payloadCaptainEmail && payloadCaptainEmail === captainEmail;
+  const sameCaptainPhone = payloadCaptainPhone && payloadCaptainPhone === captainPhone;
+  const sameCaptainName = payloadCaptainName && payloadCaptainName === captainName;
+
+  if (sameUser && sameDivision && sameSlot) return 950;
+  if (sameDivision && sameSlot && sameTeamName && sameCaptainEmail) return 900;
+  if (sameDivision && sameTeamName && sameCaptainEmail) return 850;
+  if (sameUser && sameTeamName && sameCaptainEmail) return 825;
+  if (sameDivision && sameSlot && sameTeamName && sameCaptainPhone) return 800;
+  if (sameDivision && sameSlot && sameCaptainEmail) return 775;
+  if (sameDivision && sameTeamName && sameCaptainName) return 750;
+  if (sameUser && sameDivision && sameTeamName) return 725;
+  if (sameUser && sameDivision && sameCaptainEmail) return 700;
+
+  return -1;
+};
+
+const getBestSundayLeagueCheckoutDraft = ({
+  team,
+  drafts,
+  configuredDepositAmountCents,
+}: {
+  team: SundayLeagueTeam;
+  drafts: Array<
+    Pick<
+      SundayLeagueTeamCheckoutDraft,
+      "team_id" | "user_id" | "division" | "slot_number" | "team_payload" | "amount_cents" | "updated_at" | "created_at"
+    >
+  >;
+  configuredDepositAmountCents: number;
+}) => {
+  const matches = drafts
+    .map((draft) => ({
+      draft,
+      score: getSundayLeagueDraftMatchScore(team, draft),
+      timestamp: Math.max(getRecordTimestamp(draft.updated_at), getRecordTimestamp(draft.created_at)),
+    }))
+    .filter((entry) => entry.score >= 0);
+
+  if (matches.length === 0) return null;
+
+  const bestScore = Math.max(...matches.map((entry) => entry.score));
+  const bestScoreMatches = matches.filter((entry) => entry.score === bestScore);
+  const amountCounts = new Map<number, number>();
+  for (const entry of bestScoreMatches) {
+    amountCounts.set(entry.draft.amount_cents, (amountCounts.get(entry.draft.amount_cents) ?? 0) + 1);
+  }
+
+  return bestScoreMatches.sort((a, b) => {
+    const aCount = amountCounts.get(a.draft.amount_cents) ?? 0;
+    const bCount = amountCounts.get(b.draft.amount_cents) ?? 0;
+    if (aCount !== bCount) return bCount - aCount;
+
+    const aMatchesConfigured = a.draft.amount_cents === configuredDepositAmountCents ? 1 : 0;
+    const bMatchesConfigured = b.draft.amount_cents === configuredDepositAmountCents ? 1 : 0;
+    if (aMatchesConfigured !== bMatchesConfigured) return bMatchesConfigured - aMatchesConfigured;
+
+    if (a.draft.amount_cents !== b.draft.amount_cents) return b.draft.amount_cents - a.draft.amount_cents;
+
+    return b.timestamp - a.timestamp;
+  })[0]?.draft ?? null;
+};
+
+const collectSundayLeagueAttachments = (team: SundayLeagueTeam, teamPayload: Record<string, JsonValue | undefined> | null) => {
+  const attachments = new Set<string>();
+  if (team.team_logo_url?.trim()) {
+    attachments.add(team.team_logo_url.trim());
+  }
+
+  const agreements = getJsonRecord((teamPayload?.agreements as JsonValue | undefined) ?? team.agreements ?? null);
+  const customFields = getJsonRecord((agreements?.custom_fields as JsonValue | undefined) ?? null);
+  for (const value of Object.values(customFields ?? {})) {
+    if (typeof value === "string" && value.trim().includes("/")) {
+      attachments.add(value.trim());
+    }
+  }
+
+  return Array.from(attachments);
+};
+
+const buildSundayLeagueRegistrationAnswers = (
+  team: SundayLeagueTeam,
+  teamPayload: Record<string, JsonValue | undefined> | null
+): Record<string, JsonValue | undefined> => {
+  const answers: Record<string, JsonValue | undefined> = {};
+  const preferredColors = getJsonRecord((team.preferred_jersey_colors as JsonValue | undefined) ?? null);
+  const agreements = getJsonRecord((teamPayload?.agreements as JsonValue | undefined) ?? team.agreements ?? null);
+  const customFields = getJsonRecord((agreements?.custom_fields as JsonValue | undefined) ?? null);
+
+  appendSundayLeagueAnswer(answers, "Division", `Division ${team.division}`);
+  appendSundayLeagueAnswer(answers, "Slot Number", team.slot_number);
+  appendSundayLeagueAnswer(answers, "Team Name", team.team_name);
+  appendSundayLeagueAnswer(answers, "Captain Name", team.captain_name);
+  appendSundayLeagueAnswer(answers, "Captain Email", team.captain_email);
+  appendSundayLeagueAnswer(answers, "Captain Phone", team.captain_phone);
+  appendSundayLeagueAnswer(answers, "Captain Is Playing", Boolean(team.captain_is_playing));
+  appendSundayLeagueAnswer(answers, "Primary Color", preferredColors?.primary);
+  appendSundayLeagueAnswer(answers, "Secondary Color", preferredColors?.secondary);
+  appendSundayLeagueAnswer(answers, "Accent Color", preferredColors?.accent);
+  appendSundayLeagueAnswer(answers, "Preferred Jersey Design", team.preferred_jersey_design);
+  appendSundayLeagueAnswer(answers, "Logo Description", team.logo_description);
+  appendSundayLeagueAnswer(answers, "Jersey Numbers", team.jersey_numbers ?? null);
+  appendSundayLeagueAnswer(answers, "Deposit Status", team.deposit_status ?? null);
+  appendSundayLeagueAnswer(answers, "Team Status", team.team_status ?? null);
+
+  if (agreements) {
+    appendSundayLeagueAnswer(answers, "Captain Confirmed", agreements.captain_confirmed);
+    appendSundayLeagueAnswer(answers, "Deposit Required", agreements.deposit_required);
+    appendSundayLeagueAnswer(answers, "Balance Due", agreements.balance_due);
+    appendSundayLeagueAnswer(answers, "Approval Not Guaranteed", agreements.approval_not_guaranteed);
+    appendSundayLeagueAnswer(answers, "Rules Accepted", agreements.rules_accepted);
+    appendSundayLeagueAnswer(answers, ALDRICH_COMMUNICATIONS_LABEL, agreements[ALDRICH_COMMUNICATIONS_KEY]);
+  }
+
+  for (const [key, value] of Object.entries(customFields ?? {})) {
+    appendSundayLeagueAnswer(answers, key, value);
+  }
+
+  return answers;
 };
 
 const FLYER_BUCKET = "flyers";
@@ -841,15 +1023,37 @@ export default function AdminPage() {
     if (!supabase) return;
     setLoadingRegistrations(true);
     setRegistrationsError(null);
+    const configuredSundayLeagueDepositAmountCents = Math.round(Number(sundayLeagueSettingsForm.depositAmount) * 100);
+    const sundayLeagueDepositAmountCents =
+      Number.isFinite(configuredSundayLeagueDepositAmountCents) && configuredSundayLeagueDepositAmountCents > 0
+        ? configuredSundayLeagueDepositAmountCents
+        : DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS;
 
-    const { data: submissionData, error: submissionError } = await supabase
-      .from("event_submissions")
-      .select("id,event_id,user_id,name,email,phone,answers,attachments,waiver_accepted,created_at")
-      .order("created_at", { ascending: false });
+    const [{ data: submissionData, error: submissionError }, { data: sundayLeagueTeamsData, error: sundayLeagueTeamsError }] =
+      await Promise.all([
+        supabase
+          .from("event_submissions")
+          .select("id,event_id,user_id,name,email,phone,answers,attachments,waiver_accepted,created_at")
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("sunday_league_teams")
+          .select(
+            "id,user_id,division,slot_number,captain_name,captain_phone,captain_email,captain_is_playing,team_name,preferred_jersey_colors,preferred_jersey_design,team_logo_url,logo_description,jersey_numbers,agreements,deposit_status,team_status,created_at"
+          )
+          .order("created_at", { ascending: false }),
+      ]);
 
-    if (submissionError) {
+    if (submissionError || sundayLeagueTeamsError) {
       setRegistrations([]);
-      setRegistrationsError(submissionError.message ?? "Could not load registrations.");
+      setRegistrationsError(submissionError?.message ?? sundayLeagueTeamsError?.message ?? "Could not load registrations.");
+      setLoadingRegistrations(false);
+      return;
+    }
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setRegistrations([]);
+      setRegistrationsError("Sign in again to continue.");
       setLoadingRegistrations(false);
       return;
     }
@@ -866,17 +1070,24 @@ export default function AdminPage() {
       waiver_accepted?: boolean | null;
       created_at?: string | null;
     }>;
+    const sundayLeagueTeams = (sundayLeagueTeamsData ?? []) as Array<SundayLeagueTeam>;
 
-    if (submissions.length === 0) {
+    if (submissions.length === 0 && sundayLeagueTeams.length === 0) {
       setRegistrations([]);
       setSelectedRegistrationEventId(null);
       setLoadingRegistrations(false);
       return;
     }
 
-    const userIds = Array.from(new Set(submissions.map((row) => row.user_id).filter(Boolean)));
+    const userIds = Array.from(
+      new Set([...submissions.map((row) => row.user_id), ...sundayLeagueTeams.map((row) => row.user_id)].filter(Boolean))
+    );
 
-    const [{ data: eventsData, error: eventsError }, { data: profilesData, error: profilesError }] =
+    const [
+      { data: eventsData, error: eventsError },
+      { data: profilesData, error: profilesError },
+      registrationPaymentsResponse,
+    ] =
       await Promise.all([
         supabase
           .from("events")
@@ -886,11 +1097,45 @@ export default function AdminPage() {
           .from("profiles")
           .select("id,name")
           .in("id", userIds),
+        fetch("/api/admin/registration-payments", {
+          headers: {
+            authorization: `Bearer ${accessToken}`,
+          },
+        }),
       ]);
 
-    if (eventsError || profilesError) {
+    const registrationPaymentsJson = (await registrationPaymentsResponse.json().catch(() => null)) as
+      | {
+          error?: string;
+          eventDrafts?: Array<{
+            submission_id?: string | null;
+            amount_cents?: number | null;
+            status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+            updated_at?: string | null;
+            created_at?: string | null;
+          }>;
+          sundayLeagueDrafts?: Array<{
+            team_id?: string | null;
+            user_id?: string | null;
+            division?: 1 | 2 | null;
+            slot_number?: number | null;
+            team_payload?: JsonValue | null;
+            amount_cents?: number | null;
+            status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+            updated_at?: string | null;
+            created_at?: string | null;
+          }>;
+        }
+      | null;
+
+    if (eventsError || profilesError || !registrationPaymentsResponse.ok) {
       setRegistrations([]);
-      setRegistrationsError(eventsError?.message || profilesError?.message || "Could not load registrations.");
+      setRegistrationsError(
+        eventsError?.message ||
+          profilesError?.message ||
+          registrationPaymentsJson?.error ||
+          "Could not load registrations."
+      );
       setLoadingRegistrations(false);
       return;
     }
@@ -900,10 +1145,65 @@ export default function AdminPage() {
     const eventById = new Map(
       ((eventsData ?? []) as Array<{ id: string; title: string; signup_mode?: SignupMode | null }>).map((row) => [row.id, row])
     );
+    const paidCheckoutDraftBySubmissionId = new Map<string, { amount_cents: number; updated_at?: string | null; created_at?: string | null }>();
+    const paidSundayLeagueCheckoutDrafts = [] as Array<
+      Pick<
+        SundayLeagueTeamCheckoutDraft,
+        "team_id" | "user_id" | "division" | "slot_number" | "team_payload" | "amount_cents" | "updated_at" | "created_at"
+      >
+    >;
 
-    const resolved: RegistrationRecord[] = submissions.map((row) => {
+    for (const row of (registrationPaymentsJson?.eventDrafts ?? []) as Array<{
+      submission_id?: string | null;
+      amount_cents?: number | null;
+      status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+      updated_at?: string | null;
+      created_at?: string | null;
+    }>) {
+      if (!row.submission_id || !row.amount_cents || row.amount_cents <= 0) continue;
+      if (row.status !== "completed" && row.status !== "paid") continue;
+
+      const existing = paidCheckoutDraftBySubmissionId.get(row.submission_id);
+      const rowTimestamp = row.updated_at ?? row.created_at ?? "";
+      const existingTimestamp = existing?.updated_at ?? existing?.created_at ?? "";
+      if (!existing || rowTimestamp >= existingTimestamp) {
+        paidCheckoutDraftBySubmissionId.set(row.submission_id, {
+          amount_cents: row.amount_cents,
+          updated_at: row.updated_at ?? null,
+          created_at: row.created_at ?? null,
+        });
+      }
+    }
+
+    for (const row of (registrationPaymentsJson?.sundayLeagueDrafts ?? []) as Array<{
+      team_id?: string | null;
+      user_id?: string | null;
+      division?: 1 | 2 | null;
+      slot_number?: number | null;
+      team_payload?: JsonValue | null;
+      amount_cents?: number | null;
+      status?: "pending" | "paid" | "completed" | "failed" | "expired" | null;
+      updated_at?: string | null;
+      created_at?: string | null;
+    }>) {
+      if (!row.amount_cents || row.amount_cents <= 0) continue;
+      if (row.status !== "completed" && row.status !== "paid") continue;
+      paidSundayLeagueCheckoutDrafts.push({
+        team_id: row.team_id ?? null,
+        user_id: row.user_id ?? "",
+        division: row.division ?? 1,
+        slot_number: row.slot_number ?? 0,
+        team_payload: row.team_payload ?? null,
+        amount_cents: row.amount_cents,
+        updated_at: row.updated_at ?? null,
+        created_at: row.created_at ?? null,
+      });
+    }
+
+    const eventRegistrations: RegistrationRecord[] = submissions.map((row) => {
       const profile = profileById.get(row.user_id);
       const eventInfo = eventById.get(row.event_id);
+      const checkoutDraft = paidCheckoutDraftBySubmissionId.get(row.id);
       return {
         id: row.id,
         submitted_at: row.created_at ?? null,
@@ -917,7 +1217,43 @@ export default function AdminPage() {
         event_id: row.event_id,
         event_title: eventInfo?.title ?? "Unknown event",
         signup_mode: eventInfo?.signup_mode === "waitlist" ? "waitlist" : "registration",
+        paid_amount_cents: checkoutDraft?.amount_cents ?? null,
+        type_label: eventInfo?.signup_mode === "waitlist" ? "Waitlist" : "Registration",
+        registration_name: null,
       };
+    });
+
+    const sundayLeagueRegistrations: RegistrationRecord[] = sundayLeagueTeams.map((team) => {
+      const profile = profileById.get(team.user_id);
+      const checkoutDraft = getBestSundayLeagueCheckoutDraft({
+        team,
+        drafts: paidSundayLeagueCheckoutDrafts,
+        configuredDepositAmountCents: sundayLeagueDepositAmountCents,
+      });
+      const teamPayload = getJsonRecord((checkoutDraft?.team_payload as JsonValue | undefined) ?? null);
+      return {
+        id: team.id,
+        submitted_at: team.created_at ?? checkoutDraft?.created_at ?? null,
+        user_id: team.user_id,
+        user_name: profile?.name?.trim() || team.captain_name || "Unknown captain",
+        user_email: team.captain_email,
+        user_phone: team.captain_phone ?? null,
+        answers: buildSundayLeagueRegistrationAnswers(team, teamPayload),
+        attachments: collectSundayLeagueAttachments(team, teamPayload),
+        waiver_accepted: false,
+        event_id: `sunday-league-division-${team.division}`,
+        event_title: `Sunday League Division ${team.division}`,
+        signup_mode: "registration",
+        paid_amount_cents: checkoutDraft?.amount_cents ?? (team.deposit_status === "paid" ? sundayLeagueDepositAmountCents : null),
+        type_label: "Sunday League Team",
+        registration_name: team.team_name,
+      };
+    });
+
+    const resolved: RegistrationRecord[] = [...eventRegistrations, ...sundayLeagueRegistrations].sort((a, b) => {
+      const aTime = a.submitted_at ? new Date(a.submitted_at).getTime() : 0;
+      const bTime = b.submitted_at ? new Date(b.submitted_at).getTime() : 0;
+      return bTime - aTime;
     });
 
     setRegistrations(resolved);
@@ -1245,19 +1581,6 @@ export default function AdminPage() {
       registration_fields: prev.registration_fields.map((field) =>
         field.id === fieldId ? { ...field, expanded: false } : field
       ),
-    });
-
-    if (target === "create") {
-      setForm(apply);
-      return;
-    }
-    setEditForm(apply);
-  };
-
-  const setAllRegistrationFieldsExpanded = (target: "create" | "edit", expanded: boolean) => {
-    const apply = (prev: EventFormState) => ({
-      ...prev,
-      registration_fields: prev.registration_fields.map((field) => ({ ...field, expanded })),
     });
 
     if (target === "create") {
@@ -2276,6 +2599,7 @@ export default function AdminPage() {
       void loadSports();
     }
     if (module === "registrations") {
+      void loadSundayLeagueSettings();
       void loadRegistrations();
     }
     if (module === "community") {
@@ -3242,6 +3566,7 @@ export default function AdminPage() {
     if (!term) return true;
     return (
       row.user_name.toLowerCase().includes(term) ||
+      (row.registration_name ?? "").toLowerCase().includes(term) ||
       row.user_email.toLowerCase().includes(term) ||
       row.user_id.toLowerCase().includes(term)
     );
@@ -5045,7 +5370,7 @@ export default function AdminPage() {
               <>
                 <section className="account-card">
                   <h2>Event Registrations</h2>
-                  <p className="muted">See who signed up for which event, including waitlist-only events.</p>
+                  <p className="muted">See who signed up for events, waitlists, and Sunday League team registration.</p>
                 </section>
                 <section className="account-card">
                   <div className="account-card__header">
@@ -5158,10 +5483,12 @@ export default function AdminPage() {
                                 <h3>{row.event_title}</h3>
                               </div>
                               <div className="event-card__meta">
-                                <p className="muted">Type: {row.signup_mode === "waitlist" ? "Waitlist" : "Registration"}</p>
+                                <p className="muted">Type: {row.type_label}</p>
                                 <p className="muted">User: {row.user_name}</p>
+                                {row.registration_name ? <p className="muted">Team: {row.registration_name}</p> : null}
                                 <p className="muted">Email: {row.user_email}</p>
                                 {row.user_phone ? <p className="muted">Phone: {row.user_phone}</p> : null}
+                                <p className="muted">Paid: {row.paid_amount_cents ? formatEventPaymentAmount(row.paid_amount_cents) : "No payment"}</p>
                                 {row.submitted_at ? (
                                   <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
                                 ) : null}
@@ -5216,9 +5543,11 @@ export default function AdminPage() {
                               <h3>{row.user_name}</h3>
                             </div>
                             <div className="event-card__meta">
-                              <p className="muted">Type: {row.signup_mode === "waitlist" ? "Waitlist" : "Registration"}</p>
+                              <p className="muted">Type: {row.type_label}</p>
+                              {row.registration_name ? <p className="muted">Team: {row.registration_name}</p> : null}
                               <p className="muted">Email: {row.user_email}</p>
                               {row.user_phone ? <p className="muted">Phone: {row.user_phone}</p> : null}
+                              <p className="muted">Paid: {row.paid_amount_cents ? formatEventPaymentAmount(row.paid_amount_cents) : "No payment"}</p>
                               <p className="muted">User ID: {row.user_id}</p>
                               {row.submitted_at ? (
                                 <p className="muted">Submitted: {formatMessageDate(row.submitted_at)}</p>
@@ -5244,11 +5573,16 @@ export default function AdminPage() {
                   submission={
                     selectedRegistrationSubmission
                       ? {
-                          eventTitle: selectedRegistrationSubmission.event_title,
+                          eventTitle: selectedRegistrationSubmission.registration_name
+                            ? `${selectedRegistrationSubmission.event_title} • ${selectedRegistrationSubmission.registration_name}`
+                            : selectedRegistrationSubmission.event_title,
                           submittedAt: selectedRegistrationSubmission.submitted_at,
                           name: selectedRegistrationSubmission.user_name,
                           email: selectedRegistrationSubmission.user_email,
                           phone: selectedRegistrationSubmission.user_phone,
+                          paymentSummary: selectedRegistrationSubmission.paid_amount_cents
+                            ? `Paid ${formatEventPaymentAmount(selectedRegistrationSubmission.paid_amount_cents)}`
+                            : "No payment",
                           answers: selectedRegistrationSubmission.answers ?? null,
                           attachments: selectedRegistrationSubmission.attachments ?? null,
                           waiverAccepted: selectedRegistrationSubmission.waiver_accepted ?? false,
@@ -5583,10 +5917,13 @@ export default function AdminPage() {
                                   {isFlyerExpanded ? "Collapse Flyer" : "Expand Flyer"}
                                 </button>
                                 {isFlyerExpanded ? (
-                                  <img
+                                  <Image
                                     src={flyer.flyer_image_url}
                                     alt={`${event.title} flyer`}
-                                    style={{ width: "100%", maxWidth: 420, borderRadius: 12, border: "1px solid var(--border)" }}
+                                    width={840}
+                                    height={1188}
+                                    sizes="(max-width: 720px) 100vw, 420px"
+                                    style={{ width: "100%", maxWidth: 420, height: "auto", borderRadius: 12, border: "1px solid var(--border)" }}
                                   />
                                 ) : (
                                   <p className="muted">Flyer uploaded. Expand to preview it.</p>
