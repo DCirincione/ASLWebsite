@@ -49,6 +49,11 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
       return;
     }
 
+    if (!form.country_code) {
+      setStatus({ type: "error", message: "Please select your country." });
+      return;
+    }
+
     setStatus({ type: "loading" });
 
     const { email, password, name, about, communications_opt_in, country_code } = form;
@@ -166,6 +171,7 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
             name="country_code"
             value={form.country_code}
             onChange={(e) => update("country_code", e.target.value)}
+            required
           >
             <option value="">Select country</option>
             {COUNTRY_OPTIONS.map((country) => (

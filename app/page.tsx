@@ -8,12 +8,12 @@ import { HomeUpcomingEvents } from "@/components/home-upcoming-events";
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
 import { resolveHomeBannerButtonHref } from "@/lib/home-banner";
-import { SITE_DESCRIPTION, SITE_NAME } from "@/lib/site-metadata";
+import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/site-metadata";
 import { readSiteSettings } from "@/lib/site-settings";
 
 export const metadata: Metadata = {
   title: {
-    absolute: SITE_NAME,
+    absolute: SITE_TITLE,
   },
   description: SITE_DESCRIPTION,
 };
