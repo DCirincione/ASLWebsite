@@ -1,24 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
 
 import { isAdminOrOwner } from "@/lib/admin-route-auth";
+import {
+  type CommunitySponsor,
+  readCommunitySponsors,
+  writeCommunitySponsors,
+} from "@/lib/community-sponsors";
 
-type CommunitySponsorPlacement = "standard" | "top";
-
-type CommunitySponsor = {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  placement: CommunitySponsorPlacement;
-  websiteUrl?: string;
-  instagramUrl?: string;
-};
-
-const sponsorsFilePath = path.join(process.cwd(), "data", "community-sponsors.json");
-
-const normalizeSponsorPlacement = (value?: string): CommunitySponsorPlacement =>
+const normalizeSponsorPlacement = (value?: string): CommunitySponsor["placement"] =>
   value === "top" ? "top" : "standard";
 
 const normalizeExternalUrl = (value?: string) => {
@@ -31,32 +20,9 @@ const normalizeExternalUrl = (value?: string) => {
 const countTopSponsors = (sponsors: CommunitySponsor[], excludedId?: string) =>
   sponsors.filter((sponsor) => sponsor.placement === "top" && sponsor.id !== excludedId).length;
 
-const readSponsors = async (): Promise<CommunitySponsor[]> => {
-  const content = await fs.readFile(sponsorsFilePath, "utf8");
-  const parsed = JSON.parse(content);
-  if (!Array.isArray(parsed)) return [];
-  return (parsed as Array<Partial<CommunitySponsor>>)
-    .filter(
-      (item) =>
-        item &&
-        typeof item.name === "string" &&
-        typeof item.description === "string" &&
-        typeof item.image === "string"
-    )
-    .map((item) => ({
-      id: item.id?.trim() || crypto.randomUUID(),
-      name: item.name!.trim(),
-      description: item.description!.trim(),
-      image: item.image!.trim(),
-      placement: normalizeSponsorPlacement(typeof item.placement === "string" ? item.placement : undefined),
-      ...(item.websiteUrl?.trim() ? { websiteUrl: normalizeExternalUrl(item.websiteUrl) } : {}),
-      ...(item.instagramUrl?.trim() ? { instagramUrl: normalizeExternalUrl(item.instagramUrl) } : {}),
-    }));
-};
-
 export async function GET() {
   try {
-    const sponsors = await readSponsors();
+    const sponsors = await readCommunitySponsors();
     return NextResponse.json({ sponsors });
   } catch {
     return NextResponse.json({ error: "Could not read community sponsors." }, { status: 500 });
@@ -82,7 +48,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name, description, and image are required." }, { status: 400 });
     }
 
-    const current = await readSponsors();
+    const current = await readCommunitySponsors();
     if (placement === "top" && countTopSponsors(current) >= 2) {
       return NextResponse.json({ error: "Top Sponsors can only contain two sponsors." }, { status: 400 });
     }
@@ -98,7 +64,7 @@ export async function POST(req: NextRequest) {
     };
 
     const next = [sponsor, ...current];
-    await fs.writeFile(sponsorsFilePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+    await writeCommunitySponsors(next);
 
     return NextResponse.json({ ok: true, sponsor, sponsors: next });
   } catch {
@@ -126,12 +92,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "ID, name, description, and image are required." }, { status: 400 });
     }
 
-    const current = await readSponsors();
+    const current = await readCommunitySponsors();
     if (placement === "top" && countTopSponsors(current, id) >= 2) {
       return NextResponse.json({ error: "Top Sponsors can only contain two sponsors." }, { status: 400 });
     }
 
-    const next = current.map((sponsor) =>
+    const next: CommunitySponsor[] = current.map((sponsor) =>
       sponsor.id === id
         ? {
             id,
@@ -145,7 +111,7 @@ export async function PUT(req: NextRequest) {
         : sponsor
     );
 
-    await fs.writeFile(sponsorsFilePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+    await writeCommunitySponsors(next);
     return NextResponse.json({ ok: true, sponsors: next });
   } catch {
     return NextResponse.json({ error: "Could not update sponsor." }, { status: 500 });
@@ -165,9 +131,9 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Sponsor ID is required." }, { status: 400 });
     }
 
-    const current = await readSponsors();
+    const current = await readCommunitySponsors();
     const next = current.filter((sponsor) => sponsor.id !== id);
-    await fs.writeFile(sponsorsFilePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+    await writeCommunitySponsors(next);
     return NextResponse.json({ ok: true, sponsors: next });
   } catch {
     return NextResponse.json({ error: "Could not delete sponsor." }, { status: 500 });

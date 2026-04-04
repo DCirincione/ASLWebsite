@@ -1,5 +1,3 @@
-import { promises as fs } from "fs";
-import path from "path";
 import Image from "next/image";
 import { unstable_noStore as noStore } from "next/cache";
 
@@ -7,16 +5,7 @@ import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
 import featuredArticles from "@/data/community-articles.json";
 import communityContent from "@/data/community-content.json";
-
-type CommunitySponsor = {
-  id: string;
-  name: string;
-  description: string;
-  image: string;
-  placement: "standard" | "top";
-  websiteUrl?: string;
-  instagramUrl?: string;
-};
+import { readCommunitySponsors } from "@/lib/community-sponsors";
 
 function SponsorMediaLinks({
   websiteUrl,
@@ -48,39 +37,6 @@ function SponsorMediaLinks({
     </div>
   );
 }
-
-const sponsorsFilePath = path.join(process.cwd(), "data", "community-sponsors.json");
-
-const normalizeExternalUrl = (value?: string) => {
-  const trimmed = value?.trim() || "";
-  if (!trimmed) return "";
-  if (/^https?:\/\//i.test(trimmed)) return trimmed;
-  return `https://${trimmed}`;
-};
-
-const readCommunitySponsors = async (): Promise<CommunitySponsor[]> => {
-  try {
-    const content = await fs.readFile(sponsorsFilePath, "utf8");
-    const parsed = JSON.parse(content);
-    if (!Array.isArray(parsed)) return [];
-
-    return (parsed as Array<Partial<CommunitySponsor>>).map((sponsor, index) => {
-      const name = sponsor.name?.trim() || "";
-      const image = sponsor.image?.trim() || "";
-      return {
-        id: sponsor.id?.trim() || `${name || "sponsor"}-${index}`,
-        name,
-        description: sponsor.description?.trim() || "",
-        image,
-        placement: sponsor.placement === "top" ? "top" : "standard",
-        ...(sponsor.websiteUrl?.trim() ? { websiteUrl: normalizeExternalUrl(sponsor.websiteUrl) } : {}),
-        ...(sponsor.instagramUrl?.trim() ? { instagramUrl: normalizeExternalUrl(sponsor.instagramUrl) } : {}),
-      };
-    });
-  } catch {
-    return [];
-  }
-};
 
 export default async function CommunityPage() {
   noStore();
