@@ -489,6 +489,8 @@ export default function AdminPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingSportId, setEditingSportId] = useState<string | null>(null);
   const [showCreateEventForm, setShowCreateEventForm] = useState(false);
+  const [showExistingEvents, setShowExistingEvents] = useState(false);
+  const [showPartnerRequests, setShowPartnerRequests] = useState(false);
   const [showCreateSportForm, setShowCreateSportForm] = useState(false);
   const [showCreateArticleForm, setShowCreateArticleForm] = useState(false);
   const [showCreateSponsorForm, setShowCreateSponsorForm] = useState(false);
@@ -3705,6 +3707,305 @@ export default function AdminPage() {
   const flyerByEventId = new Map(
     flyers.filter((flyer) => flyer.event_id).map((flyer) => [flyer.event_id as string, flyer])
   );
+  const partnerRequestEvents = events.filter((event) => event.host_type === "partner" && event.approval_status !== "approved");
+  const existingManageableEvents = events.filter((event) => event.host_type !== "partner" || event.approval_status === "approved");
+  const pendingPartnerRequestCount = partnerRequestEvents.filter((event) => event.approval_status === "pending_approval").length;
+  const renderAdminEventCards = (items: Event[], showPartnerApprovalControls: boolean) => (
+    <div className="event-list admin-existing-events-list">
+      {items.map((event) => (
+        <article key={event.id} className="event-card-simple">
+          <div className="event-card__header">
+            <h3>{event.title}</h3>
+          </div>
+          <div className="event-card__meta">
+            <p className="muted">Host: {event.host_type ?? "Unspecified"}</p>
+            {event.host_type === "partner" ? (
+              <p className="muted">
+                Approval: {formatApprovalStatusLabel(event.approval_status)}
+              </p>
+            ) : null}
+            <p className="muted">Date: {dateLabel(event.start_date, event.end_date)}</p>
+            {event.location ? <p className="muted">Location: {event.location}</p> : null}
+            {event.registration_program_slug ? (
+              <p className="muted">Event type: {event.registration_program_slug}</p>
+            ) : null}
+            {event.sport_id ? (
+              <p className="muted">Sport: {sports.find((sport) => sport.id === event.sport_id)?.title ?? event.sport_id}</p>
+            ) : null}
+            {event.host_type === "partner" && event.created_by_user_id ? (
+              <p className="muted">
+                Partner: {eventOwnerNames[event.created_by_user_id] ?? event.created_by_user_id}
+              </p>
+            ) : null}
+            <p className="muted">
+              Signup mode: {event.signup_mode === "waitlist" ? "Waitlist / interest" : "Registration"}
+            </p>
+            <p className="muted">
+              Signup status: {event.registration_enabled ? "Open" : "Closed"}
+            </p>
+            <p className="muted">
+              Payment: {event.payment_required && event.payment_amount_cents ? `${formatEventPaymentAmount(event.payment_amount_cents)} required` : "No payment"}
+            </p>
+          </div>
+          {event.description ? <p className="muted">{event.description}</p> : null}
+          {showPartnerApprovalControls && event.host_type === "partner" ? (
+            <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
+              <div className="form-control">
+                <label htmlFor={`partner-approval-notes-${event.id}`}>Owner notes</label>
+                <textarea
+                  id={`partner-approval-notes-${event.id}`}
+                  value={partnerApprovalNotes[event.id] ?? ""}
+                  onChange={(e) =>
+                    setPartnerApprovalNotes((prev) => ({
+                      ...prev,
+                      [event.id]: e.target.value,
+                    }))
+                  }
+                  rows={4}
+                  placeholder="Add approval notes or requested edits for the partner."
+                />
+              </div>
+              <div className="cta-row">
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => void savePartnerApproval(event.id, "approved")}
+                  disabled={savingPartnerApprovalId === event.id}
+                >
+                  {savingPartnerApprovalId === event.id ? "Saving..." : "Approve & Publish"}
+                </button>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => void savePartnerApproval(event.id, "changes_requested")}
+                  disabled={savingPartnerApprovalId === event.id}
+                >
+                  Request Changes
+                </button>
+              </div>
+            </div>
+          ) : null}
+          <div className="cta-row">
+            <button
+              className="button ghost"
+              type="button"
+              onClick={() => startEditing(event)}
+              disabled={editingId === event.id && savingEditId === event.id}
+            >
+              {editingId === event.id ? "Editing" : "Edit"}
+            </button>
+            <button
+              className="button ghost"
+              type="button"
+              onClick={() => void handleDeleteEvent(event.id, event.title)}
+              disabled={deletingId === event.id}
+            >
+              {deletingId === event.id ? "Deleting..." : "Delete"}
+            </button>
+          </div>
+          {editingId === event.id ? (
+            <div className="register-form" style={{ marginTop: 12 }}>
+              <div className="register-form-grid">
+                <div className="form-control">
+                  <label htmlFor={`edit-title-${event.id}`}>Title *</label>
+                  <input
+                    id={`edit-title-${event.id}`}
+                    value={editForm.title}
+                    onChange={(e) => updateEdit("title", e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-start-${event.id}`}>Start date</label>
+                  <input
+                    id={`edit-start-${event.id}`}
+                    type="date"
+                    value={editForm.start_date}
+                    onChange={(e) => updateEdit("start_date", e.target.value)}
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-end-${event.id}`}>End date</label>
+                  <input
+                    id={`edit-end-${event.id}`}
+                    type="date"
+                    value={editForm.end_date}
+                    onChange={(e) => updateEdit("end_date", e.target.value)}
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-time-${event.id}`}>Time info</label>
+                  <input
+                    id={`edit-time-${event.id}`}
+                    value={editForm.time_info}
+                    onChange={(e) => updateEdit("time_info", e.target.value)}
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-location-${event.id}`}>Location</label>
+                  <input
+                    id={`edit-location-${event.id}`}
+                    value={editForm.location}
+                    onChange={(e) => updateEdit("location", e.target.value)}
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-host-${event.id}`}>Host type</label>
+                  <select
+                    id={`edit-host-${event.id}`}
+                    value={editForm.host_type}
+                    onChange={(e) => updateEdit("host_type", e.target.value as HostType)}
+                  >
+                    <option value="aldrich">Aldrich</option>
+                    <option value="featured">Featured</option>
+                    <option value="partner">Partner</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-image-${event.id}`}>Image URL</label>
+                  <input
+                    id={`edit-image-${event.id}`}
+                    value={editForm.image_url ?? ""}
+                    onChange={(e) => updateEdit("image_url", e.target.value)}
+                  />
+                  <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                    <label
+                      className="button ghost"
+                      htmlFor={`edit-image-upload-${event.id}`}
+                      style={{ padding: "0.45rem 0.75rem" }}
+                    >
+                      {uploadingEditImageId === event.id ? "Uploading..." : "Upload an image manually"}
+                    </label>
+                    <input
+                      id={`edit-image-upload-${event.id}`}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => void handleEditImageUpload(event.id, e)}
+                      disabled={uploadingEditImageId === event.id}
+                      style={{ display: "none" }}
+                    />
+                  </div>
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-signup-mode-${event.id}`}>Signup mode</label>
+                  <select
+                    id={`edit-signup-mode-${event.id}`}
+                    value={editForm.signup_mode}
+                    onChange={(e) => updateEdit("signup_mode", e.target.value as SignupMode)}
+                  >
+                    <option value="registration">Registration</option>
+                    <option value="waitlist">Waitlist / interest</option>
+                  </select>
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-sport-${event.id}`}>Sport page</label>
+                  <select
+                    id={`edit-sport-${event.id}`}
+                    value={editForm.sport_id}
+                    onChange={(e) => updateEditSportId(e.target.value)}
+                  >
+                    <option value="">Not linked to a sport page</option>
+                    {sports.map((sport) => (
+                      <option key={sport.id} value={sport.id}>
+                        {sport.title}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-slug-${event.id}`}>Event type</label>
+                  <select
+                    id={`edit-slug-${event.id}`}
+                    value={editForm.registration_program_slug}
+                    onChange={(e) => updateEdit("registration_program_slug", e.target.value)}
+                    disabled={!editForm.sport_id}
+                  >
+                    <option value="">{editForm.sport_id ? "Select an event type" : "Select a sport page first"}</option>
+                    {getEventProgramSlugOptions(sports.find((sport) => sport.id === editForm.sport_id) ?? null).map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-waiver-url-${event.id}`}>Waiver URL</label>
+                  <input
+                    id={`edit-waiver-url-${event.id}`}
+                    value={editForm.waiver_url}
+                    onChange={(e) => updateEdit("waiver_url", e.target.value)}
+                    disabled={editForm.signup_mode === "waitlist"}
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-registration-limit-${event.id}`}>Registration limit</label>
+                  <input
+                    id={`edit-registration-limit-${event.id}`}
+                    type="number"
+                    min="1"
+                    value={editForm.registration_limit}
+                    onChange={(e) => updateEdit("registration_limit", e.target.value)}
+                    disabled={editForm.signup_mode === "waitlist"}
+                  />
+                </div>
+                <div className="form-control">
+                  <label htmlFor={`edit-payment-amount-${event.id}`}>Payment amount (USD)</label>
+                  <input
+                    id={`edit-payment-amount-${event.id}`}
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    value={editForm.payment_amount}
+                    onChange={(e) => updateEdit("payment_amount", e.target.value)}
+                    disabled={editForm.signup_mode === "waitlist" || !editForm.payment_required}
+                  />
+                </div>
+              </div>
+              <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={editForm.registration_enabled}
+                    onChange={(e) => updateEdit("registration_enabled", e.target.checked)}
+                  />
+                  <span>Accept signups</span>
+                </label>
+              </div>
+              <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={editForm.payment_required}
+                    onChange={(e) => updateEdit("payment_required", e.target.checked)}
+                    disabled={editForm.signup_mode === "waitlist"}
+                  />
+                  <span>Require payment before registration is created</span>
+                </label>
+              </div>
+              {editForm.signup_mode === "waitlist" ? (
+                <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
+              ) : null}
+              {renderRegistrationBuilder("edit", editForm)}
+              <div className="cta-row">
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={() => void handleSaveEdit(event.id)}
+                  disabled={savingEditId === event.id}
+                >
+                  {savingEditId === event.id ? "Saving..." : "Save"}
+                </button>
+                <button className="button ghost" type="button" onClick={cancelEditing}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  );
   const renderSportFormFields = (
     state: SportFormState,
     target: "create" | "edit",
@@ -4093,310 +4394,63 @@ export default function AdminPage() {
               <div className="account-card__header">
                 <div>
                   <h2>Existing Events</h2>
-                  <p className="muted">Delete outdated or incorrect events.</p>
+                  <p className="muted">Open the event list when you want to review or edit published events.</p>
                 </div>
-                <button className="button ghost" type="button" onClick={() => void loadEvents()} disabled={loadingEvents}>
-                  {loadingEvents ? "Refreshing..." : "Refresh"}
-                </button>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  {showExistingEvents ? (
+                    <button className="button ghost" type="button" onClick={() => void loadEvents()} disabled={loadingEvents}>
+                      {loadingEvents ? "Refreshing..." : "Refresh"}
+                    </button>
+                  ) : null}
+                  <button className="button primary" type="button" onClick={() => setShowExistingEvents((prev) => !prev)}>
+                    {showExistingEvents ? "Close Events" : "View/Edit Events"}
+                  </button>
+                </div>
               </div>
-              {loadingEvents ? <p className="muted">Loading events...</p> : null}
-              {eventsError ? <p className="form-help error">{eventsError}</p> : null}
-              {!loadingEvents && events.length === 0 ? <p className="muted">No events found.</p> : null}
-              {!loadingEvents && events.length > 0 ? (
-                <div className="event-list admin-existing-events-list">
-                  {events.map((event) => (
-                    <article key={event.id} className="event-card-simple">
-                      <div className="event-card__header">
-                        <h3>{event.title}</h3>
-                      </div>
-                      <div className="event-card__meta">
-                        <p className="muted">Host: {event.host_type ?? "Unspecified"}</p>
-                        {event.host_type === "partner" ? (
-                          <p className="muted">
-                            Approval: {formatApprovalStatusLabel(event.approval_status)}
-                          </p>
-                        ) : null}
-                        <p className="muted">Date: {dateLabel(event.start_date, event.end_date)}</p>
-                        {event.location ? <p className="muted">Location: {event.location}</p> : null}
-                        {event.registration_program_slug ? (
-                          <p className="muted">Event type: {event.registration_program_slug}</p>
-                        ) : null}
-                        {event.sport_id ? (
-                          <p className="muted">Sport: {sports.find((sport) => sport.id === event.sport_id)?.title ?? event.sport_id}</p>
-                        ) : null}
-                        {event.host_type === "partner" && event.created_by_user_id ? (
-                          <p className="muted">
-                            Partner: {eventOwnerNames[event.created_by_user_id] ?? event.created_by_user_id}
-                          </p>
-                        ) : null}
-                        <p className="muted">
-                          Signup mode: {event.signup_mode === "waitlist" ? "Waitlist / interest" : "Registration"}
-                        </p>
-                        <p className="muted">
-                          Signup status: {event.registration_enabled ? "Open" : "Closed"}
-                        </p>
-                        <p className="muted">
-                          Payment: {event.payment_required && event.payment_amount_cents ? `${formatEventPaymentAmount(event.payment_amount_cents)} required` : "No payment"}
-                        </p>
-                      </div>
-                      {event.description ? <p className="muted">{event.description}</p> : null}
-                      {event.host_type === "partner" ? (
-                        <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
-                          <div className="form-control">
-                            <label htmlFor={`partner-approval-notes-${event.id}`}>Owner notes</label>
-                            <textarea
-                              id={`partner-approval-notes-${event.id}`}
-                              value={partnerApprovalNotes[event.id] ?? ""}
-                              onChange={(e) =>
-                                setPartnerApprovalNotes((prev) => ({
-                                  ...prev,
-                                  [event.id]: e.target.value,
-                                }))
-                              }
-                              rows={4}
-                              placeholder="Add approval notes or requested edits for the partner."
-                            />
-                          </div>
-                          <div className="cta-row">
-                            <button
-                              className="button primary"
-                              type="button"
-                              onClick={() => void savePartnerApproval(event.id, "approved")}
-                              disabled={savingPartnerApprovalId === event.id}
-                            >
-                              {savingPartnerApprovalId === event.id ? "Saving..." : "Approve & Publish"}
-                            </button>
-                            <button
-                              className="button ghost"
-                              type="button"
-                              onClick={() => void savePartnerApproval(event.id, "changes_requested")}
-                              disabled={savingPartnerApprovalId === event.id}
-                            >
-                              Request Changes
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                      <div className="cta-row">
-                        <button
-                          className="button ghost"
-                          type="button"
-                          onClick={() => startEditing(event)}
-                          disabled={editingId === event.id && savingEditId === event.id}
-                        >
-                          {editingId === event.id ? "Editing" : "Edit"}
-                        </button>
-                        <button
-                          className="button ghost"
-                          type="button"
-                          onClick={() => void handleDeleteEvent(event.id, event.title)}
-                          disabled={deletingId === event.id}
-                        >
-                          {deletingId === event.id ? "Deleting..." : "Delete"}
-                        </button>
-                      </div>
-                      {editingId === event.id ? (
-                        <div className="register-form" style={{ marginTop: 12 }}>
-                          <div className="register-form-grid">
-                            <div className="form-control">
-                              <label htmlFor={`edit-title-${event.id}`}>Title *</label>
-                              <input
-                                id={`edit-title-${event.id}`}
-                                value={editForm.title}
-                                onChange={(e) => updateEdit("title", e.target.value)}
-                                required
-                              />
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-start-${event.id}`}>Start date</label>
-                              <input
-                                id={`edit-start-${event.id}`}
-                                type="date"
-                                value={editForm.start_date}
-                                onChange={(e) => updateEdit("start_date", e.target.value)}
-                              />
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-end-${event.id}`}>End date</label>
-                              <input
-                                id={`edit-end-${event.id}`}
-                                type="date"
-                                value={editForm.end_date}
-                                onChange={(e) => updateEdit("end_date", e.target.value)}
-                              />
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-time-${event.id}`}>Time info</label>
-                              <input
-                                id={`edit-time-${event.id}`}
-                                value={editForm.time_info}
-                                onChange={(e) => updateEdit("time_info", e.target.value)}
-                              />
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-location-${event.id}`}>Location</label>
-                              <input
-                                id={`edit-location-${event.id}`}
-                                value={editForm.location}
-                                onChange={(e) => updateEdit("location", e.target.value)}
-                              />
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-host-${event.id}`}>Host type</label>
-                              <select
-                                id={`edit-host-${event.id}`}
-                                value={editForm.host_type}
-                                onChange={(e) => updateEdit("host_type", e.target.value as HostType)}
-                              >
-                                <option value="aldrich">Aldrich</option>
-                                <option value="featured">Featured</option>
-                                <option value="partner">Partner</option>
-                                <option value="other">Other</option>
-                              </select>
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-image-${event.id}`}>Image URL</label>
-                              <input
-                                id={`edit-image-${event.id}`}
-                                value={editForm.image_url ?? ""}
-                                onChange={(e) => updateEdit("image_url", e.target.value)}
-                              />
-                              <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-                                <label
-                                  className="button ghost"
-                                  htmlFor={`edit-image-upload-${event.id}`}
-                                  style={{ padding: "0.45rem 0.75rem" }}
-                                >
-                                  {uploadingEditImageId === event.id ? "Uploading..." : "Upload an image manually"}
-                                </label>
-                                <input
-                                  id={`edit-image-upload-${event.id}`}
-                                  type="file"
-                                  accept="image/*"
-                                  onChange={(e) => void handleEditImageUpload(event.id, e)}
-                                  disabled={uploadingEditImageId === event.id}
-                                  style={{ display: "none" }}
-                                />
-                              </div>
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-signup-mode-${event.id}`}>Signup mode</label>
-                              <select
-                                id={`edit-signup-mode-${event.id}`}
-                                value={editForm.signup_mode}
-                                onChange={(e) => updateEdit("signup_mode", e.target.value as SignupMode)}
-                              >
-                                <option value="registration">Registration</option>
-                                <option value="waitlist">Waitlist / interest</option>
-                              </select>
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-sport-${event.id}`}>Sport page</label>
-                              <select
-                                id={`edit-sport-${event.id}`}
-                                value={editForm.sport_id}
-                                onChange={(e) => updateEditSportId(e.target.value)}
-                              >
-                                <option value="">Not linked to a sport page</option>
-                                {sports.map((sport) => (
-                                  <option key={sport.id} value={sport.id}>
-                                    {sport.title}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-slug-${event.id}`}>Event type</label>
-                              <select
-                                id={`edit-slug-${event.id}`}
-                                value={editForm.registration_program_slug}
-                                onChange={(e) => updateEdit("registration_program_slug", e.target.value)}
-                                disabled={!editForm.sport_id}
-                              >
-                                <option value="">{editForm.sport_id ? "Select an event type" : "Select a sport page first"}</option>
-                                {getEventProgramSlugOptions(sports.find((sport) => sport.id === editForm.sport_id) ?? null).map((option) => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-waiver-url-${event.id}`}>Waiver URL</label>
-                              <input
-                                id={`edit-waiver-url-${event.id}`}
-                                value={editForm.waiver_url}
-                                onChange={(e) => updateEdit("waiver_url", e.target.value)}
-                                disabled={editForm.signup_mode === "waitlist"}
-                              />
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-registration-limit-${event.id}`}>Registration limit</label>
-                              <input
-                                id={`edit-registration-limit-${event.id}`}
-                                type="number"
-                                min="1"
-                                value={editForm.registration_limit}
-                                onChange={(e) => updateEdit("registration_limit", e.target.value)}
-                                disabled={editForm.signup_mode === "waitlist"}
-                              />
-                            </div>
-                            <div className="form-control">
-                              <label htmlFor={`edit-payment-amount-${event.id}`}>Payment amount (USD)</label>
-                              <input
-                                id={`edit-payment-amount-${event.id}`}
-                                type="number"
-                                min="0.01"
-                                step="0.01"
-                                value={editForm.payment_amount}
-                                onChange={(e) => updateEdit("payment_amount", e.target.value)}
-                                disabled={editForm.signup_mode === "waitlist" || !editForm.payment_required}
-                              />
-                            </div>
-                          </div>
-                          <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
-                            <label className="checkbox-label">
-                              <input
-                                type="checkbox"
-                                checked={editForm.registration_enabled}
-                                onChange={(e) => updateEdit("registration_enabled", e.target.checked)}
-                              />
-                              <span>Accept signups</span>
-                            </label>
-                          </div>
-                          <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
-                            <label className="checkbox-label">
-                              <input
-                                type="checkbox"
-                                checked={editForm.payment_required}
-                                onChange={(e) => updateEdit("payment_required", e.target.checked)}
-                                disabled={editForm.signup_mode === "waitlist"}
-                              />
-                              <span>Require payment before registration is created</span>
-                            </label>
-                          </div>
-                          {editForm.signup_mode === "waitlist" ? (
-                            <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
-                          ) : null}
-                          {renderRegistrationBuilder("edit", editForm)}
-                          <div className="cta-row">
-                            <button
-                              className="button primary"
-                              type="button"
-                              onClick={() => void handleSaveEdit(event.id)}
-                              disabled={savingEditId === event.id}
-                            >
-                              {savingEditId === event.id ? "Saving..." : "Save"}
-                            </button>
-                            <button className="button ghost" type="button" onClick={cancelEditing}>
-                              Cancel
-                            </button>
-                          </div>
-                        </div>
-                      ) : null}
-                    </article>
-                  ))}
+              {showExistingEvents ? (
+                <>
+                  {loadingEvents ? <p className="muted">Loading events...</p> : null}
+                  {eventsError ? <p className="form-help error">{eventsError}</p> : null}
+                  {!loadingEvents && existingManageableEvents.length === 0 ? <p className="muted">No events found.</p> : null}
+                  {!loadingEvents && existingManageableEvents.length > 0 ? renderAdminEventCards(existingManageableEvents, false) : null}
+                </>
+              ) : null}
+            </section>
+
+            <section className="account-card">
+              <div className="account-card__header">
+                <div>
+                  <h2>Partner Requests</h2>
+                  <p className="muted">Review new partner submissions separately before they are published.</p>
                 </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  {showPartnerRequests ? (
+                    <button className="button ghost" type="button" onClick={() => void loadEvents()} disabled={loadingEvents}>
+                      {loadingEvents ? "Refreshing..." : "Refresh"}
+                    </button>
+                  ) : null}
+                  <button
+                    className="button ghost account-card__action-button"
+                    type="button"
+                    onClick={() => setShowPartnerRequests((prev) => !prev)}
+                  >
+                    {showPartnerRequests ? "Close Requests" : "Partner Requests"}
+                    <span
+                      className={`account-card__action-badge${pendingPartnerRequestCount > 0 ? " account-card__action-badge--unread" : ""}`}
+                      aria-label={`${pendingPartnerRequestCount} pending partner request${pendingPartnerRequestCount === 1 ? "" : "s"}`}
+                    >
+                      {pendingPartnerRequestCount}
+                    </span>
+                  </button>
+                </div>
+              </div>
+              {showPartnerRequests ? (
+                <>
+                  {loadingEvents ? <p className="muted">Loading partner requests...</p> : null}
+                  {eventsError ? <p className="form-help error">{eventsError}</p> : null}
+                  {!loadingEvents && partnerRequestEvents.length === 0 ? <p className="muted">No partner requests right now.</p> : null}
+                  {!loadingEvents && partnerRequestEvents.length > 0 ? renderAdminEventCards(partnerRequestEvents, true) : null}
+                </>
               ) : null}
             </section>
               </>
