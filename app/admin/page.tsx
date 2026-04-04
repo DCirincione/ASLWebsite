@@ -4138,12 +4138,12 @@ export default function AdminPage() {
         ) : null}
         {status === "allowed" ? (
           <>
-            <section className="account-card">
+            <section className="account-card account-card__summary">
               <h1>Admin Dashboard</h1>
               <p className="muted">Choose an area to manage.</p>
               <div
                 style={{
-                  marginTop: 12,
+                  marginTop: 8,
                   display: "grid",
                   gap: 12,
                   gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
@@ -4178,7 +4178,7 @@ export default function AdminPage() {
 
             {activeModule === "events" ? (
               <>
-            <section className="account-card">
+            <section className="account-card account-card__summary">
               <h2>Events Manager</h2>
               <p className="muted">Add new events or update/remove existing ones.</p>
             </section>
@@ -4457,7 +4457,7 @@ export default function AdminPage() {
             ) : null}
             {activeModule === "sundayLeague" ? (
               <>
-                <section className="account-card">
+                <section className="account-card account-card__summary">
                   <h2>Sunday League</h2>
                   <p className="muted">Manage the public Create Team form and post weekly schedule text for Black Sheep Field and Magic Fountain Field.</p>
                 </section>
@@ -4674,7 +4674,7 @@ export default function AdminPage() {
             ) : null}
             {activeModule === "sports" ? (
               <>
-                <section className="account-card">
+                <section className="account-card account-card__summary">
                   <h2>Sports Manager</h2>
                   <p className="muted">Create sport pages and control which section headers appear on each one.</p>
                 </section>
@@ -4782,7 +4782,7 @@ export default function AdminPage() {
             ) : null}
             {activeModule === "community" ? (
               <>
-                <section className="account-card">
+                <section className="account-card account-card__summary">
                   <h2>Community Content</h2>
                   <p className="muted">Manage the intro block, sponsor shout-outs, and featured articles shown on the Community page.</p>
                 </section>
@@ -5383,7 +5383,7 @@ export default function AdminPage() {
             ) : null}
             {activeModule === "settings" ? (
               <>
-                <section className="account-card">
+                <section className="account-card account-card__summary">
                   <h2>Settings</h2>
                   <p className="muted">Control site-wide banners and send inbox announcements to site members.</p>
                 </section>
@@ -5639,7 +5639,7 @@ export default function AdminPage() {
             ) : null}
             {activeModule === "registrations" ? (
               <>
-                <section className="account-card">
+                <section className="account-card account-card__summary">
                   <h2>Event Registrations</h2>
                   <p className="muted">See who signed up for events, waitlists, and Sunday League team registration.</p>
                 </section>
@@ -5866,7 +5866,7 @@ export default function AdminPage() {
             ) : null}
             {activeModule === "users" ? (
               <>
-                <section className="account-card">
+                <section className="account-card account-card__summary">
                   <h2>Users</h2>
                   <p className="muted">Manage user roles and account status.</p>
                 </section>
@@ -6038,7 +6038,7 @@ export default function AdminPage() {
             ) : null}
             {activeModule === "contact" ? (
               <>
-                <section className="account-card">
+                <section className="account-card account-card__summary">
                   <h2>Contact Messages</h2>
                   <p className="muted">Messages sent from the public contact form.</p>
                 </section>
@@ -6136,7 +6136,7 @@ export default function AdminPage() {
             ) : null}
             {activeModule === "flyers" ? (
               <>
-                <section className="account-card">
+                <section className="account-card account-card__summary">
                   <h2>Flyers</h2>
                   <p className="muted">Upload flyer images that appear in each event detail card.</p>
                 </section>

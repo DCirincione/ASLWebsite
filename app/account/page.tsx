@@ -719,25 +719,25 @@ export default function AccountPage() {
                 <p className="eyebrow">Account</p>
                 <h1>{data.name}</h1>
                 <p className="muted">Manage your profile, events, teams, and friends.</p>
+                <div className="account-create__actions account-profile-card__actions">
+                  {!isEditingProfile ? (
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => {
+                        setProfileForm(toProfileFormState(data));
+                        setProfileSaveStatus({ type: "idle" });
+                        setIsEditingProfile(true);
+                      }}
+                    >
+                      Edit Profile
+                    </button>
+                  ) : null}
+                  <button className="button ghost" type="button" onClick={handleSignOut} disabled={signingOut}>
+                    {signingOut ? "Signing out..." : "Sign out"}
+                  </button>
+                </div>
               </div>
-            </div>
-            <div className="account-create__actions">
-              {!isEditingProfile ? (
-                <button
-                  className="button ghost"
-                  type="button"
-                  onClick={() => {
-                    setProfileForm(toProfileFormState(data));
-                    setProfileSaveStatus({ type: "idle" });
-                    setIsEditingProfile(true);
-                  }}
-                >
-                  Edit Profile
-                </button>
-              ) : null}
-              <button className="button ghost" type="button" onClick={handleSignOut} disabled={signingOut}>
-                {signingOut ? "Signing out..." : "Sign out"}
-              </button>
             </div>
           </header>
 
