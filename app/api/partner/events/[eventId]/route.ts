@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getAuthenticatedProfile, getSupabaseServiceRole } from "@/lib/admin-route-auth";
 import { parseOptionalInteger, parseOptionalMoneyCents, trimOptionalString } from "@/lib/event-approval";
-import type { EventUpdate } from "@/lib/supabase/types";
+import type { Event, EventUpdate } from "@/lib/supabase/types";
 
 type EventWriteBody = {
   title?: unknown;
@@ -15,11 +15,51 @@ type EventWriteBody = {
   signup_mode?: unknown;
   registration_program_slug?: unknown;
   sport_id?: unknown;
+  flyer_image_url?: unknown;
+  flyer_details?: unknown;
   registration_enabled?: unknown;
   waiver_url?: unknown;
   registration_limit?: unknown;
   payment_required?: unknown;
   payment_amount?: unknown;
+};
+
+const getFlyerName = (event: Pick<Event, "title" | "registration_program_slug">) =>
+  event.registration_program_slug?.trim() || event.title.trim();
+
+const syncFlyerRecord = async (
+  supabase: NonNullable<ReturnType<typeof getSupabaseServiceRole>>,
+  event: Pick<Event, "id" | "title" | "registration_program_slug">,
+  flyerImageUrl: string | null,
+  flyerDetails: string | null
+) => {
+  const { data: currentFlyer } = await supabase
+    .from("flyers")
+    .select("id,flyer_image_url,details")
+    .eq("event_id", event.id)
+    .maybeSingle();
+
+  if (!currentFlyer && !flyerImageUrl && !flyerDetails) {
+    return null;
+  }
+
+  const payload = {
+    event_id: event.id,
+    flyer_name: getFlyerName(event),
+    flyer_image_url: flyerImageUrl,
+    details: flyerDetails,
+  };
+
+  const query = currentFlyer
+    ? supabase.from("flyers").update(payload).eq("id", currentFlyer.id)
+    : supabase.from("flyers").insert(payload);
+
+  const { error } = await query;
+  if (error) {
+    throw error;
+  }
+
+  return flyerImageUrl;
 };
 
 const buildPartnerEventPayload = (body: EventWriteBody) => {
@@ -28,16 +68,16 @@ const buildPartnerEventPayload = (body: EventWriteBody) => {
     return { error: "Title is required." };
   }
 
-  const signupMode = body.signup_mode === "waitlist" ? "waitlist" : "registration";
-  const registrationEnabled = Boolean(body.registration_enabled);
-  const paymentRequired = signupMode === "waitlist" ? false : Boolean(body.payment_required);
+  const signupMode = "registration" as const;
+  const registrationEnabled = true;
+  const paymentRequired = Boolean(body.payment_required);
   const paymentAmountCents = paymentRequired ? parseOptionalMoneyCents(body.payment_amount) : null;
 
   if (paymentRequired && (!paymentAmountCents || paymentAmountCents <= 0)) {
     return { error: "Enter a payment amount greater than $0.00 when payment is required." };
   }
 
-  const registrationLimit = signupMode === "waitlist" ? null : parseOptionalInteger(body.registration_limit);
+  const registrationLimit = parseOptionalInteger(body.registration_limit);
   if (registrationLimit !== null && registrationLimit <= 0) {
     return { error: "Registration limit must be greater than 0." };
   }
@@ -55,7 +95,7 @@ const buildPartnerEventPayload = (body: EventWriteBody) => {
     registration_program_slug: trimOptionalString(body.registration_program_slug),
     sport_id: trimOptionalString(body.sport_id),
     registration_enabled: registrationEnabled,
-    waiver_url: signupMode === "waitlist" ? null : trimOptionalString(body.waiver_url),
+    waiver_url: trimOptionalString(body.waiver_url),
     allow_multiple_registrations: false,
     registration_limit: registrationLimit,
     payment_required: paymentRequired,
@@ -114,6 +154,8 @@ export async function PATCH(
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
+    const flyerImageUrl = trimOptionalString(body.flyer_image_url);
+    const flyerDetails = trimOptionalString(body.flyer_details);
 
     const { data, error } = await supabase
       .from("events")
@@ -127,7 +169,16 @@ export async function PATCH(
       return NextResponse.json({ error: error?.message ?? "Could not update the event." }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, event: data });
+    await syncFlyerRecord(supabase, data as Event, flyerImageUrl, flyerDetails);
+
+    return NextResponse.json({
+      ok: true,
+      event: {
+        ...data,
+        flyer_image_url: flyerImageUrl,
+        flyer_details: flyerDetails,
+      },
+    });
   } catch {
     return NextResponse.json({ error: "Could not update the event." }, { status: 500 });
   }

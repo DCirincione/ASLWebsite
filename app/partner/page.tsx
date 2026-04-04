@@ -14,6 +14,12 @@ import type { Event, Profile, Sport } from "@/lib/supabase/types";
 type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type SaveStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
 const EVENT_IMAGE_BUCKET = "event-creation-uploads";
+const FLYER_BUCKET = "flyers";
+
+type PartnerEventRecord = Event & {
+  flyer_image_url?: string | null;
+  flyer_details?: string | null;
+};
 
 type PartnerEventFormState = {
   title: string;
@@ -22,6 +28,8 @@ type PartnerEventFormState = {
   time_info: string;
   location: string;
   image_url: string;
+  flyer_image_url: string;
+  flyer_details: string;
   signup_mode: "registration" | "waitlist";
   registration_program_slug: string;
   sport_id: string;
@@ -39,27 +47,31 @@ const emptyForm = (): PartnerEventFormState => ({
   time_info: "",
   location: "",
   image_url: "",
+  flyer_image_url: "",
+  flyer_details: "",
   signup_mode: "registration",
   registration_program_slug: "",
   sport_id: "",
-  registration_enabled: false,
+  registration_enabled: true,
   waiver_url: "",
   registration_limit: "",
   payment_required: false,
   payment_amount: "",
 });
 
-const mapEventToForm = (event: Event): PartnerEventFormState => ({
+const mapEventToForm = (event: PartnerEventRecord): PartnerEventFormState => ({
   title: event.title ?? "",
   start_date: event.start_date ?? "",
   end_date: event.end_date ?? "",
   time_info: event.time_info ?? "",
   location: event.location ?? "",
   image_url: event.image_url ?? "",
-  signup_mode: event.signup_mode === "waitlist" ? "waitlist" : "registration",
+  flyer_image_url: event.flyer_image_url ?? "",
+  flyer_details: event.flyer_details ?? "",
+  signup_mode: "registration",
   registration_program_slug: event.registration_program_slug ?? "",
   sport_id: event.sport_id ?? "",
-  registration_enabled: Boolean(event.registration_enabled),
+  registration_enabled: true,
   waiver_url: event.waiver_url ?? "",
   registration_limit: event.registration_limit?.toString() ?? "",
   payment_required: Boolean(event.payment_required),
@@ -94,8 +106,9 @@ export default function PartnerPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
   const [profile, setProfile] = useState<Pick<Profile, "id" | "name" | "role"> | null>(null);
   const [sports, setSports] = useState<Sport[]>([]);
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<PartnerEventRecord[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [showCreateEventForm, setShowCreateEventForm] = useState(false);
   const [form, setForm] = useState<PartnerEventFormState>(emptyForm());
   const [editForm, setEditForm] = useState<PartnerEventFormState>(emptyForm());
   const [formStatus, setFormStatus] = useState<SaveStatus>({ type: "idle" });
@@ -104,6 +117,8 @@ export default function PartnerPage() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [uploadingCreateImage, setUploadingCreateImage] = useState(false);
   const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
+  const [uploadingCreateFlyer, setUploadingCreateFlyer] = useState(false);
+  const [uploadingEditFlyerId, setUploadingEditFlyerId] = useState<string | null>(null);
 
   const fetchWithSession = useCallback(async (input: string, init?: RequestInit) => {
     if (!supabase) {
@@ -130,7 +145,7 @@ export default function PartnerPage() {
     setLoadingEvents(true);
     try {
       const response = await fetchWithSession("/api/partner/events");
-      const json = (await response.json().catch(() => null)) as { error?: string; events?: Event[] } | null;
+      const json = (await response.json().catch(() => null)) as { error?: string; events?: PartnerEventRecord[] } | null;
       if (!response.ok) {
         throw new Error(json?.error ?? "Could not load your events.");
       }
@@ -223,6 +238,18 @@ export default function PartnerPage() {
     });
   };
 
+  const openCreateEventForm = () => {
+    setForm(emptyForm());
+    setFormStatus({ type: "idle" });
+    setShowCreateEventForm(true);
+  };
+
+  const closeCreateEventForm = () => {
+    setForm(emptyForm());
+    setFormStatus({ type: "idle" });
+    setShowCreateEventForm(false);
+  };
+
   const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
   const uploadManagedImage = async (folder: "events" | "events/waivers", file: File) => {
@@ -242,6 +269,26 @@ export default function PartnerPage() {
 
     const finalPath = data?.path ?? path;
     const { data: publicUrlData } = supabase.storage.from(EVENT_IMAGE_BUCKET).getPublicUrl(finalPath);
+    return publicUrlData.publicUrl;
+  };
+
+  const uploadFlyerImage = async (file: File) => {
+    if (!supabase) {
+      throw new Error("Supabase is not configured.");
+    }
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
+    const baseName = file.name.replace(new RegExp(`\\.${ext}$`, "i"), "");
+    const path = `events/${createId()}-${safeFileName(baseName)}.${ext}`;
+    const { data, error } = await supabase.storage.from(FLYER_BUCKET).upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
+
+    if (error) throw error;
+
+    const finalPath = data?.path ?? path;
+    const { data: publicUrlData } = supabase.storage.from(FLYER_BUCKET).getPublicUrl(finalPath);
     return publicUrlData.publicUrl;
   };
 
@@ -289,6 +336,50 @@ export default function PartnerPage() {
     }
   };
 
+  const handleCreateFlyerUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setFormStatus({ type: "error", message: "Please select a valid flyer image file." });
+      return;
+    }
+
+    try {
+      setUploadingCreateFlyer(true);
+      const publicUrl = await uploadFlyerImage(file);
+      setForm((prev) => ({ ...prev, flyer_image_url: publicUrl }));
+      setFormStatus({ type: "success", message: "Flyer uploaded. The generated URL was added to the field. Click Create Event to save it." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload flyer.";
+      setFormStatus({ type: "error", message: `${message} (Bucket: ${FLYER_BUCKET})` });
+    } finally {
+      setUploadingCreateFlyer(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleEditFlyerUpload = async (eventId: string, e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setFormStatus({ type: "error", message: "Please select a valid flyer image file." });
+      return;
+    }
+
+    try {
+      setUploadingEditFlyerId(eventId);
+      const publicUrl = await uploadFlyerImage(file);
+      setEditForm((prev) => ({ ...prev, flyer_image_url: publicUrl }));
+      setFormStatus({ type: "success", message: "Flyer uploaded. The generated URL was added to the field. Click Save Changes to update the event." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload flyer.";
+      setFormStatus({ type: "error", message: `${message} (Bucket: ${FLYER_BUCKET})` });
+    } finally {
+      setUploadingEditFlyerId(null);
+      e.target.value = "";
+    }
+  };
+
   const submitCreate = async (event: FormEvent) => {
     event.preventDefault();
     setFormStatus({ type: "loading" });
@@ -305,6 +396,7 @@ export default function PartnerPage() {
 
       setFormStatus({ type: "success", message: "Event saved and sent to the owner approval queue." });
       setForm(emptyForm());
+      setShowCreateEventForm(false);
       await loadPartnerEvents();
     } catch (error) {
       setFormStatus({
@@ -411,7 +503,7 @@ export default function PartnerPage() {
       <div className="account-body shell">
         <HistoryBackButton label="← Back" fallbackHref="/account" />
 
-        <section className="account-card">
+        <section className="account-card account-card__intro">
           <h1>Partner Portal</h1>
           <p className="muted">
             Create your own events, edit only your events, and send every version through owner approval before it goes live.
@@ -426,25 +518,37 @@ export default function PartnerPage() {
           <div className="account-card__header">
             <div>
               <h2>Create Event</h2>
-              <p className="muted">New partner events are saved with `host_type = partner` and start in owner review.</p>
+              <p className="muted">Open the event builder when you want to add a new partner event.</p>
             </div>
-          </div>
-          <form className="register-form" onSubmit={submitCreate}>
-            <PartnerEventFields
-              idPrefix="create"
-              form={form}
-              sports={sports}
-              update={updateCreateForm}
-              updateSportId={updateCreateSportId}
-              uploadingImage={uploadingCreateImage}
-              onImageUpload={handleCreateImageUpload}
-            />
-            <div className="cta-row">
-              <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
-                {formStatus.type === "loading" ? "Saving..." : "Create Event"}
+            {!showCreateEventForm ? (
+              <button className="button primary" type="button" onClick={openCreateEventForm}>
+                Create Event
               </button>
-            </div>
-          </form>
+            ) : null}
+          </div>
+          {showCreateEventForm ? (
+            <form className="register-form" onSubmit={submitCreate}>
+              <PartnerEventFields
+                idPrefix="create"
+                form={form}
+                sports={sports}
+                update={updateCreateForm}
+                updateSportId={updateCreateSportId}
+                uploadingImage={uploadingCreateImage}
+                uploadingFlyer={uploadingCreateFlyer}
+                onImageUpload={handleCreateImageUpload}
+                onFlyerUpload={handleCreateFlyerUpload}
+              />
+              <div className="cta-row">
+                <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
+                  {formStatus.type === "loading" ? "Saving..." : "Create Event"}
+                </button>
+                <button className="button ghost" type="button" onClick={closeCreateEventForm}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : null}
           {formStatus.message ? (
             <p className={`form-help ${formStatus.type === "error" ? "error" : formStatus.type === "success" ? "success" : "muted"}`}>
               {formStatus.message}
@@ -522,7 +626,9 @@ export default function PartnerPage() {
                         update={updateEditForm}
                         updateSportId={updateEditSportId}
                         uploadingImage={uploadingEditImageId === event.id}
+                        uploadingFlyer={uploadingEditFlyerId === event.id}
                         onImageUpload={(e) => void handleEditImageUpload(event.id, e)}
+                        onFlyerUpload={(e) => void handleEditFlyerUpload(event.id, e)}
                       />
                       <div className="cta-row">
                         <button
@@ -556,7 +662,9 @@ function PartnerEventFields({
   update,
   updateSportId,
   uploadingImage,
+  uploadingFlyer,
   onImageUpload,
+  onFlyerUpload,
 }: {
   idPrefix: string;
   form: PartnerEventFormState;
@@ -564,7 +672,9 @@ function PartnerEventFields({
   update: <K extends keyof PartnerEventFormState>(key: K, value: PartnerEventFormState[K]) => void;
   updateSportId: (sportId: string) => void;
   uploadingImage: boolean;
+  uploadingFlyer: boolean;
   onImageUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onFlyerUpload: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
     <>
@@ -614,17 +724,6 @@ function PartnerEventFields({
           />
         </div>
         <div className="form-control">
-          <label htmlFor={`${idPrefix}-partner-signup-mode`}>Signup mode</label>
-          <select
-            id={`${idPrefix}-partner-signup-mode`}
-            value={form.signup_mode}
-            onChange={(e) => update("signup_mode", e.target.value as "registration" | "waitlist")}
-          >
-            <option value="registration">Registration</option>
-            <option value="waitlist">Waitlist / interest</option>
-          </select>
-        </div>
-        <div className="form-control">
           <label htmlFor={`${idPrefix}-partner-sport`}>Sport page</label>
           <select
             id={`${idPrefix}-partner-sport`}
@@ -663,7 +762,6 @@ function PartnerEventFields({
             min="1"
             value={form.registration_limit}
             onChange={(e) => update("registration_limit", e.target.value)}
-            disabled={form.signup_mode === "waitlist"}
           />
         </div>
         <div className="form-control">
@@ -675,7 +773,8 @@ function PartnerEventFields({
             step="0.01"
             value={form.payment_amount}
             onChange={(e) => update("payment_amount", e.target.value)}
-            disabled={form.signup_mode === "waitlist" || !form.payment_required}
+            placeholder={form.payment_required ? "25.00" : "Enable payment below to enter an amount"}
+            disabled={!form.payment_required}
           />
         </div>
         <div className="form-control">
@@ -700,12 +799,34 @@ function PartnerEventFields({
           </div>
         </div>
         <div className="form-control">
-          <label htmlFor={`${idPrefix}-partner-waiver`}>Waiver URL</label>
+          <label htmlFor={`${idPrefix}-partner-flyer`}>Flyer Upload</label>
           <input
-            id={`${idPrefix}-partner-waiver`}
-            value={form.waiver_url}
-            onChange={(e) => update("waiver_url", e.target.value)}
-            disabled={form.signup_mode === "waitlist"}
+            id={`${idPrefix}-partner-flyer`}
+            value={form.flyer_image_url}
+            onChange={(e) => update("flyer_image_url", e.target.value)}
+          />
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <label className="button ghost" htmlFor={`${idPrefix}-partner-flyer-upload`} style={{ padding: "0.45rem 0.75rem" }}>
+              {uploadingFlyer ? "Uploading..." : "Upload a flyer manually"}
+            </label>
+            <input
+              id={`${idPrefix}-partner-flyer-upload`}
+              type="file"
+              accept="image/*"
+              onChange={onFlyerUpload}
+              disabled={uploadingFlyer}
+              style={{ display: "none" }}
+            />
+          </div>
+        </div>
+        <div className="form-control" style={{ gridColumn: "1 / -1" }}>
+          <label htmlFor={`${idPrefix}-partner-flyer-details`}>Details</label>
+          <textarea
+            id={`${idPrefix}-partner-flyer-details`}
+            value={form.flyer_details}
+            onChange={(e) => update("flyer_details", e.target.value)}
+            rows={4}
+            placeholder="Optional extra event details for the flyer modal."
           />
         </div>
       </div>
@@ -713,19 +834,8 @@ function PartnerEventFields({
         <label className="checkbox-label">
           <input
             type="checkbox"
-            checked={form.registration_enabled}
-            onChange={(e) => update("registration_enabled", e.target.checked)}
-          />
-          <span>Accept signups</span>
-        </label>
-      </div>
-      <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
-        <label className="checkbox-label">
-          <input
-            type="checkbox"
             checked={form.payment_required}
             onChange={(e) => update("payment_required", e.target.checked)}
-            disabled={form.signup_mode === "waitlist"}
           />
           <span>Require payment before registration is created</span>
         </label>

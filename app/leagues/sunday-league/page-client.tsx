@@ -903,13 +903,14 @@ export default function SundayLeaguePageClient({
             <div className="sunday-league-copy-block">
               <h2>Overview</h2>
               <p>
-                Aldrich Sunday League is the regular ASL competition hub for standings, matchdays, team pages, and player info.
+                Aldrich Sunday League is ASL’s flagship 5v5 soccer league and the main hub for matchdays, standings, team pages, and player info. This is where the best matchups happen, storylines build week to week, and teams compete for legacy all summer. The season runs every Sunday from May 31st through August 2nd, excluding Father’s Day.
               </p>
               <p>
-                Division 1 and Division 2 currently open with {SUNDAY_LEAGUE_SLOT_COUNT} team slots each. Open slots flip to live teams as captains sign up.
+                Use the Teams tab to browse current team slots. If you’re a captain, click Create Team to reserve a spot and continue through the deposit flow. Once your team is created, you’ll unlock your Team Portal where you can invite players, manage your roster, and view your schedule, stats, and standings.
               </p>
               <p>
-                Use the Teams tab to view each division, then use Create Team to reserve the next open slot and continue into your deposit and team portal flow.
+
+                Don’t have a team? Sign up as a Free Agent to get scouted by captains and placed on a roster.
               </p>
             </div>
             <div className="sunday-league-promo">

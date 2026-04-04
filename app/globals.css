@@ -3149,7 +3149,7 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
 .account-body {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .account-header {
@@ -3585,8 +3585,22 @@ html[data-theme="dark"] .account-chat-composer textarea:focus {
   flex-wrap: wrap;
 }
 
+.account-card__intro {
+  display: grid;
+  gap: 4px;
+}
+
 .account-card__header--compact {
   margin-bottom: -14px;
+}
+
+.account-card__intro h1 {
+  line-height: 0.95;
+}
+
+.account-card__intro h1,
+.account-card__intro p {
+  margin: 0;
 }
 
 .account-card__header h2,
