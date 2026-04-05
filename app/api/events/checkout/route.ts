@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getBearerToken, getSupabaseServiceRole, getSupabaseWithToken } from "@/lib/admin-route-auth";
+import { isPaidEventRegistration } from "@/lib/effective-event-registrations";
 import { isPublicEventVisible } from "@/lib/event-approval";
 import { EVENT_CHECKOUT_WINDOW_MS, EVENT_PAYMENT_CURRENCY } from "@/lib/event-payments";
 import { createSquarePaymentLink, getAppUrl, getSquareLocationId } from "@/lib/square";
@@ -314,19 +315,40 @@ export async function POST(req: NextRequest) {
     }
 
     if (!eventConfig.allow_multiple_registrations) {
-      const { data: existingSubmission, error: existingSubmissionError } = await serviceClient
-        .from("event_submissions")
-        .select("id")
-        .eq("event_id", eventConfig.id)
-        .eq("user_id", userId)
-        .limit(1);
+      if (isPaidEventRegistration(eventConfig)) {
+        const { data: existingSuccessfulDraft, error: existingSuccessfulDraftError } = await serviceClient
+          .from("event_checkout_drafts")
+          .select("id")
+          .eq("event_id", eventConfig.id)
+          .eq("user_id", userId)
+          .in("status", ["paid", "completed"])
+          .limit(1);
 
-      if (existingSubmissionError) {
-        return NextResponse.json({ error: existingSubmissionError.message ?? "Could not verify registration status." }, { status: 500 });
-      }
+        if (existingSuccessfulDraftError) {
+          return NextResponse.json(
+            { error: existingSuccessfulDraftError.message ?? "Could not verify registration status." },
+            { status: 500 },
+          );
+        }
 
-      if ((existingSubmission ?? []).length > 0) {
-        return NextResponse.json({ error: "You are already registered for this event." }, { status: 400 });
+        if ((existingSuccessfulDraft ?? []).length > 0) {
+          return NextResponse.json({ error: "You are already registered for this event." }, { status: 400 });
+        }
+      } else {
+        const { data: existingSubmission, error: existingSubmissionError } = await serviceClient
+          .from("event_submissions")
+          .select("id")
+          .eq("event_id", eventConfig.id)
+          .eq("user_id", userId)
+          .limit(1);
+
+        if (existingSubmissionError) {
+          return NextResponse.json({ error: existingSubmissionError.message ?? "Could not verify registration status." }, { status: 500 });
+        }
+
+        if ((existingSubmission ?? []).length > 0) {
+          return NextResponse.json({ error: "You are already registered for this event." }, { status: 400 });
+        }
       }
     }
 

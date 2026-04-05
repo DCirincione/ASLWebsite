@@ -18,6 +18,7 @@ import {
   getSignupSuccessMessage,
   isWaitlistEvent,
 } from "@/lib/event-signups";
+import { isPaidEventRegistration } from "@/lib/effective-event-registrations";
 import { isPublicEventVisible } from "@/lib/event-approval";
 import { formatEventPaymentAmount } from "@/lib/event-payments";
 import { supabase } from "@/lib/supabase/client";
@@ -318,22 +319,43 @@ export function RegistrationModal({
     }
 
     if (mode === "create" && !eventConfig.allow_multiple_registrations) {
-      const { data: existing, error: existingError } = await client
-        .from("event_submissions")
-        .select("id")
-        .eq("event_id", eventConfig.id)
-        .eq("user_id", userId)
-        .limit(1);
+      if (isPaidEventRegistration(eventConfig)) {
+        const { data: existingDrafts, error: existingDraftsError } = await client
+          .from("event_checkout_drafts")
+          .select("id")
+          .eq("event_id", eventConfig.id)
+          .eq("user_id", userId)
+          .in("status", ["paid", "completed"])
+          .limit(1);
 
-      if (existingError) {
-        setStatus({ type: "error", message: existingError.message ?? "Could not verify registration status." });
-        return;
-      }
+        if (existingDraftsError) {
+          setStatus({ type: "error", message: existingDraftsError.message ?? "Could not verify registration status." });
+          return;
+        }
 
-      if ((existing ?? []).length > 0) {
-        setStatus({ type: "error", message: getSignupDuplicateMessage(eventConfig) });
-        onSubmitted?.();
-        return;
+        if ((existingDrafts ?? []).length > 0) {
+          setStatus({ type: "error", message: getSignupDuplicateMessage(eventConfig) });
+          onSubmitted?.();
+          return;
+        }
+      } else {
+        const { data: existing, error: existingError } = await client
+          .from("event_submissions")
+          .select("id")
+          .eq("event_id", eventConfig.id)
+          .eq("user_id", userId)
+          .limit(1);
+
+        if (existingError) {
+          setStatus({ type: "error", message: existingError.message ?? "Could not verify registration status." });
+          return;
+        }
+
+        if ((existing ?? []).length > 0) {
+          setStatus({ type: "error", message: getSignupDuplicateMessage(eventConfig) });
+          onSubmitted?.();
+          return;
+        }
       }
     }
 

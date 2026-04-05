@@ -233,22 +233,25 @@ const processEventPayment = async ({
   }
 
   if (!eventConfig.allow_multiple_registrations) {
-    const { data: existingSubmission } = await serviceClient
-      .from("event_submissions")
-      .select("id")
+    const { data: existingSuccessfulDraft } = await serviceClient
+      .from("event_checkout_drafts")
+      .select("id,submission_id")
       .eq("event_id", draft.event_id)
       .eq("user_id", draft.user_id)
-      .order("created_at", { ascending: false })
+      .neq("id", draft.id)
+      .in("status", ["paid", "completed"])
+      .order("completed_at", { ascending: false, nullsFirst: false })
+      .order("updated_at", { ascending: false, nullsFirst: false })
       .limit(1)
       .maybeSingle();
 
-    if (existingSubmission?.id) {
+    if (existingSuccessfulDraft?.submission_id) {
       await serviceClient
         .from("event_checkout_drafts")
         .update({
           status: "completed",
           square_payment_id: payment.id ?? null,
-          submission_id: existingSubmission.id,
+          submission_id: existingSuccessfulDraft.submission_id,
           completed_at: draft.completed_at ?? new Date().toISOString(),
           error_message: null,
         } satisfies EventCheckoutDraftUpdate)
@@ -278,11 +281,34 @@ const processEventPayment = async ({
 
   const { data: createdSubmission, error: createError } = await serviceClient
     .from("event_submissions")
-    .insert(submissionPayload)
+    .insert({
+      ...submissionPayload,
+      id: draft.id,
+    })
     .select("*")
     .single();
 
   if (createError || !createdSubmission) {
+    const { data: existingCreatedSubmission } = await serviceClient
+      .from("event_submissions")
+      .select("*")
+      .eq("id", draft.id)
+      .maybeSingle();
+
+    if (existingCreatedSubmission) {
+      await serviceClient
+        .from("event_checkout_drafts")
+        .update({
+          status: "completed",
+          square_payment_id: payment.id ?? null,
+          submission_id: existingCreatedSubmission.id,
+          completed_at: new Date().toISOString(),
+          error_message: null,
+        } satisfies EventCheckoutDraftUpdate)
+        .eq("id", draft.id);
+      return;
+    }
+
     await serviceClient
       .from("event_checkout_drafts")
       .update({

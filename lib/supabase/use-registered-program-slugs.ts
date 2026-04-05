@@ -2,11 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import {
+  filterEffectiveRegisteredSubmissions,
+  getBestSuccessfulRegistrationDraftBySubmissionId,
+  type EffectiveRegistrationDraftRow,
+  type EffectiveRegistrationEventRow,
+  type EffectiveRegistrationSubmissionRow,
+} from "@/lib/effective-event-registrations";
 import { supabase } from "@/lib/supabase/client";
 
-type SubmissionRow = {
-  event_id: string;
-};
+type SubmissionRow = EffectiveRegistrationSubmissionRow;
 
 export function useRegisteredEventIds() {
   const [userId, setUserId] = useState<string | null>(null);
@@ -21,7 +26,7 @@ export function useRegisteredEventIds() {
 
     const { data: submissions, error: submissionsError } = await client
       .from("event_submissions")
-      .select("event_id")
+      .select("id,event_id")
       .eq("user_id", uid);
 
     if (submissionsError) {
@@ -29,11 +34,43 @@ export function useRegisteredEventIds() {
       return;
     }
 
-    const eventIds = Array.from(
-      new Set((submissions as SubmissionRow[]).map((row) => row.event_id).filter(Boolean))
+    const submissionRows = (submissions ?? []) as SubmissionRow[];
+    const eventIds = Array.from(new Set(submissionRows.map((row) => row.event_id).filter(Boolean)));
+
+    if (eventIds.length === 0) {
+      setRegisteredEventIds(new Set());
+      return;
+    }
+
+    const submissionIds = submissionRows.map((row) => row.id).filter(Boolean);
+    const [{ data: eventRows, error: eventsError }, { data: draftRows, error: draftsError }] = await Promise.all([
+      client.from("events").select("id,payment_required,payment_amount_cents").in("id", eventIds),
+      submissionIds.length > 0
+        ? client
+            .from("event_checkout_drafts")
+            .select("submission_id,status,updated_at,created_at")
+            .in("submission_id", submissionIds)
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (eventsError || draftsError) {
+      setRegisteredEventIds(new Set());
+      return;
+    }
+
+    const eventsById = new Map(
+      ((eventRows ?? []) as EffectiveRegistrationEventRow[]).map((row) => [row.id, row]),
+    );
+    const successfulDraftBySubmissionId = getBestSuccessfulRegistrationDraftBySubmissionId(
+      (draftRows ?? []) as EffectiveRegistrationDraftRow[],
+    );
+    const effectiveSubmissions = filterEffectiveRegisteredSubmissions(
+      submissionRows,
+      eventsById,
+      successfulDraftBySubmissionId,
     );
 
-    setRegisteredEventIds(new Set(eventIds));
+    setRegisteredEventIds(new Set(effectiveSubmissions.map((row) => row.event_id)));
   }, []);
 
   useEffect(() => {

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } fr
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { canAccessPartnerPortal, formatApprovalStatusLabel } from "@/lib/event-approval";
+import { formatEventPaymentAmount } from "@/lib/event-payments";
 import { createId } from "@/lib/create-id";
 import { getEventProgramSlugOptions } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
@@ -19,6 +20,19 @@ const FLYER_BUCKET = "flyers";
 type PartnerEventRecord = Event & {
   flyer_image_url?: string | null;
   flyer_details?: string | null;
+  signup_count?: number;
+  paid_signup_count?: number;
+  earned_amount_cents?: number;
+};
+
+type PartnerSignupRecord = {
+  id: string;
+  user_id: string;
+  user_name: string;
+  user_email: string;
+  user_phone?: string | null;
+  submitted_at?: string | null;
+  paid_amount_cents?: number | null;
 };
 
 type PartnerEventFormState = {
@@ -102,6 +116,13 @@ const formatDateRange = (start?: string | null, end?: string | null) => {
   return startDate?.toLocaleDateString(undefined, formatOptions) ?? endDate?.toLocaleDateString(undefined, formatOptions) ?? "Date TBD";
 };
 
+const formatSubmissionDate = (value?: string | null) => {
+  if (!value) return "Unknown date";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString();
+};
+
 export default function PartnerPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
   const [profile, setProfile] = useState<Pick<Profile, "id" | "name" | "role"> | null>(null);
@@ -115,6 +136,12 @@ export default function PartnerPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [requestingPayoutId, setRequestingPayoutId] = useState<string | null>(null);
+  const [payoutStatuses, setPayoutStatuses] = useState<Record<string, SaveStatus>>({});
+  const [openSignupsEventId, setOpenSignupsEventId] = useState<string | null>(null);
+  const [loadingSignupsEventId, setLoadingSignupsEventId] = useState<string | null>(null);
+  const [signupsByEventId, setSignupsByEventId] = useState<Record<string, PartnerSignupRecord[]>>({});
+  const [signupsErrorByEventId, setSignupsErrorByEventId] = useState<Record<string, string>>({});
   const [uploadingCreateImage, setUploadingCreateImage] = useState(false);
   const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
   const [uploadingCreateFlyer, setUploadingCreateFlyer] = useState(false);
@@ -464,6 +491,98 @@ export default function PartnerPage() {
     }
   };
 
+  const requestPayout = async (event: PartnerEventRecord) => {
+    const earnedAmountCents = event.earned_amount_cents ?? 0;
+    if (earnedAmountCents <= 0) {
+      setPayoutStatuses((prev) => ({
+        ...prev,
+        [event.id]: { type: "error", message: "This event does not have any payout balance yet." },
+      }));
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Send a payout request for "${event.title}" for ${formatEventPaymentAmount(earnedAmountCents)}?`,
+    );
+    if (!confirmed) return;
+
+    setRequestingPayoutId(event.id);
+    setPayoutStatuses((prev) => ({ ...prev, [event.id]: { type: "loading" } }));
+
+    try {
+      const response = await fetchWithSession("/api/partner/payout-request", {
+        method: "POST",
+        body: JSON.stringify({ eventId: event.id }),
+      });
+      const json = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) {
+        throw new Error(json?.error ?? "Could not send the payout request.");
+      }
+
+      setPayoutStatuses((prev) => ({
+        ...prev,
+        [event.id]: {
+          type: "success",
+          message: `Payout request sent for ${formatEventPaymentAmount(earnedAmountCents)}.`,
+        },
+      }));
+    } catch (error) {
+      setPayoutStatuses((prev) => ({
+        ...prev,
+        [event.id]: {
+          type: "error",
+          message: error instanceof Error ? error.message : "Could not send the payout request.",
+        },
+      }));
+    } finally {
+      setRequestingPayoutId(null);
+    }
+  };
+
+  const toggleEventSignups = async (event: PartnerEventRecord) => {
+    const eventId = event.id;
+    if (openSignupsEventId === eventId) {
+      setOpenSignupsEventId(null);
+      return;
+    }
+
+    setOpenSignupsEventId(eventId);
+
+    if (signupsByEventId[eventId] || loadingSignupsEventId === eventId) {
+      return;
+    }
+
+    setLoadingSignupsEventId(eventId);
+    setSignupsErrorByEventId((prev) => {
+      const next = { ...prev };
+      delete next[eventId];
+      return next;
+    });
+
+    try {
+      const response = await fetchWithSession(`/api/partner/events/${eventId}/signups`);
+      const json = (await response.json().catch(() => null)) as { error?: string; signups?: PartnerSignupRecord[] } | null;
+      if (!response.ok) {
+        throw new Error(json?.error ?? "Could not load event signups.");
+      }
+
+      setSignupsByEventId((prev) => ({
+        ...prev,
+        [eventId]: json?.signups ?? [],
+      }));
+    } catch (error) {
+      setSignupsErrorByEventId((prev) => ({
+        ...prev,
+        [eventId]: error instanceof Error ? error.message : "Could not load event signups.",
+      }));
+    } finally {
+      setLoadingSignupsEventId(null);
+    }
+  };
+
+  const totalSignupCount = events.reduce((sum, event) => sum + (event.signup_count ?? 0), 0);
+  const totalEarnedAmountCents = events.reduce((sum, event) => sum + (event.earned_amount_cents ?? 0), 0);
+
   if (status === "loading") {
     return (
       <div className="account-page">
@@ -561,6 +680,13 @@ export default function PartnerPage() {
             <div>
               <h2>Your Events</h2>
               <p className="muted">Only events created under your partner account appear here.</p>
+              {!loadingEvents && events.length > 0 ? (
+                <div className="partner-events-summary">
+                  <span className="pill pill--muted">{events.length} event{events.length === 1 ? "" : "s"}</span>
+                  <span className="pill pill--muted">{totalSignupCount} signup{totalSignupCount === 1 ? "" : "s"} tracked</span>
+                  <span className="pill pill--green">{formatEventPaymentAmount(totalEarnedAmountCents)} earned</span>
+                </div>
+              ) : null}
             </div>
             <button className="button ghost" type="button" onClick={() => void loadPartnerEvents()} disabled={loadingEvents}>
               {loadingEvents ? "Refreshing..." : "Refresh"}
@@ -587,9 +713,103 @@ export default function PartnerPage() {
                       Signup mode: {event.signup_mode === "waitlist" ? "Waitlist / interest" : "Registration"}
                     </p>
                     <p className="muted">Signups: {event.registration_enabled ? "Open" : "Closed"}</p>
+                    <div className="partner-event-card__stats">
+                      <button
+                        className="partner-event-card__stat partner-event-card__stat-button"
+                        type="button"
+                        onClick={() => void toggleEventSignups(event)}
+                      >
+                        <span className="partner-event-card__stat-label">Total Signups</span>
+                        <strong className="partner-event-card__stat-value">{event.signup_count ?? 0} total signups</strong>
+                        <span className="partner-event-card__stat-hint">
+                          {openSignupsEventId === event.id ? "Hide signup list" : "View who signed up"}
+                        </span>
+                      </button>
+                      <div className="partner-event-card__stat">
+                        <span className="partner-event-card__stat-label">Paid Signups</span>
+                        <strong className="partner-event-card__stat-value">{event.paid_signup_count ?? 0}</strong>
+                      </div>
+                      <div className="partner-event-card__stat">
+                        <span className="partner-event-card__stat-label">Earned</span>
+                        <strong className="partner-event-card__stat-value">
+                          {formatEventPaymentAmount(event.earned_amount_cents ?? 0)}
+                        </strong>
+                      </div>
+                    </div>
+                    <p className="muted">
+                      {event.payment_required
+                        ? `Ticket price: ${formatEventPaymentAmount(event.payment_amount_cents ?? 0)}`
+                        : "This event does not collect signup payments."}
+                    </p>
                     {event.approval_notes ? <p className="muted">Owner notes: {event.approval_notes}</p> : null}
                   </div>
                   {event.description ? <p className="muted">{event.description}</p> : null}
+                  {openSignupsEventId === event.id ? (
+                    <div className="partner-signups-panel">
+                      <div className="event-card__header">
+                        <div>
+                          <h4 className="partner-signups-panel__title">Signup List</h4>
+                          <p className="muted">
+                            {event.signup_count ?? 0} signup{event.signup_count === 1 ? "" : "s"} for this event.
+                          </p>
+                        </div>
+                      </div>
+                      {loadingSignupsEventId === event.id ? <p className="muted">Loading signups...</p> : null}
+                      {signupsErrorByEventId[event.id] ? <p className="form-help error">{signupsErrorByEventId[event.id]}</p> : null}
+                      {loadingSignupsEventId !== event.id && !signupsErrorByEventId[event.id] ? (
+                        (signupsByEventId[event.id] ?? []).length > 0 ? (
+                          <div className="partner-signups-list">
+                            {(signupsByEventId[event.id] ?? []).map((signup) => (
+                              <article key={signup.id} className="partner-signup-row">
+                                <div>
+                                  <p className="partner-signup-row__name">{signup.user_name}</p>
+                                  <p className="muted">{signup.user_email}</p>
+                                  {signup.user_phone ? <p className="muted">{signup.user_phone}</p> : null}
+                                </div>
+                                <div className="partner-signup-row__meta">
+                                  <p className="muted">Submitted: {formatSubmissionDate(signup.submitted_at)}</p>
+                                  <p className="muted">
+                                    Paid: {signup.paid_amount_cents ? formatEventPaymentAmount(signup.paid_amount_cents) : "No payment"}
+                                  </p>
+                                </div>
+                              </article>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="muted">No signups for this event yet.</p>
+                        )
+                      ) : null}
+                    </div>
+                  ) : null}
+                  <div className="partner-event-card__payout">
+                    <div>
+                      <p className="partner-event-card__payout-title">Payouts</p>
+                      <p className="muted">
+                        Request a payout once this event has collected paid signups.
+                      </p>
+                    </div>
+                    <button
+                      className="button primary"
+                      type="button"
+                      onClick={() => void requestPayout(event)}
+                      disabled={requestingPayoutId === event.id || (event.earned_amount_cents ?? 0) <= 0}
+                    >
+                      {requestingPayoutId === event.id ? "Sending..." : "Request Payout"}
+                    </button>
+                  </div>
+                  {payoutStatuses[event.id]?.message ? (
+                    <p
+                      className={`form-help ${
+                        payoutStatuses[event.id]?.type === "error"
+                          ? "error"
+                          : payoutStatuses[event.id]?.type === "success"
+                            ? "success"
+                            : "muted"
+                      }`}
+                    >
+                      {payoutStatuses[event.id]?.message}
+                    </p>
+                  ) : null}
                   <div className="cta-row">
                     <button
                       className="button ghost"

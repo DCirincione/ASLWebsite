@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getAuthenticatedProfile, getSupabaseServiceRole } from "@/lib/admin-route-auth";
 import { parseOptionalInteger, parseOptionalMoneyCents, trimOptionalString } from "@/lib/event-approval";
+import {
+  attachPartnerEventStats,
+  type PartnerEventStats,
+  type PartnerEventStatsSupabase,
+} from "@/lib/partner-event-stats";
 import type { Event, EventInsert, Flyer } from "@/lib/supabase/types";
 
 type EventWriteBody = {
@@ -23,6 +28,13 @@ type EventWriteBody = {
   payment_required?: unknown;
   payment_amount?: unknown;
 };
+
+type PartnerEventWithFlyers = Event & {
+  flyer_image_url: string | null;
+  flyer_details: string | null;
+};
+
+type PartnerEventResponse = PartnerEventWithFlyers & PartnerEventStats;
 
 const getFlyerName = (event: Pick<Event, "title" | "registration_program_slug">) =>
   event.registration_program_slug?.trim() || event.title.trim();
@@ -154,6 +166,7 @@ export async function GET(req: NextRequest) {
     if (!supabase) {
       return NextResponse.json({ error: "Supabase service role is not configured." }, { status: 500 });
     }
+    const partnerEventStatsSupabase = supabase as unknown as PartnerEventStatsSupabase;
 
     const { data, error } = await supabase
       .from("events")
@@ -167,7 +180,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message ?? "Could not load partner events." }, { status: 500 });
     }
 
-    return NextResponse.json({ events: await attachFlyersToEvents(supabase, (data ?? []) as Event[]) });
+    const eventsWithFlyers = (await attachFlyersToEvents(
+      supabase,
+      (data ?? []) as Event[],
+    )) as PartnerEventWithFlyers[];
+    const partnerEvents = (await attachPartnerEventStats(
+      partnerEventStatsSupabase,
+      eventsWithFlyers,
+    )) as PartnerEventResponse[];
+
+    return NextResponse.json<{ events: PartnerEventResponse[] }>({ events: partnerEvents });
   } catch {
     return NextResponse.json({ error: "Could not load partner events." }, { status: 500 });
   }

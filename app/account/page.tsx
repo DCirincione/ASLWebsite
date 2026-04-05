@@ -11,6 +11,12 @@ import { SubmissionReviewModal } from "@/components/submission-review-modal";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { COUNTRY_OPTIONS, getCountryNameFromCode, normalizeCountryCode } from "@/lib/countries";
 import { createId } from "@/lib/create-id";
+import {
+  filterEffectiveRegisteredSubmissions,
+  getBestSuccessfulRegistrationDraftBySubmissionId,
+  type EffectiveRegistrationDraftRow,
+  type EffectiveRegistrationEventRow,
+} from "@/lib/effective-event-registrations";
 import { isWaitlistEvent } from "@/lib/event-signups";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
@@ -447,8 +453,55 @@ export default function AccountPage() {
       }
 
       const submissionRows = (submissions ?? []) as SubmissionRow[];
+      const eventIds = Array.from(new Set(submissionRows.map((row) => row.event_id).filter(Boolean)));
+
+      if (eventIds.length === 0) {
+        setRegisteredEvents([]);
+        setEventsStatus("ready");
+        return;
+      }
+
+      const { data: eventData, error: eventError } = await supabase
+        .from("events")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,signup_mode,registration_program_slug,payment_required,payment_amount_cents")
+        .in("id", eventIds);
+
+      if (eventError) {
+        setRegisteredEvents(fallbackEvents as RegisteredEventItem[]);
+        setEventsStatus("ready");
+        setEventsError("Could not load event details. Showing sample schedule.");
+        return;
+      }
+
+      const submissionIds = submissionRows.map((row) => row.id).filter(Boolean);
+      const { data: draftRows, error: draftsError } = submissionIds.length > 0
+        ? await supabase
+            .from("event_checkout_drafts")
+            .select("submission_id,status,updated_at,created_at")
+            .in("submission_id", submissionIds)
+        : { data: [], error: null };
+
+      if (draftsError) {
+        setRegisteredEvents(fallbackEvents as RegisteredEventItem[]);
+        setEventsStatus("ready");
+        setEventsError("Could not load your event payment details.");
+        return;
+      }
+
+      const eventsById = new Map(
+        ((eventData ?? []) as EffectiveRegistrationEventRow[]).map((event) => [event.id, event]),
+      );
+      const successfulDraftBySubmissionId = getBestSuccessfulRegistrationDraftBySubmissionId(
+        (draftRows ?? []) as EffectiveRegistrationDraftRow[],
+      );
+      const effectiveSubmissionRows = filterEffectiveRegisteredSubmissions(
+        submissionRows,
+        eventsById,
+        successfulDraftBySubmissionId,
+      );
       const latestSubmissionByEvent = new Map<string, EventSubmissionSummary>();
-      for (const row of submissionRows) {
+
+      for (const row of effectiveSubmissionRows) {
         if (!row.event_id) continue;
         const existing = latestSubmissionByEvent.get(row.event_id);
         const nextCreatedAt = row.created_at ? new Date(row.created_at).getTime() : 0;
@@ -468,31 +521,13 @@ export default function AccountPage() {
         }
       }
 
-      const eventIds = Array.from(new Set(submissionRows.map((row) => row.event_id).filter(Boolean)));
-
-      if (eventIds.length === 0) {
-        setRegisteredEvents([]);
-        setEventsStatus("ready");
-        return;
-      }
-
-      const { data: eventData, error: eventError } = await supabase
-        .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,host_type,signup_mode,registration_program_slug")
-        .in("id", eventIds);
-
-      if (eventError) {
-        setRegisteredEvents(fallbackEvents as RegisteredEventItem[]);
-        setEventsStatus("ready");
-        setEventsError("Could not load event details. Showing sample schedule.");
-        return;
-      }
-
       setRegisteredEvents(
-        ((eventData ?? []) as Event[]).map((event) => ({
-          ...event,
-          submission: latestSubmissionByEvent.get(event.id) ?? null,
-        }))
+        ((eventData ?? []) as Event[])
+          .filter((event) => latestSubmissionByEvent.has(event.id))
+          .map((event) => ({
+            ...event,
+            submission: latestSubmissionByEvent.get(event.id) ?? null,
+          }))
       );
       setEventsStatus("ready");
     };

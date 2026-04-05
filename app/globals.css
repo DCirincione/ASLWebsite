@@ -4032,6 +4032,122 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   word-break: break-word;
 }
 
+.partner-events-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.partner-event-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.partner-event-card__stat {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.partner-event-card__stat-label {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.partner-event-card__stat-value {
+  font-size: 1.2rem;
+  line-height: 1.1;
+  color: #0f172a;
+}
+
+.partner-event-card__stat-button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.partner-event-card__stat-button:hover {
+  border-color: rgba(233, 93, 42, 0.28);
+  box-shadow: 0 10px 24px rgba(233, 93, 42, 0.08);
+}
+
+.partner-event-card__stat-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.partner-event-card__stat-hint {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.partner-signups-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.partner-signups-panel__title {
+  margin: 0;
+}
+
+.partner-signups-list {
+  display: grid;
+  gap: 10px;
+}
+
+.partner-signup-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: #ffffff;
+}
+
+.partner-signup-row__name {
+  margin: 0 0 4px;
+  font-weight: 800;
+}
+
+.partner-signup-row__meta {
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.partner-event-card__payout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.partner-event-card__payout-title {
+  margin: 0 0 4px;
+  font-weight: 800;
+}
+
 .sunday-league-schedule-card {
   gap: 6px;
 }
@@ -4710,6 +4826,38 @@ html[data-theme="dark"] .event-card-simple {
   box-shadow: none;
 }
 
+html[data-theme="dark"] .partner-event-card__stat {
+  background: rgba(15, 23, 42, 0.75);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-event-card__stat-label {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .partner-event-card__stat-value {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .partner-event-card__stat-hint {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .partner-signups-panel {
+  background: rgba(15, 23, 42, 0.82);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-signup-row {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-event-card__payout {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #1f2a40;
+}
+
 html[data-theme="dark"] .sunday-league-schedule-grid > .form-control > label {
   color: #e8edf7;
 }
@@ -4824,6 +4972,18 @@ html[data-theme="dark"] .events-group {
 @media (max-width: 720px) {
   .sport-card {
     height: 220px;
+  }
+}
+
+@media (max-width: 720px) {
+  .partner-event-card__stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .partner-signup-row__meta {
+    min-width: 0;
   }
 }
 
