@@ -166,7 +166,7 @@ export default function RunClubPage() {
             image={item.image}
             dateLabel={primaryTimeLabel(item)}
             location={item.location}
-            signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit)}
+            signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit, item.signup_unit)}
             description={item.description}
             onOpen={() => setDetailEvent(item)}
             actions={

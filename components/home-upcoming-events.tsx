@@ -158,7 +158,7 @@ export function HomeUpcomingEvents() {
                 aria-hidden
               >
                 <span className="event-card__image-badge">
-                  {formatEventSignupLabel(event.signup_count, event.registration_limit)}
+                  {formatEventSignupLabel(event.signup_count, event.registration_limit, event.signup_unit)}
                 </span>
               </div>
               <div className="event-card__body">

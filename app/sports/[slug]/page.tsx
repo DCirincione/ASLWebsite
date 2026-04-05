@@ -147,7 +147,7 @@ export default function DynamicSportPage() {
               image={item.image}
               dateLabel={primaryTimeLabel(item)}
               location={item.location}
-              signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit)}
+              signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit, item.signup_unit)}
               description={item.description}
               onOpen={isSundayLeague ? undefined : () => setDetailEvent(item)}
               actions={
@@ -205,7 +205,7 @@ export default function DynamicSportPage() {
               image={event.image}
               dateLabel={primaryTimeLabel(event)}
               location={event.location}
-              signupLabel={formatEventSignupLabel(event.signup_count, event.registration_limit)}
+              signupLabel={formatEventSignupLabel(event.signup_count, event.registration_limit, event.signup_unit)}
               description={event.description}
               onOpen={isSundayLeague ? undefined : () => setDetailEvent(event)}
               actions={

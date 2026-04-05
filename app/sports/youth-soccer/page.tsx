@@ -133,7 +133,7 @@ export default function YouthSoccerPage() {
             image={item.image}
             dateLabel={primaryTimeLabel(item)}
             location={item.location}
-            signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit)}
+            signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit, item.signup_unit)}
             description={item.description}
             onOpen={() => setDetailEvent(item)}
             actions={
@@ -231,7 +231,7 @@ export default function YouthSoccerPage() {
                 image={ev.image}
                 dateLabel={primaryTimeLabel(ev)}
                 location={ev.location}
-                signupLabel={formatEventSignupLabel(ev.signup_count, ev.registration_limit)}
+                signupLabel={formatEventSignupLabel(ev.signup_count, ev.registration_limit, ev.signup_unit)}
                 description={ev.description}
                 onOpen={() => setDetailEvent(ev)}
                 actions={

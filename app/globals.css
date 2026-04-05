@@ -1100,7 +1100,7 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 
 .event-card__image-badge {
   position: absolute;
-  inset: auto auto 2px 2px;
+  inset: auto auto 0px 1px;
   background: rgba(12, 21, 38, 0.82);
   color: #f8fafc;
   padding: 2px 10px;
