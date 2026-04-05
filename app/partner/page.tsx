@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } fr
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
+import { PartnerApplicationForm } from "@/components/partner-application-form";
 import {
   buildRegistrationSchema,
   createEmptyRegistrationField,
@@ -15,6 +16,12 @@ import {
 } from "@/lib/event-registration-schema";
 import { canAccessPartnerPortal, formatApprovalStatusLabel } from "@/lib/event-approval";
 import { formatEventPaymentAmount } from "@/lib/event-payments";
+import {
+  createEmptyPartnerApplicationForm,
+  createEmptyPartnerApplicationTeamMember,
+  type PartnerApplicationSubmission,
+  type PartnerApplicationTeamMember,
+} from "@/lib/partner-application";
 import { createId } from "@/lib/create-id";
 import { getEventProgramSlugOptions } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
@@ -24,6 +31,14 @@ type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type SaveStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
 const EVENT_IMAGE_BUCKET = "event-creation-uploads";
 const FLYER_BUCKET = "flyers";
+
+type PartnerApplicationDraftSummary = {
+  id: string;
+  status: "pending" | "completed" | "failed" | "expired";
+  checkoutUrl?: string | null;
+  completedAt?: string | null;
+  error?: string | null;
+};
 
 type PartnerEventRecord = Event & {
   flyer_image_url?: string | null;
@@ -169,6 +184,11 @@ export default function PartnerPage() {
   const [uploadingEditFlyerId, setUploadingEditFlyerId] = useState<string | null>(null);
   const [uploadingCreateWaiver, setUploadingCreateWaiver] = useState(false);
   const [uploadingEditWaiverId, setUploadingEditWaiverId] = useState<string | null>(null);
+  const [partnerApplicationForm, setPartnerApplicationForm] = useState<PartnerApplicationSubmission>(createEmptyPartnerApplicationForm());
+  const [partnerApplicationStatus, setPartnerApplicationStatus] = useState<SaveStatus>({ type: "idle" });
+  const [partnerApplicationDraft, setPartnerApplicationDraft] = useState<PartnerApplicationDraftSummary | null>(null);
+  const [loadingPartnerApplicationDraft, setLoadingPartnerApplicationDraft] = useState(false);
+  const [uploadingPartnerLogo, setUploadingPartnerLogo] = useState(false);
 
   const fetchWithSession = useCallback(async (input: string, init?: RequestInit) => {
     if (!supabase) {
@@ -190,6 +210,29 @@ export default function PartnerPage() {
       },
     });
   }, []);
+
+  const loadPartnerApplicationDraft = useCallback(async () => {
+    setLoadingPartnerApplicationDraft(true);
+    try {
+      const response = await fetchWithSession("/api/partner/apply");
+      const json = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            draft?: PartnerApplicationDraftSummary | null;
+          }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(json?.error ?? "Could not load your partner application status.");
+      }
+
+      setPartnerApplicationDraft(json?.draft ?? null);
+    } catch {
+      setPartnerApplicationDraft(null);
+    } finally {
+      setLoadingPartnerApplicationDraft(false);
+    }
+  }, [fetchWithSession]);
 
   const loadPartnerEvents = useCallback(async () => {
     setLoadingEvents(true);
@@ -241,6 +284,7 @@ export default function PartnerPage() {
 
       if (!canAccessPartnerPortal(profileData?.role)) {
         setStatus("forbidden");
+        await loadPartnerApplicationDraft();
         return;
       }
 
@@ -250,7 +294,7 @@ export default function PartnerPage() {
     };
 
     void loadPage();
-  }, [loadPartnerEvents, loadSports]);
+  }, [loadPartnerApplicationDraft, loadPartnerEvents, loadSports]);
 
   const updateCreateForm = <K extends keyof PartnerEventFormState>(key: K, value: PartnerEventFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -410,7 +454,10 @@ export default function PartnerPage() {
 
   const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
-  const uploadManagedAsset = async (folder: "events" | "events/waivers", file: File) => {
+  const uploadManagedAsset = async (
+    folder: "events" | "events/waivers" | "partner-applications/logos",
+    file: File,
+  ) => {
     if (!supabase) {
       throw new Error("Supabase is not configured.");
     }
@@ -585,6 +632,138 @@ export default function PartnerPage() {
     } finally {
       setUploadingEditWaiverId(null);
       e.target.value = "";
+    }
+  };
+
+  const updatePartnerApplicationForm = <K extends keyof PartnerApplicationSubmission>(
+    key: K,
+    value: PartnerApplicationSubmission[K],
+  ) => {
+    setPartnerApplicationForm((prev) => {
+      const next = {
+        ...prev,
+        [key]: value,
+      } as PartnerApplicationSubmission;
+
+      if (key === "isNonProfit") {
+        next.selectedPlan = value === true ? "nonprofit" : "standard";
+      }
+
+      return next;
+    });
+  };
+
+  const togglePartnerApplicationSelection = (
+    key: "sportsOffered" | "postingTypes",
+    value: string,
+  ) => {
+    setPartnerApplicationForm((prev) => {
+      const currentValues = [...prev[key]] as string[];
+      const nextValues = currentValues.includes(value)
+        ? currentValues.filter((entry) => entry !== value)
+        : [...currentValues, value];
+
+      return {
+        ...prev,
+        [key]: nextValues,
+        ...(key === "sportsOffered" && !nextValues.includes("other") ? { otherSport: "" } : {}),
+        ...(key === "postingTypes" && !nextValues.includes("other") ? { otherPostingType: "" } : {}),
+      };
+    });
+  };
+
+  const addPartnerApplicationTeamMember = () => {
+    setPartnerApplicationForm((prev) => {
+      if (prev.teamMembers.length >= 5) return prev;
+      return {
+        ...prev,
+        teamMembers: [...prev.teamMembers, createEmptyPartnerApplicationTeamMember()],
+      };
+    });
+  };
+
+  const updatePartnerApplicationTeamMember = (
+    teamMemberId: string,
+    key: keyof PartnerApplicationTeamMember,
+    value: string,
+  ) => {
+    setPartnerApplicationForm((prev) => ({
+      ...prev,
+      teamMembers: prev.teamMembers.map((teamMember) =>
+        teamMember.id === teamMemberId ? { ...teamMember, [key]: value } : teamMember,
+      ),
+    }));
+  };
+
+  const removePartnerApplicationTeamMember = (teamMemberId: string) => {
+    setPartnerApplicationForm((prev) => ({
+      ...prev,
+      teamMembers: prev.teamMembers.filter((teamMember) => teamMember.id !== teamMemberId),
+    }));
+  };
+
+  const handlePartnerLogoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setPartnerApplicationStatus({ type: "error", message: "Please select a valid logo image file." });
+      return;
+    }
+
+    try {
+      setUploadingPartnerLogo(true);
+      const publicUrl = await uploadManagedAsset("partner-applications/logos", file);
+      setPartnerApplicationForm((prev) => ({ ...prev, logoUrl: publicUrl }));
+      setPartnerApplicationStatus({ type: "success", message: "Logo uploaded successfully." });
+    } catch (error) {
+      setPartnerApplicationStatus({
+        type: "error",
+        message: error instanceof Error ? error.message : "Could not upload the organization logo.",
+      });
+    } finally {
+      setUploadingPartnerLogo(false);
+      e.target.value = "";
+    }
+  };
+
+  const resumePartnerApplicationCheckout = () => {
+    if (!partnerApplicationDraft?.checkoutUrl) return;
+    window.location.assign(partnerApplicationDraft.checkoutUrl);
+  };
+
+  const submitPartnerApplication = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setPartnerApplicationStatus({ type: "loading" });
+
+    try {
+      const response = await fetchWithSession("/api/partner/apply", {
+        method: "POST",
+        body: JSON.stringify({
+          application: partnerApplicationForm,
+        }),
+      });
+      const json = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            checkoutUrl?: string | null;
+          }
+        | null;
+
+      if (!response.ok) {
+        throw new Error(json?.error ?? "Could not start the partner application checkout.");
+      }
+      if (!json?.checkoutUrl) {
+        throw new Error("Square checkout did not return a redirect URL.");
+      }
+
+      setPartnerApplicationStatus({ type: "success", message: "Redirecting to checkout..." });
+      window.location.assign(json.checkoutUrl);
+    } catch (error) {
+      setPartnerApplicationStatus({
+        type: "error",
+        message: error instanceof Error ? error.message : "Could not start the partner application checkout.",
+      });
+      await loadPartnerApplicationDraft();
     }
   };
 
@@ -788,7 +967,24 @@ export default function PartnerPage() {
       <div className="account-page">
         <AccessibilityControls />
         <div className="account-body shell">
-          <p className="muted">Sign in to access the partner portal.</p>
+          <section className="account-card account-card__intro">
+            <h1>Partner Portal</h1>
+            <p className="muted">
+              Apply for a partner account to publish organization events, manage your submissions, and request
+              payouts after approved paid signups.
+            </p>
+          </section>
+          <section className="account-card">
+            <h2>Sign In to Apply</h2>
+            <p className="muted">
+              You need an account before you can upload your organization details and complete the required checkout.
+            </p>
+            <div className="cta-row">
+              <Link className="button primary" href="/account/create">
+                Create Account / Sign In
+              </Link>
+            </div>
+          </section>
         </div>
       </div>
     );
@@ -799,7 +995,33 @@ export default function PartnerPage() {
       <div className="account-page">
         <AccessibilityControls />
         <div className="account-body shell">
-          <p className="muted">Your account does not have partner access.</p>
+          <HistoryBackButton label="← Back" fallbackHref="/account" />
+
+          <section className="account-card account-card__intro">
+            <h1>Partner Portal</h1>
+            <p className="muted">
+              Your account does not have partner access yet. Submit the application below and complete checkout to
+              send your request for admin review.
+            </p>
+            {profile?.name ? <p className="muted">Signed in as {profile.name}.</p> : null}
+          </section>
+
+          {loadingPartnerApplicationDraft ? <p className="muted">Loading your application status...</p> : null}
+
+          <PartnerApplicationForm
+            form={partnerApplicationForm}
+            status={partnerApplicationStatus}
+            uploadingLogo={uploadingPartnerLogo}
+            existingDraft={partnerApplicationDraft}
+            onSubmit={submitPartnerApplication}
+            onChange={updatePartnerApplicationForm}
+            onToggleSelection={togglePartnerApplicationSelection}
+            onAddTeamMember={addPartnerApplicationTeamMember}
+            onUpdateTeamMember={updatePartnerApplicationTeamMember}
+            onRemoveTeamMember={removePartnerApplicationTeamMember}
+            onLogoUpload={handlePartnerLogoUpload}
+            onResumeCheckout={resumePartnerApplicationCheckout}
+          />
         </div>
       </div>
     );

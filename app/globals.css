@@ -4162,6 +4162,114 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   font-weight: 800;
 }
 
+.partner-application-form {
+  display: grid;
+  gap: 22px;
+}
+
+.partner-application-section {
+  display: grid;
+  gap: 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.partner-application-section:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.partner-application-section__header {
+  display: grid;
+  gap: 6px;
+}
+
+.partner-application-section__header h3,
+.partner-application-section__header h4,
+.partner-application-plan-card h4 {
+  margin: 0;
+}
+
+.partner-application-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.partner-application-team-list {
+  display: grid;
+  gap: 12px;
+}
+
+.partner-application-team-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.partner-application-radio-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.partner-application-plan-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(233, 93, 42, 0.2);
+  background: linear-gradient(180deg, rgba(233, 93, 42, 0.08), rgba(15, 23, 42, 0.02));
+}
+
+.partner-application-plan-card__amount {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #c2410c;
+}
+
+.partner-application-terms {
+  display: grid;
+  gap: 10px;
+}
+
+.partner-application-status {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+.partner-application-status h3,
+.partner-application-status p {
+  margin: 0;
+}
+
+.partner-application-status--success {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.26);
+}
+
+.partner-application-status--pending {
+  background: rgba(233, 93, 42, 0.08);
+  border-color: rgba(233, 93, 42, 0.22);
+}
+
+.partner-application-link {
+  font-weight: 700;
+  color: #c2410c;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .sunday-league-schedule-card {
   gap: 6px;
 }
@@ -5346,6 +5454,14 @@ html[data-theme="dark"] .register-form textarea:focus {
     display: grid;
     gap: 12px;
   }
+
+  .partner-application-option-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .partner-application-plan-card {
+    align-items: flex-start;
+  }
 }
 
 html[data-theme="dark"] .event-card-simple {
@@ -5384,6 +5500,22 @@ html[data-theme="dark"] .partner-signup-row {
 html[data-theme="dark"] .partner-event-card__payout {
   background: rgba(255, 255, 255, 0.04);
   border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-application-team-card,
+html[data-theme="dark"] .partner-application-status {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-application-plan-card {
+  background: linear-gradient(180deg, rgba(233, 93, 42, 0.12), rgba(15, 23, 42, 0.36));
+  border-color: rgba(233, 93, 42, 0.24);
+}
+
+html[data-theme="dark"] .partner-application-plan-card__amount,
+html[data-theme="dark"] .partner-application-link {
+  color: #fdba74;
 }
 
 html[data-theme="dark"] .sunday-league-schedule-grid > .form-control > label {

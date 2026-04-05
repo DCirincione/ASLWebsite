@@ -10,6 +10,7 @@ const quickLinks = [
 
 const resources = [
   { href: "/contact", label: "Contact" },
+  { href: "/partner", label: "Become a Partner" },
 ];
 
 const socials = [

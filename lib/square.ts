@@ -8,6 +8,12 @@ type SquareError = {
   detail?: string;
 };
 
+type SquarePayment = {
+  id?: string;
+  status?: string;
+  order_id?: string;
+};
+
 const getSquareApiToken = () => process.env.SQUARE_ACCESS_TOKEN?.trim() || "";
 const getSquareEnvironment = () => (process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase() || "production");
 
@@ -70,6 +76,41 @@ export const createSquarePaymentLink = async (body: Record<string, unknown>) => 
   }
 
   return json;
+};
+
+export const searchSquarePaymentByOrderId = async (orderId: string) => {
+  const trimmedOrderId = orderId.trim();
+  if (!trimmedOrderId) return null;
+
+  const response = await fetch(`${getSquareApiBaseUrl()}/v2/payments/search`, {
+    method: "POST",
+    headers: getSquareHeaders(),
+    body: JSON.stringify({
+      query: {
+        filter: {
+          order_ids: [trimmedOrderId],
+        },
+        sort: {
+          sort_field: "CREATED_AT",
+          sort_order: "DESC",
+        },
+      },
+      limit: 1,
+    }),
+  });
+
+  const json = (await response.json().catch(() => null)) as
+    | {
+        errors?: SquareError[];
+        payments?: SquarePayment[];
+      }
+    | null;
+
+  if (!response.ok) {
+    throw new Error(getSquareErrorMessage(json?.errors, "Could not load the Square payment status."));
+  }
+
+  return json?.payments?.[0] ?? null;
 };
 
 export const verifySquareWebhookSignature = ({
