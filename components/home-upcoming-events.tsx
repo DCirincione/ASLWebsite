@@ -11,7 +11,7 @@ import {
   getSignupUnavailableLabel,
   getSignupUnavailableMessage,
 } from "@/lib/event-signups";
-import { filterVisiblePublicEvents } from "@/lib/event-approval";
+import { formatEventSignupLabel, loadVisiblePublicEvents, type PublicEventSignupStats } from "@/lib/public-event-signups";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
@@ -30,8 +30,9 @@ type HomeEvent = {
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
   registration_enabled?: boolean | null;
+  registration_limit?: number | null;
   image?: string | null;
-};
+} & PublicEventSignupStats;
 
 const fallbackEvents: HomeEvent[] = [
   {
@@ -39,6 +40,7 @@ const fallbackEvents: HomeEvent[] = [
     title: "3v3 Basketball Tournament",
     start_date: "2024-03-15",
     location: "Central Sports Complex",
+    signup_count: 0,
     image_url:
       "https://images.unsplash.com/photo-1505666287802-931dc83948e0?auto=format&fit=crop&w=800&q=80",
     registration_enabled: false,
@@ -48,6 +50,7 @@ const fallbackEvents: HomeEvent[] = [
     title: "Pickleball League",
     start_date: "2024-03-20",
     location: "Riverside Courts",
+    signup_count: 0,
     registration_enabled: false,
   },
   {
@@ -55,6 +58,7 @@ const fallbackEvents: HomeEvent[] = [
     title: "Flag Football Tournament",
     start_date: "2024-04-05",
     location: "Green Field Park",
+    signup_count: 0,
     image_url:
       "https://images.unsplash.com/photo-1471295253337-3ceaaedca402?auto=format&fit=crop&w=800&q=80",
     registration_enabled: false,
@@ -64,6 +68,7 @@ const fallbackEvents: HomeEvent[] = [
     title: "Community vs Kids Charity Game",
     start_date: "2024-04-12",
     location: "Central Sports Complex",
+    signup_count: 0,
     image_url:
       "https://images.unsplash.com/photo-1508609349937-5ec4ae374ebf?auto=format&fit=crop&w=800&q=80",
     registration_enabled: false,
@@ -106,14 +111,9 @@ export function HomeUpcomingEvents() {
     const loadEvents = async () => {
       if (!supabase) return;
       setLoading(true);
-      const { data, error } = await supabase
-        .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,image_url,signup_mode,registration_program_slug,registration_enabled")
-        .order("start_date", { ascending: true, nullsFirst: false })
-        .limit(12);
-
-      if (!error && data && data.length > 0) {
-        setEvents(filterVisiblePublicEvents(data as HomeEvent[]).slice(0, 4));
+      const data = await loadVisiblePublicEvents<HomeEvent>(supabase, { limit: 12 });
+      if (data.length > 0) {
+        setEvents(data.slice(0, 4));
       }
       setLoading(false);
     };
@@ -156,7 +156,11 @@ export function HomeUpcomingEvents() {
                   backgroundImage: event.image_url ? `url(${event.image_url})` : undefined,
                 }}
                 aria-hidden
-              />
+              >
+                <span className="event-card__image-badge">
+                  {formatEventSignupLabel(event.signup_count, event.registration_limit)}
+                </span>
+              </div>
               <div className="event-card__body">
                 <h3 className="event-card__title">{event.title}</h3>
                 <div className="event-card__footer" style={{ display: "grid", gap: 14 }}>

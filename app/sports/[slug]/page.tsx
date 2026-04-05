@@ -11,15 +11,15 @@ import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { SportEventCard } from "@/components/sport-event-card";
-import { filterVisiblePublicEvents } from "@/lib/event-approval";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
+import { formatEventSignupLabel, loadVisiblePublicEvents, type PublicEventSignupStats } from "@/lib/public-event-signups";
 import { getEventSectionLabel, normalizeSportSlug, parseSportSectionHeaders, slugifySportValue, sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 import type { Event, Sport } from "@/lib/supabase/types";
 
-type SportEvent = Event & { image?: string };
+type SportEvent = Event & PublicEventSignupStats & { image?: string };
 
 const formatDate = (value?: string | null) => {
   if (!value) return "Date TBD";
@@ -66,15 +66,12 @@ export default function DynamicSportPage() {
       }
       setLoading(true);
 
-      const [{ data: sportsData, error: sportsError }, { data: eventsData, error: eventsError }] = await Promise.all([
+      const [{ data: sportsData, error: sportsError }, eventsData] = await Promise.all([
         supabase.from("sports").select("*").order("title", { ascending: true }),
-        supabase
-          .from("events")
-          .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled")
-          .order("start_date", { ascending: true, nullsFirst: false }),
+        loadVisiblePublicEvents<SportEvent>(supabase),
       ]);
 
-      if (sportsError || eventsError) {
+      if (sportsError) {
         setSport(null);
         setEvents([]);
         setLoading(false);
@@ -92,7 +89,7 @@ export default function DynamicSportPage() {
       }
 
       const sportSlug = normalizeSportSlug(matchedSport);
-      const matchedEvents = filterVisiblePublicEvents((eventsData ?? []) as Event[])
+      const matchedEvents = eventsData
         .filter((event) => sportMatchesEvent(event, sportSlug, (sportsData ?? []) as Sport[]))
         .map((event) => ({
           ...event,
@@ -150,6 +147,7 @@ export default function DynamicSportPage() {
               image={item.image}
               dateLabel={primaryTimeLabel(item)}
               location={item.location}
+              signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit)}
               description={item.description}
               onOpen={isSundayLeague ? undefined : () => setDetailEvent(item)}
               actions={
@@ -207,6 +205,7 @@ export default function DynamicSportPage() {
               image={event.image}
               dateLabel={primaryTimeLabel(event)}
               location={event.location}
+              signupLabel={formatEventSignupLabel(event.signup_count, event.registration_limit)}
               description={event.description}
               onOpen={isSundayLeague ? undefined : () => setDetailEvent(event)}
               actions={

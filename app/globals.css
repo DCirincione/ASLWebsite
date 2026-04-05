@@ -1095,6 +1095,20 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   background: #f3f4f6;
   background-size: cover;
   background-position: center;
+  position: relative;
+}
+
+.event-card__image-badge {
+  position: absolute;
+  inset: auto auto 2px 2px;
+  background: rgba(12, 21, 38, 0.82);
+  color: #f8fafc;
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  letter-spacing: 0.03em;
+  z-index: 1;
+  pointer-events: none;
 }
 
 .event-card__image--interactive {

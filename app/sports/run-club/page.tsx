@@ -12,12 +12,13 @@ import { Section } from "@/components/section";
 import { SportEventCard } from "@/components/sport-event-card";
 import { filterVisiblePublicEvents } from "@/lib/event-approval";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
+import { attachPublicEventSignupCounts, formatEventSignupLabel, type PublicEventSignupStats } from "@/lib/public-event-signups";
 import { sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 import type { Event, Sport } from "@/lib/supabase/types";
 
-type SportEvent = Event & { image?: string };
+type SportEvent = Event & PublicEventSignupStats & { image?: string };
 
 export default function RunClubPage() {
   const [events, setEvents] = useState<SportEvent[]>([]);
@@ -87,7 +88,7 @@ export default function RunClubPage() {
       const [{ data, error }, { data: sportsData, error: sportsError }] = await Promise.all([
         supabase
           .from("events")
-          .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled")
+          .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled,registration_limit")
           .order("start_date", { ascending: true, nullsFirst: false }),
         supabase.from("sports").select("id,title").order("title", { ascending: true }),
       ]);
@@ -99,7 +100,8 @@ export default function RunClubPage() {
             sportMatchesEvent(row, "run-club", sports) &&
             (row.registration_program_slug ?? "").trim().toLowerCase() === "run-club"
         );
-        const mapped = runClubOnly.map((row) => ({
+        const withSignupCounts = await attachPublicEventSignupCounts(supabase, runClubOnly);
+        const mapped = withSignupCounts.map((row) => ({
           ...row,
           image: row.image_url || undefined,
         }));
@@ -164,6 +166,7 @@ export default function RunClubPage() {
             image={item.image}
             dateLabel={primaryTimeLabel(item)}
             location={item.location}
+            signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit)}
             description={item.description}
             onOpen={() => setDetailEvent(item)}
             actions={

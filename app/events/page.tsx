@@ -13,6 +13,7 @@ import {
   getSignupUnavailableMessage,
 } from "@/lib/event-signups";
 import { filterVisiblePublicEvents } from "@/lib/event-approval";
+import { formatEventSignupLabel, loadVisiblePublicEvents, type PublicEventSignupStats } from "@/lib/public-event-signups";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
@@ -31,8 +32,9 @@ type EventItem = {
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
   registration_enabled?: boolean | null;
+  registration_limit?: number | null;
   image?: string;
-};
+} & PublicEventSignupStats;
 
 export default function EventsPage() {
   const router = useRouter();
@@ -54,13 +56,8 @@ export default function EventsPage() {
     const loadEvents = async () => {
       if (!supabase) return;
       setLoading(true);
-      const { data, error } = await supabase
-        .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,image_url,signup_mode,registration_program_slug,registration_enabled")
-        .order("start_date", { ascending: true, nullsFirst: false });
-      if (!error && data) {
-        setEvents(filterVisiblePublicEvents(data as EventItem[]));
-      }
+      const data = await loadVisiblePublicEvents<EventItem>(supabase);
+      setEvents(filterVisiblePublicEvents(data));
       setLoading(false);
     };
     loadEvents();
@@ -238,6 +235,9 @@ export default function EventsPage() {
             }
           }}
         >
+          <span className="event-card__image-badge">
+            {formatEventSignupLabel(event.signup_count, event.registration_limit)}
+          </span>
         </div>
         <div className="event-card__body">
           <div className="event-card__header">

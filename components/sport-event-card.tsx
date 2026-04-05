@@ -7,6 +7,7 @@ type SportEventCardProps = {
   image?: string;
   location?: string | null;
   onOpen?: (() => void) | undefined;
+  signupLabel?: string | null;
   title: string;
 };
 
@@ -17,6 +18,7 @@ export function SportEventCard({
   image,
   location,
   onOpen,
+  signupLabel,
   title,
 }: SportEventCardProps) {
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -39,7 +41,9 @@ export function SportEventCard({
         aria-hidden={!onOpen}
         onClick={onOpen}
         onKeyDown={handleKeyDown}
-      />
+      >
+        {signupLabel ? <span className="event-card__image-badge">{signupLabel}</span> : null}
+      </div>
       <div className="event-card__body">
         <div className="event-card__header">
           <h3 className="event-card__title">{title}</h3>
