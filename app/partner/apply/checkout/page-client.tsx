@@ -30,17 +30,12 @@ export default function PartnerApplicationCheckoutPageClient({
     const loadDraft = async () => {
       const { data: sessionData } = await client.auth.getSession();
       const accessToken = sessionData.session?.access_token ?? null;
-      if (!accessToken) {
-        if (!cancelled) {
-          setDraftStatus("no-session");
-        }
-        return;
-      }
-
       const response = await fetch(`/api/partner/apply?draftId=${encodeURIComponent(draftId)}`, {
-        headers: {
-          authorization: `Bearer ${accessToken}`,
-        },
+        headers: accessToken
+          ? {
+              authorization: `Bearer ${accessToken}`,
+            }
+          : undefined,
       });
       const json = (await response.json().catch(() => null)) as
         | {
@@ -51,7 +46,7 @@ export default function PartnerApplicationCheckoutPageClient({
 
       if (!response.ok) {
         if (!cancelled) {
-          setDraftStatus("error");
+          setDraftStatus(response.status === 401 ? "no-session" : "error");
           setDraftError(json?.error ?? "Could not load the partner application checkout status.");
         }
         return;

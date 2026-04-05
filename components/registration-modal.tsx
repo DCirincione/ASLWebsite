@@ -460,12 +460,17 @@ export function RegistrationModal({
         | {
             error?: string;
             checkoutUrl?: string;
+            draftId?: string;
           }
         | null;
 
       if (!response.ok || !json?.checkoutUrl) {
         setStatus({ type: "error", message: json?.error ?? "Could not start the payment checkout." });
         return;
+      }
+
+      if (json.draftId) {
+        window.sessionStorage.setItem("eventCheckoutDraftId", json.draftId);
       }
 
       window.location.assign(json.checkoutUrl);

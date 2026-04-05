@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseServiceRole } from "@/lib/admin-route-auth";
+import {
+  finalizePartnerApplicationDraft,
+  findPartnerApplicationDraftBySquareOrderId,
+  markPartnerApplicationDraftFailed,
+  type PartnerApplicationDraft,
+} from "@/lib/partner-application-store";
 import { getSquareWebhookNotificationUrl, verifySquareWebhookSignature } from "@/lib/square";
 import type {
   Event,
@@ -333,6 +339,33 @@ const processEventPayment = async ({
     .eq("id", draft.id);
 };
 
+const processPartnerApplicationPayment = async ({
+  payment,
+  draft,
+}: {
+  payment: { id?: string; status?: string; order_id?: string };
+  draft: PartnerApplicationDraft;
+}) => {
+  if (draft.status === "completed") {
+    return;
+  }
+
+  if (payment.status === "COMPLETED") {
+    await finalizePartnerApplicationDraft({
+      draft,
+      squarePaymentId: payment.id ?? null,
+    });
+    return;
+  }
+
+  if (payment.status === "CANCELED" || payment.status === "FAILED") {
+    await markPartnerApplicationDraftFailed(
+      draft,
+      `Square marked the application payment as ${payment.status.toLowerCase()}.`,
+    );
+  }
+};
+
 export async function POST(req: NextRequest) {
   const signatureHeader = req.headers.get("x-square-hmacsha256-signature") || "";
   const requestBody = await req.text();
@@ -397,6 +430,15 @@ export async function POST(req: NextRequest) {
         serviceClient,
         payment,
         draft: eventData as EventCheckoutDraft,
+      });
+      return NextResponse.json({ ok: true });
+    }
+
+    const partnerApplicationDraft = await findPartnerApplicationDraftBySquareOrderId(payment.order_id);
+    if (partnerApplicationDraft) {
+      await processPartnerApplicationPayment({
+        payment,
+        draft: partnerApplicationDraft,
       });
     }
 

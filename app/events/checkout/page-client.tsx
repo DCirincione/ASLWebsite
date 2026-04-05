@@ -15,11 +15,19 @@ type DraftStatus = "loading" | "pending" | "paid" | "completed" | "failed" | "ex
 
 export default function EventCheckoutPageClient({ draftId }: EventCheckoutPageClientProps) {
   const router = useRouter();
-  const [draftStatus, setDraftStatus] = useState<DraftStatus>(draftId ? "loading" : "error");
-  const [draftError, setDraftError] = useState<string | null>(draftId ? null : "Checkout draft not found.");
+  const [clientDraftId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+
+    const searchDraftId = new URLSearchParams(window.location.search).get("draftId")?.trim() || "";
+    const storedDraftId = window.sessionStorage.getItem("eventCheckoutDraftId")?.trim() || "";
+    return searchDraftId || storedDraftId || null;
+  });
+  const resolvedDraftId = draftId || clientDraftId;
+  const [draftStatus, setDraftStatus] = useState<DraftStatus>(resolvedDraftId ? "loading" : "error");
+  const [draftError, setDraftError] = useState<string | null>(resolvedDraftId ? null : "Checkout draft not found.");
 
   useEffect(() => {
-    if (!draftId || !supabase) return;
+    if (!resolvedDraftId || !supabase) return;
     const client = supabase;
 
     let cancelled = false;
@@ -35,7 +43,7 @@ export default function EventCheckoutPageClient({ draftId }: EventCheckoutPageCl
         return;
       }
 
-      const response = await fetch(`/api/events/checkout?draftId=${encodeURIComponent(draftId)}`, {
+      const response = await fetch(`/api/events/checkout?draftId=${encodeURIComponent(resolvedDraftId)}`, {
         headers: {
           authorization: `Bearer ${accessToken}`,
         },
@@ -61,6 +69,15 @@ export default function EventCheckoutPageClient({ draftId }: EventCheckoutPageCl
       setDraftStatus(nextStatus);
       setDraftError(json?.error ?? null);
 
+      if (
+        nextStatus === "completed" ||
+        nextStatus === "failed" ||
+        nextStatus === "expired" ||
+        nextStatus === "error"
+      ) {
+        window.sessionStorage.removeItem("eventCheckoutDraftId");
+      }
+
       if (nextStatus === "pending" || nextStatus === "paid" || nextStatus === "loading") {
         timeoutId = setTimeout(() => {
           void loadDraft();
@@ -74,7 +91,7 @@ export default function EventCheckoutPageClient({ draftId }: EventCheckoutPageCl
       cancelled = true;
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [draftId]);
+  }, [resolvedDraftId]);
 
   return (
     <PageShell>

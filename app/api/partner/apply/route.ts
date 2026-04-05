@@ -68,17 +68,16 @@ const reconcileDraft = async (draft: PartnerApplicationDraft) => {
 
 export async function GET(req: NextRequest) {
   try {
-    const profile = await getAuthenticatedProfile(req);
-    if (!profile) {
-      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
-    }
-
     await markStalePartnerApplicationDraftsExpired();
 
     const draftId = req.nextUrl.searchParams.get("draftId")?.trim() || "";
     if (draftId) {
+      const profile = await getAuthenticatedProfile(req);
       const draft = await readPartnerApplicationDraft(draftId);
-      if (!draft || draft.userId !== profile.id) {
+      if (!draft) {
+        return NextResponse.json({ error: "Application draft not found." }, { status: 404 });
+      }
+      if (profile && draft.userId !== profile.id) {
         return NextResponse.json({ error: "Application draft not found." }, { status: 404 });
       }
 
@@ -88,9 +87,14 @@ export async function GET(req: NextRequest) {
         draftId: nextDraft.id,
         status: nextDraft.status,
         error: nextDraft.errorMessage ?? null,
-        checkoutUrl: nextDraft.squareCheckoutUrl ?? null,
+        checkoutUrl: profile && nextDraft.userId === profile.id ? nextDraft.squareCheckoutUrl ?? null : null,
         completedAt: nextDraft.completedAt ?? null,
       });
+    }
+
+    const profile = await getAuthenticatedProfile(req);
+    if (!profile) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
     const latestDraft = await findLatestPartnerApplicationDraftForUser(profile.id);

@@ -196,6 +196,16 @@ export const findLatestPartnerApplicationDraftForUser = async (userId: string) =
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
 };
 
+export const findPartnerApplicationDraftBySquareOrderId = async (squareOrderId: string) => {
+  const trimmedOrderId = squareOrderId.trim();
+  if (!trimmedOrderId) return null;
+
+  const drafts = await listPartnerApplicationDrafts();
+  return drafts
+    .filter((draft) => draft.squareOrderId === trimmedOrderId)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))[0] ?? null;
+};
+
 export const markPartnerApplicationDraftExpired = async (draft: PartnerApplicationDraft, errorMessage: string) =>
   writePartnerApplicationDraft({
     ...draft,
