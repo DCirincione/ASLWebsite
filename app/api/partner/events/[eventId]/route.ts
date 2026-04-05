@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getAuthenticatedProfile, getSupabaseServiceRole } from "@/lib/admin-route-auth";
+import { sanitizeRegistrationSchema } from "@/lib/event-registration-schema";
 import { parseOptionalInteger, parseOptionalMoneyCents, trimOptionalString } from "@/lib/event-approval";
 import type { Event, EventUpdate } from "@/lib/supabase/types";
 
@@ -22,6 +23,7 @@ type EventWriteBody = {
   registration_limit?: unknown;
   payment_required?: unknown;
   payment_amount?: unknown;
+  registration_schema?: unknown;
 };
 
 const getFlyerName = (event: Pick<Event, "title" | "registration_program_slug">) =>
@@ -72,6 +74,7 @@ const buildPartnerEventPayload = (body: EventWriteBody) => {
   const registrationEnabled = true;
   const paymentRequired = Boolean(body.payment_required);
   const paymentAmountCents = paymentRequired ? parseOptionalMoneyCents(body.payment_amount) : null;
+  const registrationSchema = sanitizeRegistrationSchema(body.registration_schema);
 
   if (paymentRequired && (!paymentAmountCents || paymentAmountCents <= 0)) {
     return { error: "Enter a payment amount greater than $0.00 when payment is required." };
@@ -95,6 +98,7 @@ const buildPartnerEventPayload = (body: EventWriteBody) => {
     registration_program_slug: trimOptionalString(body.registration_program_slug),
     sport_id: trimOptionalString(body.sport_id),
     registration_enabled: registrationEnabled,
+    registration_schema: registrationSchema,
     waiver_url: trimOptionalString(body.waiver_url),
     allow_multiple_registrations: false,
     registration_limit: registrationLimit,
@@ -110,7 +114,7 @@ const buildPartnerEventPayload = (body: EventWriteBody) => {
 };
 
 const selectClause =
-  "id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,waiver_url,registration_limit,payment_required,payment_amount_cents,created_by_user_id,approval_status,approval_notes,submitted_for_approval_at,approved_at";
+  "id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,registration_schema,waiver_url,registration_limit,payment_required,payment_amount_cents,created_by_user_id,approval_status,approval_notes,submitted_for_approval_at,approved_at";
 
 export async function PATCH(
   req: NextRequest,

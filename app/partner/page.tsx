@@ -5,6 +5,14 @@ import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } fr
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
+import {
+  buildRegistrationSchema,
+  createEmptyRegistrationField,
+  FIELD_TYPE_OPTIONS,
+  parseRegistrationSchemaState,
+  type RegistrationFieldEditor,
+  type RegistrationFieldType,
+} from "@/lib/event-registration-schema";
 import { canAccessPartnerPortal, formatApprovalStatusLabel } from "@/lib/event-approval";
 import { formatEventPaymentAmount } from "@/lib/event-payments";
 import { createId } from "@/lib/create-id";
@@ -52,6 +60,8 @@ type PartnerEventFormState = {
   registration_limit: string;
   payment_required: boolean;
   payment_amount: string;
+  require_waiver: boolean;
+  registration_fields: RegistrationFieldEditor[];
 };
 
 const emptyForm = (): PartnerEventFormState => ({
@@ -71,26 +81,34 @@ const emptyForm = (): PartnerEventFormState => ({
   registration_limit: "",
   payment_required: false,
   payment_amount: "",
+  require_waiver: false,
+  registration_fields: [],
 });
 
-const mapEventToForm = (event: PartnerEventRecord): PartnerEventFormState => ({
-  title: event.title ?? "",
-  start_date: event.start_date ?? "",
-  end_date: event.end_date ?? "",
-  time_info: event.time_info ?? "",
-  location: event.location ?? "",
-  image_url: event.image_url ?? "",
-  flyer_image_url: event.flyer_image_url ?? "",
-  flyer_details: event.flyer_details ?? "",
-  signup_mode: "registration",
-  registration_program_slug: event.registration_program_slug ?? "",
-  sport_id: event.sport_id ?? "",
-  registration_enabled: true,
-  waiver_url: event.waiver_url ?? "",
-  registration_limit: event.registration_limit?.toString() ?? "",
-  payment_required: Boolean(event.payment_required),
-  payment_amount: event.payment_amount_cents ? (event.payment_amount_cents / 100).toFixed(2) : "",
-});
+const mapEventToForm = (event: PartnerEventRecord): PartnerEventFormState => {
+  const registrationState = parseRegistrationSchemaState(event.registration_schema);
+
+  return {
+    title: event.title ?? "",
+    start_date: event.start_date ?? "",
+    end_date: event.end_date ?? "",
+    time_info: event.time_info ?? "",
+    location: event.location ?? "",
+    image_url: event.image_url ?? "",
+    flyer_image_url: event.flyer_image_url ?? "",
+    flyer_details: event.flyer_details ?? "",
+    signup_mode: "registration",
+    registration_program_slug: event.registration_program_slug ?? "",
+    sport_id: event.sport_id ?? "",
+    registration_enabled: true,
+    waiver_url: event.waiver_url ?? "",
+    registration_limit: event.registration_limit?.toString() ?? "",
+    payment_required: Boolean(event.payment_required),
+    payment_amount: event.payment_amount_cents ? (event.payment_amount_cents / 100).toFixed(2) : "",
+    require_waiver: registrationState.require_waiver,
+    registration_fields: registrationState.registration_fields,
+  };
+};
 
 const parseDateUTC = (value?: string | null) => {
   if (!value) return null;
@@ -123,6 +141,9 @@ const formatSubmissionDate = (value?: string | null) => {
   return date.toLocaleString();
 };
 
+const isPdfFile = (file: File) =>
+  file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+
 export default function PartnerPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
   const [profile, setProfile] = useState<Pick<Profile, "id" | "name" | "role"> | null>(null);
@@ -146,6 +167,8 @@ export default function PartnerPage() {
   const [uploadingEditImageId, setUploadingEditImageId] = useState<string | null>(null);
   const [uploadingCreateFlyer, setUploadingCreateFlyer] = useState(false);
   const [uploadingEditFlyerId, setUploadingEditFlyerId] = useState<string | null>(null);
+  const [uploadingCreateWaiver, setUploadingCreateWaiver] = useState(false);
+  const [uploadingEditWaiverId, setUploadingEditWaiverId] = useState<string | null>(null);
 
   const fetchWithSession = useCallback(async (input: string, init?: RequestInit) => {
     if (!supabase) {
@@ -265,6 +288,114 @@ export default function PartnerPage() {
     });
   };
 
+  const updateRegistrationField = (
+    target: "create" | "edit",
+    fieldId: string,
+    key: keyof RegistrationFieldEditor,
+    value: RegistrationFieldEditor[keyof RegistrationFieldEditor],
+  ) => {
+    const apply = (prev: PartnerEventFormState) => ({
+      ...prev,
+      registration_fields: prev.registration_fields.map((field) =>
+        field.id === fieldId ? ({ ...field, [key]: value } as RegistrationFieldEditor) : field,
+      ),
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+
+    setEditForm(apply);
+  };
+
+  const addRegistrationField = (target: "create" | "edit") => {
+    const nextField = createEmptyRegistrationField();
+    const apply = (prev: PartnerEventFormState) => ({
+      ...prev,
+      registration_fields: [...prev.registration_fields, nextField],
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+
+    setEditForm(apply);
+  };
+
+  const toggleRegistrationFieldExpanded = (target: "create" | "edit", fieldId: string) => {
+    const apply = (prev: PartnerEventFormState) => ({
+      ...prev,
+      registration_fields: prev.registration_fields.map((field) =>
+        field.id === fieldId ? { ...field, expanded: !field.expanded } : field,
+      ),
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+
+    setEditForm(apply);
+  };
+
+  const collapseRegistrationField = (target: "create" | "edit", fieldId: string) => {
+    const apply = (prev: PartnerEventFormState) => ({
+      ...prev,
+      registration_fields: prev.registration_fields.map((field) =>
+        field.id === fieldId ? { ...field, expanded: false } : field,
+      ),
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+
+    setEditForm(apply);
+  };
+
+  const removeRegistrationField = (target: "create" | "edit", fieldId: string) => {
+    const apply = (prev: PartnerEventFormState) => ({
+      ...prev,
+      registration_fields: prev.registration_fields.filter((field) => field.id !== fieldId),
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+
+    setEditForm(apply);
+  };
+
+  const moveRegistrationField = (target: "create" | "edit", fieldId: string, direction: -1 | 1) => {
+    const apply = (prev: PartnerEventFormState) => {
+      const index = prev.registration_fields.findIndex((field) => field.id === fieldId);
+      const nextIndex = index + direction;
+      if (index < 0 || nextIndex < 0 || nextIndex >= prev.registration_fields.length) {
+        return prev;
+      }
+
+      const nextFields = [...prev.registration_fields];
+      const [field] = nextFields.splice(index, 1);
+      nextFields.splice(nextIndex, 0, field);
+
+      return {
+        ...prev,
+        registration_fields: nextFields,
+      };
+    };
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+
+    setEditForm(apply);
+  };
+
   const openCreateEventForm = () => {
     setForm(emptyForm());
     setFormStatus({ type: "idle" });
@@ -279,7 +410,7 @@ export default function PartnerPage() {
 
   const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, "_");
 
-  const uploadManagedImage = async (folder: "events" | "events/waivers", file: File) => {
+  const uploadManagedAsset = async (folder: "events" | "events/waivers", file: File) => {
     if (!supabase) {
       throw new Error("Supabase is not configured.");
     }
@@ -329,7 +460,7 @@ export default function PartnerPage() {
 
     try {
       setUploadingCreateImage(true);
-      const publicUrl = await uploadManagedImage("events", file);
+      const publicUrl = await uploadManagedAsset("events", file);
       setForm((prev) => ({ ...prev, image_url: publicUrl }));
       setFormStatus({ type: "success", message: "Image uploaded. The generated URL was added to the field. Click Create Event to save it." });
     } catch (error) {
@@ -351,7 +482,7 @@ export default function PartnerPage() {
 
     try {
       setUploadingEditImageId(eventId);
-      const publicUrl = await uploadManagedImage("events", file);
+      const publicUrl = await uploadManagedAsset("events", file);
       setEditForm((prev) => ({ ...prev, image_url: publicUrl }));
       setFormStatus({ type: "success", message: "Image uploaded. The generated URL was added to the field. Click Save Changes to update the event." });
     } catch (error) {
@@ -407,14 +538,68 @@ export default function PartnerPage() {
     }
   };
 
+  const handleCreateWaiverUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!isPdfFile(file)) {
+      setFormStatus({ type: "error", message: "Please select a PDF waiver file." });
+      return;
+    }
+
+    try {
+      setUploadingCreateWaiver(true);
+      const publicUrl = await uploadManagedAsset("events/waivers", file);
+      setForm((prev) => ({ ...prev, waiver_url: publicUrl, require_waiver: true }));
+      setFormStatus({
+        type: "success",
+        message: "Waiver PDF uploaded. The generated URL was added to the form and waiver acceptance was enabled.",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload waiver PDF.";
+      setFormStatus({ type: "error", message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})` });
+    } finally {
+      setUploadingCreateWaiver(false);
+      e.target.value = "";
+    }
+  };
+
+  const handleEditWaiverUpload = async (eventId: string, e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!isPdfFile(file)) {
+      setFormStatus({ type: "error", message: "Please select a PDF waiver file." });
+      return;
+    }
+
+    try {
+      setUploadingEditWaiverId(eventId);
+      const publicUrl = await uploadManagedAsset("events/waivers", file);
+      setEditForm((prev) => ({ ...prev, waiver_url: publicUrl, require_waiver: true }));
+      setFormStatus({
+        type: "success",
+        message: "Waiver PDF uploaded. The generated URL was added to the form and waiver acceptance was enabled.",
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Could not upload waiver PDF.";
+      setFormStatus({ type: "error", message: `${message} (Bucket: ${EVENT_IMAGE_BUCKET})` });
+    } finally {
+      setUploadingEditWaiverId(null);
+      e.target.value = "";
+    }
+  };
+
   const submitCreate = async (event: FormEvent) => {
     event.preventDefault();
     setFormStatus({ type: "loading" });
 
     try {
+      const payload = {
+        ...form,
+        registration_schema: buildRegistrationSchema(form),
+      };
       const response = await fetchWithSession("/api/partner/events", {
         method: "POST",
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const json = (await response.json().catch(() => null)) as { error?: string } | null;
       if (!response.ok) {
@@ -438,9 +623,13 @@ export default function PartnerPage() {
     setFormStatus({ type: "idle" });
 
     try {
+      const payload = {
+        ...editForm,
+        registration_schema: buildRegistrationSchema(editForm),
+      };
       const response = await fetchWithSession(`/api/partner/events/${eventId}`, {
         method: "PATCH",
-        body: JSON.stringify(editForm),
+        body: JSON.stringify(payload),
       });
       const json = (await response.json().catch(() => null)) as { error?: string } | null;
       if (!response.ok) {
@@ -648,15 +837,24 @@ export default function PartnerPage() {
           {showCreateEventForm ? (
             <form className="register-form" onSubmit={submitCreate}>
               <PartnerEventFields
+                target="create"
                 idPrefix="create"
                 form={form}
                 sports={sports}
                 update={updateCreateForm}
                 updateSportId={updateCreateSportId}
+                updateRegistrationField={updateRegistrationField}
+                addRegistrationField={addRegistrationField}
+                toggleRegistrationFieldExpanded={toggleRegistrationFieldExpanded}
+                collapseRegistrationField={collapseRegistrationField}
+                removeRegistrationField={removeRegistrationField}
+                moveRegistrationField={moveRegistrationField}
                 uploadingImage={uploadingCreateImage}
                 uploadingFlyer={uploadingCreateFlyer}
+                uploadingWaiver={uploadingCreateWaiver}
                 onImageUpload={handleCreateImageUpload}
                 onFlyerUpload={handleCreateFlyerUpload}
+                onWaiverUpload={handleCreateWaiverUpload}
               />
               <div className="cta-row">
                 <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
@@ -840,15 +1038,24 @@ export default function PartnerPage() {
                   {editingId === event.id ? (
                     <div className="register-form" style={{ marginTop: 12 }}>
                       <PartnerEventFields
+                        target="edit"
                         idPrefix={`edit-${event.id}`}
                         form={editForm}
                         sports={sports}
                         update={updateEditForm}
                         updateSportId={updateEditSportId}
+                        updateRegistrationField={updateRegistrationField}
+                        addRegistrationField={addRegistrationField}
+                        toggleRegistrationFieldExpanded={toggleRegistrationFieldExpanded}
+                        collapseRegistrationField={collapseRegistrationField}
+                        removeRegistrationField={removeRegistrationField}
+                        moveRegistrationField={moveRegistrationField}
                         uploadingImage={uploadingEditImageId === event.id}
                         uploadingFlyer={uploadingEditFlyerId === event.id}
+                        uploadingWaiver={uploadingEditWaiverId === event.id}
                         onImageUpload={(e) => void handleEditImageUpload(event.id, e)}
                         onFlyerUpload={(e) => void handleEditFlyerUpload(event.id, e)}
+                        onWaiverUpload={(e) => void handleEditWaiverUpload(event.id, e)}
                       />
                       <div className="cta-row">
                         <button
@@ -876,25 +1083,48 @@ export default function PartnerPage() {
 }
 
 function PartnerEventFields({
+  target,
   idPrefix,
   form,
   sports,
   update,
   updateSportId,
+  updateRegistrationField,
+  addRegistrationField,
+  toggleRegistrationFieldExpanded,
+  collapseRegistrationField,
+  removeRegistrationField,
+  moveRegistrationField,
   uploadingImage,
   uploadingFlyer,
+  uploadingWaiver,
   onImageUpload,
   onFlyerUpload,
+  onWaiverUpload,
 }: {
+  target: "create" | "edit";
   idPrefix: string;
   form: PartnerEventFormState;
   sports: Sport[];
   update: <K extends keyof PartnerEventFormState>(key: K, value: PartnerEventFormState[K]) => void;
   updateSportId: (sportId: string) => void;
+  updateRegistrationField: (
+    target: "create" | "edit",
+    fieldId: string,
+    key: keyof RegistrationFieldEditor,
+    value: RegistrationFieldEditor[keyof RegistrationFieldEditor],
+  ) => void;
+  addRegistrationField: (target: "create" | "edit") => void;
+  toggleRegistrationFieldExpanded: (target: "create" | "edit", fieldId: string) => void;
+  collapseRegistrationField: (target: "create" | "edit", fieldId: string) => void;
+  removeRegistrationField: (target: "create" | "edit", fieldId: string) => void;
+  moveRegistrationField: (target: "create" | "edit", fieldId: string, direction: -1 | 1) => void;
   uploadingImage: boolean;
   uploadingFlyer: boolean;
+  uploadingWaiver: boolean;
   onImageUpload: (event: ChangeEvent<HTMLInputElement>) => void;
   onFlyerUpload: (event: ChangeEvent<HTMLInputElement>) => void;
+  onWaiverUpload: (event: ChangeEvent<HTMLInputElement>) => void;
 }) {
   return (
     <>
@@ -1039,6 +1269,34 @@ function PartnerEventFields({
             />
           </div>
         </div>
+        <div className="form-control">
+          <label htmlFor={`${idPrefix}-partner-waiver`}>Waiver PDF URL</label>
+          <input
+            id={`${idPrefix}-partner-waiver`}
+            value={form.waiver_url}
+            onChange={(e) => update("waiver_url", e.target.value)}
+            placeholder="https://..."
+          />
+          <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <label className="button ghost" htmlFor={`${idPrefix}-partner-waiver-upload`} style={{ padding: "0.45rem 0.75rem" }}>
+              {uploadingWaiver ? "Uploading..." : "Upload waiver PDF"}
+            </label>
+            <input
+              id={`${idPrefix}-partner-waiver-upload`}
+              type="file"
+              accept=".pdf,application/pdf"
+              onChange={onWaiverUpload}
+              disabled={uploadingWaiver}
+              style={{ display: "none" }}
+            />
+            {form.waiver_url ? (
+              <a className="muted" href={form.waiver_url} target="_blank" rel="noreferrer">
+                View waiver
+              </a>
+            ) : null}
+          </div>
+          <p className="form-help muted">Uploading a waiver PDF automatically enables waiver acceptance during signup.</p>
+        </div>
         <div className="form-control" style={{ gridColumn: "1 / -1" }}>
           <label htmlFor={`${idPrefix}-partner-flyer-details`}>Details</label>
           <textarea
@@ -1059,6 +1317,142 @@ function PartnerEventFields({
           />
           <span>Require payment before registration is created</span>
         </label>
+      </div>
+      <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+        <label className="checkbox-label">
+          <input
+            type="checkbox"
+            checked={form.require_waiver}
+            onChange={(e) => update("require_waiver", e.target.checked)}
+          />
+          <span>Require waiver acceptance during signup</span>
+        </label>
+      </div>
+      <div style={{ display: "grid", gap: 16 }}>
+        <div className="account-card__header">
+          <div>
+            <h3 style={{ margin: 0 }}>Extra Form Fields</h3>
+            <p className="muted" style={{ margin: 0 }}>
+              Name, email, and phone are always included automatically.
+            </p>
+          </div>
+          <button className="button ghost" type="button" onClick={() => addRegistrationField(target)}>
+            Add field
+          </button>
+        </div>
+        {form.registration_fields.length === 0 ? (
+          <p className="muted">No extra fields yet.</p>
+        ) : (
+          form.registration_fields.map((field, index) => (
+            <div
+              key={field.id}
+              style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 16, display: "grid", gap: 12 }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div>
+                  <p className="list__title" style={{ margin: 0 }}>
+                    {field.label.trim() || `Field ${index + 1}`}
+                  </p>
+                  <p className="muted" style={{ margin: "4px 0 0" }}>
+                    {field.type}
+                    {field.required ? " • required" : ""}
+                  </p>
+                </div>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => toggleRegistrationFieldExpanded(target, field.id)}
+                >
+                  {field.expanded ? "Collapse" : "Edit"}
+                </button>
+              </div>
+
+              {field.expanded ? (
+                <>
+                  <div className="register-form-grid">
+                    <div className="form-control">
+                      <label htmlFor={`${idPrefix}-field-label-${field.id}`}>Field label</label>
+                      <input
+                        id={`${idPrefix}-field-label-${field.id}`}
+                        value={field.label}
+                        onChange={(e) => updateRegistrationField(target, field.id, "label", e.target.value)}
+                        placeholder="T-shirt size"
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor={`${idPrefix}-field-placeholder-${field.id}`}>Placeholder</label>
+                      <input
+                        id={`${idPrefix}-field-placeholder-${field.id}`}
+                        value={field.placeholder}
+                        onChange={(e) => updateRegistrationField(target, field.id, "placeholder", e.target.value)}
+                        placeholder="Optional helper text"
+                      />
+                    </div>
+                    <div className="form-control">
+                      <label htmlFor={`${idPrefix}-field-type-${field.id}`}>Field type</label>
+                      <select
+                        id={`${idPrefix}-field-type-${field.id}`}
+                        value={field.type}
+                        onChange={(e) => updateRegistrationField(target, field.id, "type", e.target.value as RegistrationFieldType)}
+                      >
+                        {FIELD_TYPE_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={field.required}
+                        onChange={(e) => updateRegistrationField(target, field.id, "required", e.target.checked)}
+                      />
+                      <span>Required field</span>
+                    </label>
+                  </div>
+                  {field.type === "select" ? (
+                    <div className="form-control">
+                      <label htmlFor={`${idPrefix}-field-options-${field.id}`}>Options</label>
+                      <textarea
+                        id={`${idPrefix}-field-options-${field.id}`}
+                        value={field.optionsText}
+                        onChange={(e) => updateRegistrationField(target, field.id, "optionsText", e.target.value)}
+                        rows={4}
+                        placeholder={"Small\nMedium\nLarge"}
+                      />
+                      <p className="form-help muted">One option per line.</p>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+
+              <div className="cta-row">
+                {field.expanded ? (
+                  <button className="button primary" type="button" onClick={() => collapseRegistrationField(target, field.id)}>
+                    Save field
+                  </button>
+                ) : null}
+                <button className="button ghost" type="button" onClick={() => moveRegistrationField(target, field.id, -1)} disabled={index === 0}>
+                  Move up
+                </button>
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => moveRegistrationField(target, field.id, 1)}
+                  disabled={index === form.registration_fields.length - 1}
+                >
+                  Move down
+                </button>
+                <button className="button ghost" type="button" onClick={() => removeRegistrationField(target, field.id)}>
+                  Remove
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </>
   );
