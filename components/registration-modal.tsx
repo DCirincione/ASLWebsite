@@ -263,6 +263,7 @@ export function RegistrationModal({
 
   const waiverRequired = Boolean(eventConfig?.waiver_url || schemaRequiresWaiver(eventConfig?.registration_schema));
   const waitlistMode = isWaitlistEvent(eventConfig);
+  const showWaitlistSuccessState = status.type === "success" && waitlistMode && mode === "create";
   const paymentRequired = mode === "create" && !waitlistMode && Boolean(eventConfig?.payment_required && (eventConfig.payment_amount_cents ?? 0) > 0);
   const paymentAmountLabel =
     paymentRequired && eventConfig?.payment_amount_cents
@@ -490,7 +491,9 @@ export function RegistrationModal({
     void syncAldrichCommunicationsPreference(client, Boolean(values.communications_opt_in));
     setStatus({ type: "success", message: getSignupSuccessMessage(eventConfig, mode) });
     onSubmitted?.();
-    onClose();
+    if (!waitlistMode || mode !== "create") {
+      onClose();
+    }
   };
 
   if (!open) return null;
@@ -522,7 +525,25 @@ export function RegistrationModal({
           </p>
         ) : null}
 
-        {!loadingEvent && eventConfig ? (
+        {!loadingEvent && eventConfig && showWaitlistSuccessState ? (
+          <div className="register-modal__success" role="status" aria-live="polite">
+            <div className="register-modal__success-copy">
+              <p className="eyebrow">Waitlist confirmed</p>
+              <h3>You joined the waitlist for {eventConfig.title}.</h3>
+              <p className="muted">{status.message}</p>
+            </div>
+            <div className="register-modal__footer">
+              <div className="register-footer__left" />
+              <div className="register-footer__actions">
+                <button className="button primary" type="button" onClick={onClose}>
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {!loadingEvent && eventConfig && !showWaitlistSuccessState ? (
           <form className="register-form" onSubmit={handleSubmit}>
             {paymentAmountLabel ? (
               <p className="muted">

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { unstable_noStore as noStore } from "next/cache";
 import { CSSProperties } from "react";
 
+import { HomeHeroCarousel } from "@/components/home-hero-carousel";
 import { HomeUpcomingEvents } from "@/components/home-upcoming-events";
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
@@ -30,7 +31,7 @@ export default async function Home() {
     <PageShell>
       <Section
         id="home"
-        className={`hero hero--image hero--full${showHomeBanner ? " hero--with-banner" : ""}`}
+        className={`hero hero--image hero--full home-hero${showHomeBanner ? " hero--with-banner" : ""}`}
         title="Community Sports. Real Competition. Local Impact."
         description=""
         headingLevel="h1"
@@ -41,6 +42,7 @@ export default async function Home() {
           } as CSSProperties
         }
       >
+        <HomeHeroCarousel />
         {showHomeBanner ? (
           <div className="home-banner home-banner--overlay" aria-label="Home page announcement">
             <div className="home-banner__inner">

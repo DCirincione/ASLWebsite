@@ -3,7 +3,6 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
-import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { supabase } from "@/lib/supabase/client";
 
@@ -15,6 +14,12 @@ type DraftStatus = "loading" | "pending" | "paid" | "completed" | "failed" | "ex
 
 export default function EventCheckoutPageClient({ draftId }: EventCheckoutPageClientProps) {
   const router = useRouter();
+  const goToEvents = () => {
+    if (typeof window !== "undefined") {
+      window.sessionStorage.removeItem("eventCheckoutDraftId");
+    }
+    router.push("/events");
+  };
   const [clientDraftId] = useState<string | null>(() => {
     if (typeof window === "undefined") return null;
 
@@ -119,7 +124,9 @@ export default function EventCheckoutPageClient({ draftId }: EventCheckoutPageCl
                 Go to My Events
               </button>
             ) : null}
-            <HistoryBackButton label="Back to Events" fallbackHref="/events" />
+            <button className="button ghost" type="button" onClick={goToEvents}>
+              Back to Events
+            </button>
           </div>
         </div>
       </section>

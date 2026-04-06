@@ -15,6 +15,14 @@ export type PublicEventSignupStats = {
   signup_unit?: "teams" | null;
 };
 
+export type PublicEventSignupCountResponse = {
+  counts: Array<{
+    eventId: string;
+    signupCount: number;
+    signupUnit?: "teams" | null;
+  }>;
+};
+
 export const PUBLIC_EVENT_SELECT =
   "id,title,start_date,end_date,time_info,location,description,host_type,approval_status,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,registration_limit,payment_required,payment_amount_cents,registration_schema";
 
@@ -37,17 +45,60 @@ export const formatEventSignupLabel = (
   return `${count} signed up`;
 };
 
-export const attachPublicEventSignupCounts = async <T extends Pick<Event, "id">>(
+const mergePublicEventSignupCounts = <T extends Pick<Event, "id">>(
+  events: T[],
+  signupStatsByEventId: Map<string, PublicEventSignupStats>,
+): Array<T & PublicEventSignupStats> =>
+  events.map((event) => ({
+    ...event,
+    signup_count: signupStatsByEventId.get(event.id)?.signup_count ?? 0,
+    signup_unit: signupStatsByEventId.get(event.id)?.signup_unit ?? null,
+  }));
+
+const loadPublicEventSignupCountsFromApi = async (eventIds: string[]) => {
+  try {
+    const response = await fetch("/api/public/event-signups", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({ eventIds }),
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    const json = (await response.json().catch(() => null)) as PublicEventSignupCountResponse | null;
+    if (!json?.counts || !Array.isArray(json.counts)) {
+      return null;
+    }
+
+    return new Map(
+      json.counts.map((entry) => [
+        entry.eventId,
+        {
+          signup_count: entry.signupCount ?? 0,
+          signup_unit: entry.signupUnit ?? null,
+        } satisfies PublicEventSignupStats,
+      ]),
+    );
+  } catch {
+    return null;
+  }
+};
+
+const loadPublicEventSignupCountsDirect = async <T extends Pick<Event, "id">>(
   client: SupabaseClient<Database>,
   events: T[],
-): Promise<Array<T & PublicEventSignupStats>> => {
+): Promise<Map<string, PublicEventSignupStats>> => {
   if (events.length === 0) {
-    return [];
+    return new Map();
   }
 
   const eventIds = Array.from(new Set(events.map((event) => event.id).filter(Boolean)));
   if (eventIds.length === 0) {
-    return events.map((event) => ({ ...event, signup_count: 0, signup_unit: null }));
+    return new Map();
   }
 
   const sundayLeagueEventIds = new Set(
@@ -110,11 +161,39 @@ export const attachPublicEventSignupCounts = async <T extends Pick<Event, "id">>
     }
   }
 
-  return events.map((event) => ({
-    ...event,
-    signup_count: signupCountByEventId.get(event.id) ?? 0,
-    signup_unit: sundayLeagueEventIds.has(event.id) ? "teams" : null,
-  }));
+  return new Map(
+    eventIds.map((eventId) => [
+      eventId,
+      {
+        signup_count: signupCountByEventId.get(eventId) ?? 0,
+        signup_unit: sundayLeagueEventIds.has(eventId) ? "teams" : null,
+      } satisfies PublicEventSignupStats,
+    ]),
+  );
+};
+
+export const attachPublicEventSignupCounts = async <T extends Pick<Event, "id">>(
+  client: SupabaseClient<Database>,
+  events: T[],
+): Promise<Array<T & PublicEventSignupStats>> => {
+  if (events.length === 0) {
+    return [];
+  }
+
+  const eventIds = Array.from(new Set(events.map((event) => event.id).filter(Boolean)));
+  if (eventIds.length === 0) {
+    return events.map((event) => ({ ...event, signup_count: 0, signup_unit: null }));
+  }
+
+  if (typeof window !== "undefined") {
+    const apiSignupCounts = await loadPublicEventSignupCountsFromApi(eventIds);
+    if (apiSignupCounts) {
+      return mergePublicEventSignupCounts(events, apiSignupCounts);
+    }
+  }
+
+  const directSignupCounts = await loadPublicEventSignupCountsDirect(client, events);
+  return mergePublicEventSignupCounts(events, directSignupCounts);
 };
 
 export const loadVisiblePublicEvents = async <T extends Event = Event>(
