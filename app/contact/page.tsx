@@ -1,15 +1,40 @@
 "use client";
 
 import Link from "next/link";
+import Script from "next/script";
 import { useState, type FormEvent } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
+import {
+  getRecaptchaSiteKey,
+  RECAPTCHA_CONTACT_ACTION,
+  RECAPTCHA_SECRET_KEY_ENV_NAMES,
+  RECAPTCHA_SITE_KEY_ENV_NAMES,
+} from "@/lib/recaptcha";
 
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
 
+type ReCaptchaApi = {
+  ready: (callback: () => void) => void;
+  execute: (siteKey: string, options: { action: string }) => Promise<string>;
+};
+
+declare global {
+  interface Window {
+    grecaptcha?: ReCaptchaApi;
+  }
+}
+
+const recaptchaSiteKey = getRecaptchaSiteKey();
+const recaptchaConfigMessage = `Contact form protection is not configured. Add ${[
+  ...RECAPTCHA_SITE_KEY_ENV_NAMES,
+  ...RECAPTCHA_SECRET_KEY_ENV_NAMES,
+].join(" and/or ")} to .env.local.`;
+
 export default function ContactPage() {
   const [status, setStatus] = useState<Status>({ type: "idle" });
+  const [recaptchaScriptLoaded, setRecaptchaScriptLoaded] = useState(false);
   const [form, setForm] = useState({
     name: "",
     email: "",
@@ -20,18 +45,48 @@ export default function ContactPage() {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const getRecaptchaToken = async () => {
+    if (!recaptchaSiteKey) {
+      throw new Error(recaptchaConfigMessage);
+    }
+
+    if (!recaptchaScriptLoaded || !window.grecaptcha) {
+      throw new Error("Verification is still loading. Please try again.");
+    }
+
+    return await new Promise<string>((resolve, reject) => {
+      window.grecaptcha?.ready(() => {
+        window.grecaptcha
+          ?.execute(recaptchaSiteKey, { action: RECAPTCHA_CONTACT_ACTION })
+          .then((token) => {
+            if (!token?.trim()) {
+              reject(new Error("Verification failed. Please try again."));
+              return;
+            }
+            resolve(token);
+          })
+          .catch(() => {
+            reject(new Error("Verification failed. Please try again."));
+          });
+      });
+    });
+  };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+
     try {
       const name = form.name.trim();
       const email = form.email.trim();
       const message = form.message.trim();
+
       if (!name || !email || !message) {
         setStatus({ type: "error", message: "Full Name, email, and message are required." });
         return;
       }
 
       setStatus({ type: "loading" });
+      const recaptchaToken = await getRecaptchaToken();
       const response = await fetch("/api/contact", {
         method: "POST",
         headers: {
@@ -42,6 +97,7 @@ export default function ContactPage() {
           email,
           message,
           communicationsOptIn: false,
+          recaptchaToken,
         }),
       });
 
@@ -62,13 +118,23 @@ export default function ContactPage() {
 
       setStatus({ type: "success", message: json.message ?? "Message sent. We will get back to you soon." });
       setForm({ name: "", email: "", message: "" });
-    } catch {
-      setStatus({ type: "error", message: "Could not send message." });
+    } catch (error) {
+      setStatus({
+        type: "error",
+        message: error instanceof Error ? error.message : "Could not send message.",
+      });
     }
   };
 
   return (
     <PageShell>
+      {recaptchaSiteKey ? (
+        <Script
+          src={`https://www.google.com/recaptcha/api.js?render=${encodeURIComponent(recaptchaSiteKey)}`}
+          strategy="afterInteractive"
+          onReady={() => setRecaptchaScriptLoaded(true)}
+        />
+      ) : null}
       <Section
         id="contact-page"
         eyebrow="Contact"
@@ -116,6 +182,7 @@ export default function ContactPage() {
               <button className="button primary" type="submit" disabled={status.type === "loading"}>
                 {status.type === "loading" ? "Sending..." : "Send Message"}
               </button>
+              {!recaptchaSiteKey ? <p className="form-help error">{recaptchaConfigMessage}</p> : null}
               {status.message ? (
                 <p className={`form-help ${status.type === "error" ? "error" : "muted"}`}>{status.message}</p>
               ) : null}

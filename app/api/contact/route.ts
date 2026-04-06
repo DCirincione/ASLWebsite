@@ -5,6 +5,12 @@ import {
   appendAldrichCommunicationsPreferenceToMessage,
   ALDRICH_COMMUNICATIONS_LABEL,
 } from "@/lib/aldrich-communications";
+import {
+  getRecaptchaMinScore,
+  getRecaptchaSecretKey,
+  RECAPTCHA_CONTACT_ACTION,
+  RECAPTCHA_SECRET_KEY_ENV_NAMES,
+} from "@/lib/recaptcha";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -12,6 +18,11 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.
 const resendApiKey = process.env.RESEND_API_KEY;
 const contactToEmail = process.env.CONTACT_TO_EMAIL;
 const contactFromEmail = process.env.CONTACT_FROM_EMAIL;
+const recaptchaSecretKey = getRecaptchaSecretKey();
+const recaptchaMinScore = getRecaptchaMinScore();
+const recaptchaConfigMessage = `Contact form protection is not configured. Add ${RECAPTCHA_SECRET_KEY_ENV_NAMES.join(
+  " or "
+)} to the server environment.`;
 
 const getSupabase = () => {
   if (!supabaseUrl) return null;
@@ -36,6 +47,121 @@ const escapeHtml = (value: string) =>
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+
+type ReCaptchaVerificationResponse = {
+  success: boolean;
+  score?: number;
+  action?: string;
+  hostname?: string;
+  "error-codes"?: string[];
+};
+
+const isLocalDevelopmentRequest = (req: NextRequest) =>
+  process.env.NODE_ENV !== "production" && ["localhost", "127.0.0.1", "::1"].includes(req.nextUrl.hostname);
+
+const getRecaptchaFailureDetail = (result: ReCaptchaVerificationResponse | null) => {
+  if (!result) return "no verification payload returned";
+
+  const parts: string[] = [];
+  if (Array.isArray(result["error-codes"]) && result["error-codes"].length > 0) {
+    parts.push(`error-codes=${result["error-codes"].join(",")}`);
+  }
+  if (result.hostname) {
+    parts.push(`hostname=${result.hostname}`);
+  }
+  if (result.action) {
+    parts.push(`action=${result.action}`);
+  }
+  if (typeof result.score === "number") {
+    parts.push(`score=${result.score}`);
+  }
+
+  return parts.join(" ") || "verification failed without a detailed error code";
+};
+
+const getRequestIp = (req: NextRequest) => {
+  const cfIp = req.headers.get("cf-connecting-ip")?.trim();
+  if (cfIp) return cfIp;
+
+  const forwardedFor = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
+  return forwardedFor || null;
+};
+
+const validateRecaptchaToken = async (req: NextRequest, token: string) => {
+  const allowLocalBypass = isLocalDevelopmentRequest(req);
+
+  if (!recaptchaSecretKey) {
+    return { ok: false as const, status: 500, error: recaptchaConfigMessage };
+  }
+
+  if (!token.trim()) {
+    return { ok: false as const, status: 400, error: "Verification failed. Please try again." };
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const body = new URLSearchParams({
+      secret: recaptchaSecretKey,
+      response: token.trim(),
+    });
+
+    const remoteIp = getRequestIp(req);
+    if (remoteIp) {
+      body.set("remoteip", remoteIp);
+    }
+
+    const response = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+      },
+      body,
+      signal: controller.signal,
+    });
+
+    const result = (await response.json().catch(() => null)) as ReCaptchaVerificationResponse | null;
+    if (!response.ok || !result?.success) {
+      if (allowLocalBypass) {
+        console.warn(`[contact] bypassing reCAPTCHA on localhost: ${getRecaptchaFailureDetail(result)}`);
+        return { ok: true as const };
+      }
+      return { ok: false as const, status: 400, error: "Verification failed. Please try again." };
+    }
+
+    if (result.action && result.action !== RECAPTCHA_CONTACT_ACTION) {
+      if (allowLocalBypass) {
+        console.warn(
+          `[contact] bypassing reCAPTCHA on localhost: expected action=${RECAPTCHA_CONTACT_ACTION} received action=${result.action}`
+        );
+        return { ok: true as const };
+      }
+      return { ok: false as const, status: 400, error: "Verification failed. Please try again." };
+    }
+
+    if (typeof result.score === "number" && result.score < recaptchaMinScore) {
+      if (allowLocalBypass) {
+        console.warn(
+          `[contact] bypassing reCAPTCHA on localhost: score=${result.score} below threshold=${recaptchaMinScore}`
+        );
+        return { ok: true as const };
+      }
+      return { ok: false as const, status: 400, error: "Verification failed. Please try again." };
+    }
+
+    return { ok: true as const };
+  } catch (error) {
+    if (allowLocalBypass) {
+      const reason = error instanceof Error ? error.message : "unknown verification error";
+      console.warn(`[contact] bypassing reCAPTCHA on localhost after verification error: ${reason}`);
+      return { ok: true as const };
+    }
+    return { ok: false as const, status: 502, error: "Verification failed. Please try again." };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
 
 const sendContactEmail = async (payload: { name: string; email: string; message: string; communicationsOptIn: boolean }) => {
   if (!resendApiKey || !contactToEmail || !contactFromEmail) {
@@ -93,15 +219,22 @@ export async function POST(req: NextRequest) {
       email: string;
       message: string;
       communicationsOptIn: boolean;
+      recaptchaToken: string;
     }>;
 
     const name = body.name?.trim() || "";
     const email = body.email?.trim() || "";
     const message = body.message?.trim() || "";
     const communicationsOptIn = body.communicationsOptIn !== false;
+    const recaptchaToken = body.recaptchaToken?.trim() || "";
 
     if (!name || !email || !message) {
       return NextResponse.json({ error: "Full Name, email, and message are required." }, { status: 400 });
+    }
+
+    const recaptchaValidation = await validateRecaptchaToken(req, recaptchaToken);
+    if (!recaptchaValidation.ok) {
+      return NextResponse.json({ error: recaptchaValidation.error }, { status: recaptchaValidation.status });
     }
 
     const supabase = getSupabase();

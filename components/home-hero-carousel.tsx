@@ -4,8 +4,8 @@ import Image from "next/image";
 import { startTransition, useEffect, useState } from "react";
 
 import fundraisersSlide from "../public/home-hero/Aldrich Sports Fundraisers.png";
-import homePageSlide from "../public/home-hero/Aldrich Sports Home Page.png";
-import leaguesSlide from "../public/home-hero/Aldrich Sports Leagues.png";
+import homePageSlide from "../public/home-hero/NewAldrichSportsHomePagePremiereDestinationForLocalSports.png";
+import leaguesSlide from "../public/home-hero/AldrichSportsLeaguesPageAldrichSundayLeagueAldrichSoccerPickleball.png";
 import moreSlide from "../public/home-hero/Aldrich Sports More.png";
 import tournamentsSlide from "../public/home-hero/Aldrich Sports Tournaments.png";
 

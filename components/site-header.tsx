@@ -184,6 +184,7 @@ export function SiteHeader() {
   }, []);
 
   const canAccessAdmin = canAccessAdminDashboard(profileRole);
+  const shouldShowPartnerSignup = !isPartnerRole(profileRole) && !canAccessAdmin;
   const navLinks = isPartnerRole(profileRole) ? [...links, { href: "/partner", label: "Partner Portal" }] : links;
 
   return (
@@ -239,9 +240,9 @@ export function SiteHeader() {
                       <Link href="/account/settings" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
                         Settings
                       </Link>
-                      {isPartnerRole(profileRole) ? (
+                      {shouldShowPartnerSignup ? (
                         <Link href="/partner" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
-                          Partner Portal
+                          Become a Partner
                         </Link>
                       ) : null}
                       {canAccessAdmin ? (
@@ -290,9 +291,9 @@ export function SiteHeader() {
                     <Link href="/account/inbox" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                       Inbox
                     </Link>
-                    {isPartnerRole(profileRole) ? (
+                    {shouldShowPartnerSignup ? (
                       <Link href="/partner" role="menuitem" onClick={() => setIsMenuOpen(false)}>
-                        Partner Portal
+                        Become a Partner
                       </Link>
                     ) : null}
                     {canAccessAdmin ? (
