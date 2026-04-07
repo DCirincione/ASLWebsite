@@ -1297,8 +1297,9 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   padding: 18px;
   background: #ffffff;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.04);
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  align-items: center;
   gap: 10px;
 }
 
@@ -1315,6 +1316,10 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 .program-card h3 {
   margin: 0;
   color: #0f172a;
+}
+
+.program-card p {
+  grid-column: 1 / -1;
 }
 
 .sunday-league-page {
