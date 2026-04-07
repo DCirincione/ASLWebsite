@@ -152,6 +152,9 @@ export default async function CommunityPage() {
                     className={`community-sponsors-carousel ${standardSponsors.length > 1 ? "community-sponsors-carousel--scrollable" : ""}`}
                     aria-label="More community sponsors"
                   >
+                    {standardSponsors.length > 1 ? (
+                      <input className="community-sponsors-carousel__expand-input" type="checkbox" id="community-sponsors-expand" />
+                    ) : null}
                     <div className="community-sponsors-carousel__viewport">
                       <div className="community-sponsors-carousel__track">
                         {standardSponsors.map((sponsor) => (
@@ -184,6 +187,17 @@ export default async function CommunityPage() {
                         <span className="community-sponsors-carousel__cue-line" />
                         <span className="community-sponsors-carousel__cue-arrow">↓</span>
                       </div>
+                    ) : null}
+
+                    {standardSponsors.length > 1 ? (
+                      <label className="community-sponsors-carousel__expand-toggle" htmlFor="community-sponsors-expand">
+                        <span className="community-sponsors-carousel__expand-label community-sponsors-carousel__expand-label--closed">
+                          Expand sponsor view
+                        </span>
+                        <span className="community-sponsors-carousel__expand-label community-sponsors-carousel__expand-label--open">
+                          Collapse sponsor view
+                        </span>
+                      </label>
                     ) : null}
                   </div>
                 ) : null}

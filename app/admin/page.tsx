@@ -4946,7 +4946,7 @@ export default function AdminPage() {
                               backgroundImage: `url(${communitySponsorForm.image})`,
                               backgroundPosition: "center",
                               backgroundRepeat: "no-repeat",
-                              backgroundSize: "cover",
+                              backgroundSize: "contain",
                             }}
                             role="img"
                             aria-label={communitySponsorForm.name || "Sponsor preview"}
@@ -5023,7 +5023,7 @@ export default function AdminPage() {
                                       backgroundImage: `url(${sponsor.image})`,
                                       backgroundPosition: "center",
                                       backgroundRepeat: "no-repeat",
-                                      backgroundSize: "cover",
+                                      backgroundSize: "contain",
                                     }}
                                     role="img"
                                     aria-label={sponsor.name}
@@ -5147,7 +5147,7 @@ export default function AdminPage() {
                                             backgroundImage: `url(${communitySponsorEditForm.image})`,
                                             backgroundPosition: "center",
                                             backgroundRepeat: "no-repeat",
-                                            backgroundSize: "cover",
+                                            backgroundSize: "contain",
                                           }}
                                           role="img"
                                           aria-label={communitySponsorEditForm.name || "Sponsor preview"}

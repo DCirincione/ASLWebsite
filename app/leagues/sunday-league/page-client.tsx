@@ -70,6 +70,15 @@ const rules = [
       "Each team plays XXX games per Sunday (TBD).",
       "Two fields are in use each Sunday: Field 1 (Black Sheep) and Field 2 (Magic Fountain).",
       "Teams rotate fields throughout the day.",
+      "Conference Format (Black Sheep Conference + Magic Fountain Conference)",
+      "Teams will be randomly placed into one of two conferences.",
+      "If each conference has 8 teams (16 total):",
+      "Top 4 teams in each conference advance to the Championship Playoffs.",
+      "Bottom 4 teams in each conference compete in a separate bracket for a secondary title/prize.",
+      "If each conference has 10 teams (20 total):",
+      "Top 4 teams in each conference advance to the Championship Playoffs.",
+      "Bottom 6 teams in each conference compete in a separate bracket for a secondary title/prize.",
+      "Playoff bracket format and exact scheduling will be posted before Week 1.",
     ],
   },
   {
@@ -926,8 +935,8 @@ export default function SundayLeaguePageClient({
             {rules.map((ruleSection) => (
               <div key={ruleSection.heading} className="sunday-league-panel-box">
                 <h3>{ruleSection.heading}</h3>
-                {ruleSection.items.map((item) => (
-                  <p key={item}>{item}</p>
+                {ruleSection.items.map((item, itemIndex) => (
+                  <p key={`${ruleSection.heading}-${itemIndex}`}>{item}</p>
                 ))}
               </div>
             ))}

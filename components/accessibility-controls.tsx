@@ -7,7 +7,7 @@ const FONT_MIN = 0.9;
 const FONT_MAX = 1.5;
 const FONT_STEP = 0.1;
 const STORAGE_KEY = "asl-accessibility-settings";
-const DEFAULT_THEME = "dark" as const;
+const DEFAULT_THEME = "light" as const;
 
 export function AccessibilityControls() {
   const getSavedSettings = () => {

@@ -10,7 +10,7 @@ const accessibilityBootstrapScript = `
   const STORAGE_KEY = "asl-accessibility-settings";
   const root = document.documentElement;
   let fontScale = 1;
-  let theme = "dark";
+  let theme = "light";
   let highlightLinks = "off";
 
   try {
@@ -142,7 +142,7 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" data-scroll-behavior="smooth" data-theme="dark" suppressHydrationWarning>
+    <html lang="en" data-scroll-behavior="smooth" data-theme="light" suppressHydrationWarning>
       <body>
         <Script
           id="accessibility-bootstrap"
