@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseServiceRole } from "@/lib/admin-route-auth";
 import {
+  findPartnerBillingAccountBySubscriptionId,
+  writePartnerBillingAccount,
+} from "@/lib/partner-billing-store";
+import {
   finalizePartnerApplicationDraft,
   findPartnerApplicationDraftBySquareOrderId,
   markPartnerApplicationDraftFailed,
@@ -30,6 +34,13 @@ type SquarePaymentWebhookEvent = {
         id?: string;
         status?: string;
         order_id?: string;
+      };
+      subscription?: {
+        id?: string;
+        status?: string;
+        customer_id?: string;
+        card_id?: string;
+        plan_variation_id?: string;
       };
     };
   };
@@ -366,6 +377,32 @@ const processPartnerApplicationPayment = async ({
   }
 };
 
+const processPartnerSubscriptionUpdate = async (subscription: {
+  id?: string;
+  status?: string;
+  customer_id?: string;
+  card_id?: string;
+  plan_variation_id?: string;
+}) => {
+  const subscriptionId = subscription.id?.trim() || "";
+  if (!subscriptionId) {
+    return;
+  }
+
+  const account = await findPartnerBillingAccountBySubscriptionId(subscriptionId);
+  if (!account) {
+    return;
+  }
+
+  await writePartnerBillingAccount({
+    ...account,
+    squareCustomerId: subscription.customer_id?.trim() || account.squareCustomerId,
+    squareCardId: subscription.card_id?.trim() || account.squareCardId,
+    squarePlanVariationId: subscription.plan_variation_id?.trim() || account.squarePlanVariationId,
+    subscriptionStatus: subscription.status?.trim() || account.subscriptionStatus,
+  });
+};
+
 export async function POST(req: NextRequest) {
   const signatureHeader = req.headers.get("x-square-hmacsha256-signature") || "";
   const requestBody = await req.text();
@@ -386,6 +423,12 @@ export async function POST(req: NextRequest) {
   try {
     const event = JSON.parse(requestBody) as SquarePaymentWebhookEvent;
     const payment = event.data?.object?.payment;
+    const subscription = event.data?.object?.subscription;
+
+    if ((event.type === "subscription.created" || event.type === "subscription.updated") && subscription?.id) {
+      await processPartnerSubscriptionUpdate(subscription);
+      return NextResponse.json({ ok: true });
+    }
 
     if (event.type !== "payment.updated" || !payment?.order_id) {
       return NextResponse.json({ ok: true });

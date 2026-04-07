@@ -4327,6 +4327,24 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   color: #c2410c;
 }
 
+.partner-square-card {
+  min-height: 56px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.partner-square-card--disabled {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.partner-square-card iframe {
+  width: 100%;
+}
+
 .partner-application-terms {
   display: grid;
   gap: 10px;
@@ -5630,6 +5648,11 @@ html[data-theme="dark"] .partner-application-status {
 html[data-theme="dark"] .partner-application-plan-card {
   background: linear-gradient(180deg, rgba(233, 93, 42, 0.12), rgba(15, 23, 42, 0.36));
   border-color: rgba(233, 93, 42, 0.24);
+}
+
+html[data-theme="dark"] .partner-square-card {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: #1f2a40;
 }
 
 html[data-theme="dark"] .partner-application-plan-card__amount,

@@ -28,6 +28,9 @@ type PartnerApplicationFormProps = {
   status: FormStatus;
   uploadingLogo: boolean;
   existingDraft: ExistingDraft | null;
+  squareCardContainerId: string;
+  squareCardEnabled: boolean;
+  squareCardStatusMessage?: string | null;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onChange: <K extends keyof PartnerApplicationSubmission>(key: K, value: PartnerApplicationSubmission[K]) => void;
   onToggleSelection: (
@@ -57,6 +60,9 @@ export function PartnerApplicationForm({
   status,
   uploadingLogo,
   existingDraft,
+  squareCardContainerId,
+  squareCardEnabled,
+  squareCardStatusMessage,
   onSubmit,
   onChange,
   onToggleSelection,
@@ -414,11 +420,36 @@ export function PartnerApplicationForm({
               </div>
               <p className="partner-application-plan-card__amount">{plan.checkoutLabel}</p>
             </div>
-            {!form.isNonProfit ? (
-              <p className="form-help muted">
-                Standard plans require the $75 setup checkout now. Monthly billing begins after approval.
-              </p>
+            {form.selectedPlan === "standard" ? (
+              <div className="form-control">
+                <label htmlFor="partner-promo-code">Promo Code</label>
+                <input
+                  id="partner-promo-code"
+                  value={form.promoCode ?? ""}
+                  onChange={(event) => onChange("promoCode", event.target.value)}
+                  autoComplete="off"
+                  spellCheck={false}
+                  placeholder="Optional"
+                />
+                <p className="form-help muted">
+                  Promo codes are validated securely on the server before billing starts.
+                </p>
+              </div>
             ) : null}
+            <div className="form-control">
+              <label htmlFor={squareCardContainerId}>Card Details</label>
+              <div
+                id={squareCardContainerId}
+                className={`partner-square-card ${squareCardEnabled ? "" : "partner-square-card--disabled"}`}
+                aria-live="polite"
+              />
+              <p className="form-help muted">
+                {squareCardStatusMessage ??
+                  (form.isNonProfit
+                    ? "Your card will be charged a one-time $75 partnership fee."
+                    : "Your card will be charged $75 for the first month, then $35/month after that.")}
+              </p>
+            </div>
           </section>
 
           <section className="partner-application-section">

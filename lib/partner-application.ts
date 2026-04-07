@@ -60,6 +60,7 @@ export type PartnerApplicationSubmission = {
   nonProfitName: string;
   nonProfitRegistrationNumber: string;
   selectedPlan: PartnerApplicationPlan;
+  promoCode: string;
   termsAuthorized: boolean;
   termsAccuracy: boolean;
   termsTos: boolean;
@@ -149,6 +150,7 @@ export const createEmptyPartnerApplicationForm = (): PartnerApplicationSubmissio
   nonProfitName: "",
   nonProfitRegistrationNumber: "",
   selectedPlan: "standard",
+  promoCode: "",
   termsAuthorized: false,
   termsAccuracy: false,
   termsTos: false,
@@ -184,6 +186,7 @@ export const sanitizePartnerApplicationSubmission = (value: unknown): PartnerApp
     nonProfitName: asTrimmedString(input.nonProfitName),
     nonProfitRegistrationNumber: asTrimmedString(input.nonProfitRegistrationNumber),
     selectedPlan: normalizePartnerApplicationPlan(isNonProfit, input.selectedPlan),
+    promoCode: asTrimmedString(input.promoCode),
     termsAuthorized: asBoolean(input.termsAuthorized),
     termsAccuracy: asBoolean(input.termsAccuracy),
     termsTos: asBoolean(input.termsTos),
@@ -244,8 +247,8 @@ export const getPartnerApplicationPlanDetails = (plan: PartnerApplicationPlan) =
     : {
         label: "Standard",
         checkoutAmountCents: PARTNER_APPLICATION_SETUP_FEE_CENTS,
-        planDescription: "$75 setup + $35/month recurring",
-        checkoutLabel: "$75 setup due now",
+        planDescription: "$75 first month, then $35/month recurring",
+        checkoutLabel: "$75 charged now, then $35/month",
       };
 
 export const formatPartnerApplicationSelection = (

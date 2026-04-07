@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import Script from "next/script";
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
@@ -17,12 +18,13 @@ import {
 import { canAccessPartnerPortal, formatApprovalStatusLabel } from "@/lib/event-approval";
 import { formatEventPaymentAmount } from "@/lib/event-payments";
 import {
+  PARTNER_APPLICATION_PAYMENT_CURRENCY,
+  PARTNER_APPLICATION_SETUP_FEE_CENTS,
   createEmptyPartnerApplicationForm,
   createEmptyPartnerApplicationTeamMember,
   type PartnerApplicationSubmission,
   type PartnerApplicationTeamMember,
 } from "@/lib/partner-application";
-import { createId } from "@/lib/create-id";
 import { getEventProgramSlugOptions } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Profile, Sport } from "@/lib/supabase/types";
@@ -31,6 +33,65 @@ type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type SaveStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
 const EVENT_IMAGE_BUCKET = "event-creation-uploads";
 const FLYER_BUCKET = "flyers";
+const PARTNER_SQUARE_CARD_CONTAINER_ID = "partner-square-card";
+
+type SquareTokenizeResult =
+  | {
+      status: "OK";
+      token: string;
+      errors?: undefined;
+    }
+  | {
+      status: string;
+      token?: undefined;
+      errors?: Array<{ message?: string }>;
+    };
+
+type SquareCardTokenizeDetails = {
+  amount: string;
+  currencyCode: string;
+  intent: "CHARGE" | "CHARGE_AND_STORE";
+  billingContact?: {
+    givenName?: string;
+    familyName?: string;
+    email?: string;
+    phone?: string;
+    countryCode?: string;
+  };
+  customerInitiated?: boolean;
+  sellerKeyedIn?: boolean;
+};
+
+type SquareCardHandle = {
+  attach: (selector: string) => Promise<void>;
+  destroy?: () => Promise<void> | void;
+  tokenize: (details?: SquareCardTokenizeDetails) => Promise<SquareTokenizeResult>;
+};
+
+type SquarePaymentsHandle = {
+  card: () => Promise<SquareCardHandle>;
+};
+
+type SquareWindowApi = {
+  payments: (applicationId: string, locationId: string) => SquarePaymentsHandle;
+};
+
+declare global {
+  interface Window {
+    Square?: SquareWindowApi;
+  }
+}
+
+const squareApplicationId = process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID?.trim() || "";
+const squareLocationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID?.trim() || "";
+const squareEnvironment = process.env.NEXT_PUBLIC_SQUARE_ENVIRONMENT?.trim().toLowerCase() || "production";
+const squareScriptSrc =
+  squareEnvironment === "sandbox"
+    ? "https://sandbox.web.squarecdn.com/v1/square.js"
+    : "https://web.squarecdn.com/v1/square.js";
+const isSquareCardConfigured = Boolean(squareApplicationId && squareLocationId);
+const squareCardConfigError =
+  "Standard partner billing is not configured. Add NEXT_PUBLIC_SQUARE_APPLICATION_ID and NEXT_PUBLIC_SQUARE_LOCATION_ID.";
 
 type PartnerApplicationDraftSummary = {
   id: string;
@@ -189,6 +250,14 @@ export default function PartnerPage() {
   const [partnerApplicationDraft, setPartnerApplicationDraft] = useState<PartnerApplicationDraftSummary | null>(null);
   const [loadingPartnerApplicationDraft, setLoadingPartnerApplicationDraft] = useState(false);
   const [uploadingPartnerLogo, setUploadingPartnerLogo] = useState(false);
+  const [squareScriptLoaded, setSquareScriptLoaded] = useState(false);
+  const [squareCardReady, setSquareCardReady] = useState(false);
+  const [squareCardStatusMessage, setSquareCardStatusMessage] = useState<string | null>(
+    isSquareCardConfigured
+      ? "Secure card entry is loading..."
+      : squareCardConfigError,
+  );
+  const squareCardRef = useRef<SquareCardHandle | null>(null);
 
   const fetchWithSession = useCallback(async (input: string, init?: RequestInit) => {
     if (!supabase) {
@@ -201,13 +270,15 @@ export default function PartnerPage() {
       throw new Error("You need to be signed in.");
     }
 
+    const headers = new Headers(init?.headers);
+    headers.set("authorization", `Bearer ${accessToken}`);
+    if (!(init?.body instanceof FormData) && !headers.has("content-type")) {
+      headers.set("content-type", "application/json");
+    }
+
     return fetch(input, {
       ...init,
-      headers: {
-        "content-type": "application/json",
-        authorization: `Bearer ${accessToken}`,
-        ...(init?.headers ?? {}),
-      },
+      headers,
     });
   }, []);
 
@@ -295,6 +366,110 @@ export default function PartnerPage() {
 
     void loadPage();
   }, [loadPartnerApplicationDraft, loadPartnerEvents, loadSports]);
+
+  const hasCompletedPartnerApplication = partnerApplicationDraft?.status === "completed";
+  const hasPendingPartnerCheckout =
+    partnerApplicationDraft?.status === "pending" && Boolean(partnerApplicationDraft?.checkoutUrl);
+  const shouldShowPartnerApplicationForm = !hasCompletedPartnerApplication && !hasPendingPartnerCheckout;
+
+  useEffect(() => {
+    if (status !== "forbidden" || !shouldShowPartnerApplicationForm) {
+      return;
+    }
+
+    if (!isSquareCardConfigured) {
+      setSquareCardReady(false);
+      setSquareCardStatusMessage(squareCardConfigError);
+      return;
+    }
+
+    if (!squareScriptLoaded) {
+      setSquareCardReady(false);
+      setSquareCardStatusMessage("Secure card entry is loading...");
+      return;
+    }
+
+    const host = document.getElementById(PARTNER_SQUARE_CARD_CONTAINER_ID);
+    if (!host || squareCardRef.current) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const mountCard = async () => {
+      try {
+        const square = window.Square;
+        if (!square) {
+          throw new Error("Square payment form is unavailable.");
+        }
+
+        const payments = square.payments(squareApplicationId, squareLocationId);
+        const card = await payments.card();
+        await card.attach(`#${PARTNER_SQUARE_CARD_CONTAINER_ID}`);
+
+        if (cancelled) {
+          await card.destroy?.();
+          return;
+        }
+
+        squareCardRef.current = card;
+        setSquareCardReady(true);
+        setSquareCardStatusMessage(null);
+      } catch (error) {
+        setSquareCardReady(false);
+        setSquareCardStatusMessage(
+          error instanceof Error
+            ? error.message
+            : "Secure card entry could not load.",
+        );
+      }
+    };
+
+    void mountCard();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [squareScriptLoaded, status, shouldShowPartnerApplicationForm]);
+
+  const tokenizePartnerApplicationCard = useCallback(async () => {
+    if (!isSquareCardConfigured) {
+      if (partnerApplicationForm.selectedPlan === "standard") {
+        throw new Error(squareCardConfigError);
+      }
+      return "";
+    }
+
+    if (!squareCardRef.current) {
+      throw new Error("Secure card entry is still loading. Try again in a moment.");
+    }
+
+    const intent = partnerApplicationForm.isNonProfit ? "CHARGE" : "CHARGE_AND_STORE";
+    const tokenizeResult = await squareCardRef.current.tokenize({
+      amount: (PARTNER_APPLICATION_SETUP_FEE_CENTS / 100).toFixed(2),
+      currencyCode: PARTNER_APPLICATION_PAYMENT_CURRENCY,
+      intent,
+      billingContact: {
+        givenName: partnerApplicationForm.contactFirstName,
+        familyName: partnerApplicationForm.contactLastName,
+        email: partnerApplicationForm.contactEmail,
+        phone: partnerApplicationForm.contactPhone,
+        countryCode: "US",
+      },
+      customerInitiated: true,
+      sellerKeyedIn: false,
+    });
+
+    if (!("token" in tokenizeResult) || !tokenizeResult.token?.trim()) {
+      const errorMessage = tokenizeResult.errors
+        ?.map((error: { message?: string }) => error.message?.trim())
+        .filter(Boolean)
+        .join(" ");
+      throw new Error(errorMessage || "Could not securely tokenize the payment card.");
+    }
+
+    return tokenizeResult.token.trim();
+  }, [partnerApplicationForm]);
 
   const updateCreateForm = <K extends keyof PartnerEventFormState>(key: K, value: PartnerEventFormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -452,50 +627,46 @@ export default function PartnerPage() {
     setShowCreateEventForm(false);
   };
 
-  const safeFileName = (name: string) => name.replace(/[^a-zA-Z0-9._-]/g, "_");
+  const uploadPartnerAsset = async (
+    kind: "partner-logo" | "event-image" | "event-flyer" | "event-waiver",
+    file: File,
+  ) => {
+    const formData = new FormData();
+    formData.set("kind", kind);
+    formData.set("file", file);
+
+    const response = await fetchWithSession("/api/partner/upload", {
+      method: "POST",
+      body: formData,
+    });
+    const json = (await response.json().catch(() => null)) as
+      | {
+          error?: string;
+          fileUrl?: string;
+        }
+      | null;
+
+    if (!response.ok || !json?.fileUrl) {
+      throw new Error(json?.error ?? "Could not upload file.");
+    }
+
+    return json.fileUrl;
+  };
 
   const uploadManagedAsset = async (
     folder: "events" | "events/waivers" | "partner-applications/logos",
     file: File,
   ) => {
-    if (!supabase) {
-      throw new Error("Supabase is not configured.");
+    if (folder === "partner-applications/logos") {
+      return uploadPartnerAsset("partner-logo", file);
     }
-
-    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-    const baseName = file.name.replace(new RegExp(`\\.${ext}$`, "i"), "");
-    const path = `${folder}/${createId()}-${safeFileName(baseName)}.${ext}`;
-    const { data, error } = await supabase.storage.from(EVENT_IMAGE_BUCKET).upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-    });
-
-    if (error) throw error;
-
-    const finalPath = data?.path ?? path;
-    const { data: publicUrlData } = supabase.storage.from(EVENT_IMAGE_BUCKET).getPublicUrl(finalPath);
-    return publicUrlData.publicUrl;
+    if (folder === "events/waivers") {
+      return uploadPartnerAsset("event-waiver", file);
+    }
+    return uploadPartnerAsset("event-image", file);
   };
 
-  const uploadFlyerImage = async (file: File) => {
-    if (!supabase) {
-      throw new Error("Supabase is not configured.");
-    }
-
-    const ext = file.name.split(".").pop()?.toLowerCase() || "png";
-    const baseName = file.name.replace(new RegExp(`\\.${ext}$`, "i"), "");
-    const path = `events/${createId()}-${safeFileName(baseName)}.${ext}`;
-    const { data, error } = await supabase.storage.from(FLYER_BUCKET).upload(path, file, {
-      cacheControl: "3600",
-      upsert: false,
-    });
-
-    if (error) throw error;
-
-    const finalPath = data?.path ?? path;
-    const { data: publicUrlData } = supabase.storage.from(FLYER_BUCKET).getPublicUrl(finalPath);
-    return publicUrlData.publicUrl;
-  };
+  const uploadFlyerImage = async (file: File) => uploadPartnerAsset("event-flyer", file);
 
   const handleCreateImageUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -733,31 +904,46 @@ export default function PartnerPage() {
 
   const submitPartnerApplication = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setPartnerApplicationStatus({ type: "loading" });
+    setPartnerApplicationStatus({
+      type: "loading",
+      message: isSquareCardConfigured ? "Processing payment..." : undefined,
+    });
 
     try {
+      const squareSourceId = await tokenizePartnerApplicationCard();
       const response = await fetchWithSession("/api/partner/apply", {
         method: "POST",
         body: JSON.stringify({
           application: partnerApplicationForm,
+          squareSourceId,
         }),
       });
       const json = (await response.json().catch(() => null)) as
         | {
             error?: string;
             checkoutUrl?: string | null;
+            message?: string;
           }
         | null;
 
       if (!response.ok) {
         throw new Error(json?.error ?? "Could not start the partner application checkout.");
       }
-      if (!json?.checkoutUrl) {
-        throw new Error("Square checkout did not return a redirect URL.");
+
+      if (json?.checkoutUrl) {
+        if (partnerApplicationForm.selectedPlan === "standard") {
+          throw new Error("Standard partner plans should not redirect to the old hosted Square checkout.");
+        }
+        setPartnerApplicationStatus({ type: "success", message: "Redirecting to checkout..." });
+        window.location.assign(json.checkoutUrl);
+        return;
       }
 
-      setPartnerApplicationStatus({ type: "success", message: "Redirecting to checkout..." });
-      window.location.assign(json.checkoutUrl);
+      setPartnerApplicationStatus({
+        type: "success",
+        message: json?.message ?? "Application submitted successfully.",
+      });
+      await loadPartnerApplicationDraft();
     } catch (error) {
       setPartnerApplicationStatus({
         type: "error",
@@ -954,6 +1140,18 @@ export default function PartnerPage() {
   if (status === "loading") {
     return (
       <div className="account-page">
+        {isSquareCardConfigured ? (
+          <Script
+            src={squareScriptSrc}
+            strategy="afterInteractive"
+            onReady={() => setSquareScriptLoaded(true)}
+            onError={() =>
+              setSquareCardStatusMessage(
+                "Secure card entry could not load.",
+              )
+            }
+          />
+        ) : null}
         <AccessibilityControls />
         <div className="account-body shell">
           <p className="muted">Loading partner portal...</p>
@@ -965,6 +1163,18 @@ export default function PartnerPage() {
   if (status === "no-session") {
     return (
       <div className="account-page">
+        {isSquareCardConfigured ? (
+          <Script
+            src={squareScriptSrc}
+            strategy="afterInteractive"
+            onReady={() => setSquareScriptLoaded(true)}
+            onError={() =>
+              setSquareCardStatusMessage(
+                "Secure card entry could not load.",
+              )
+            }
+          />
+        ) : null}
         <AccessibilityControls />
         <div className="account-body shell">
           <section className="account-card account-card__intro">
@@ -993,6 +1203,18 @@ export default function PartnerPage() {
   if (status === "forbidden") {
     return (
       <div className="account-page">
+        {isSquareCardConfigured ? (
+          <Script
+            src={squareScriptSrc}
+            strategy="afterInteractive"
+            onReady={() => setSquareScriptLoaded(true)}
+            onError={() =>
+              setSquareCardStatusMessage(
+                "Secure card entry could not load.",
+              )
+            }
+          />
+        ) : null}
         <AccessibilityControls />
         <div className="account-body shell">
           <HistoryBackButton label="← Back" fallbackHref="/account" />
@@ -1013,6 +1235,9 @@ export default function PartnerPage() {
             status={partnerApplicationStatus}
             uploadingLogo={uploadingPartnerLogo}
             existingDraft={partnerApplicationDraft}
+            squareCardContainerId={PARTNER_SQUARE_CARD_CONTAINER_ID}
+            squareCardEnabled={squareCardReady}
+            squareCardStatusMessage={squareCardStatusMessage}
             onSubmit={submitPartnerApplication}
             onChange={updatePartnerApplicationForm}
             onToggleSelection={togglePartnerApplicationSelection}
@@ -1029,6 +1254,18 @@ export default function PartnerPage() {
 
   return (
     <div className="account-page">
+      {isSquareCardConfigured ? (
+        <Script
+          src={squareScriptSrc}
+          strategy="afterInteractive"
+          onReady={() => setSquareScriptLoaded(true)}
+          onError={() =>
+            setSquareCardStatusMessage(
+              "Secure card entry could not load.",
+            )
+          }
+        />
+      ) : null}
       <AccessibilityControls />
       <div className="account-body shell">
         <HistoryBackButton label="← Back" fallbackHref="/account" />

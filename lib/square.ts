@@ -8,10 +8,30 @@ type SquareError = {
   detail?: string;
 };
 
+type SquareCustomer = {
+  id?: string;
+};
+
 type SquarePayment = {
   id?: string;
   status?: string;
   order_id?: string;
+};
+
+type SquareCard = {
+  id?: string;
+  customer_id?: string;
+  card_brand?: string;
+  last_4?: string;
+  exp_month?: number;
+  exp_year?: number;
+};
+
+type SquareSubscription = {
+  id?: string;
+  status?: string;
+  customer_id?: string;
+  plan_variation_id?: string;
 };
 
 const getSquareApiToken = () => process.env.SQUARE_ACCESS_TOKEN?.trim() || "";
@@ -21,6 +41,12 @@ const getSquareApiBaseUrl = () =>
   getSquareEnvironment() === "sandbox" ? "https://connect.squareupsandbox.com" : "https://connect.squareup.com";
 
 export const getSquareLocationId = () => process.env.SQUARE_LOCATION_ID?.trim() || "";
+export const getSquarePartnerStandardPlanVariationId = () =>
+  process.env.SQUARE_PARTNER_STANDARD_PLAN_VARIATION_ID?.trim() || "";
+export const getSquarePartnerStandardPromoCode = () =>
+  process.env.PARTNER_APPLICATION_STANDARD_PROMO_CODE?.trim() || "";
+export const getSquarePartnerStandardPromoPlanVariationId = () =>
+  process.env.SQUARE_PARTNER_STANDARD_PROMO_PLAN_VARIATION_ID?.trim() || "";
 
 export const getAppUrl = () => (process.env.APP_URL?.trim() || "").replace(/\/+$/, "");
 
@@ -50,16 +76,29 @@ const getSquareErrorMessage = (errors: SquareError[] | undefined, fallback: stri
   return detail || fallback;
 };
 
-export const createSquarePaymentLink = async (body: Record<string, unknown>) => {
-  const response = await fetch(`${getSquareApiBaseUrl()}/v2/online-checkout/payment-links`, {
+const squareFetch = async <T>(path: string, body: Record<string, unknown>, fallbackError: string) => {
+  const response = await fetch(`${getSquareApiBaseUrl()}${path}`, {
     method: "POST",
     headers: getSquareHeaders(),
     body: JSON.stringify(body),
   });
 
-  const json = (await response.json().catch(() => null)) as
+  const json = (await response.json().catch(() => null)) as ({ errors?: SquareError[] } & T) | null;
+
+  if (!response.ok) {
+    throw new Error(getSquareErrorMessage(json?.errors, fallbackError));
+  }
+
+  if (!json) {
+    throw new Error(fallbackError);
+  }
+
+  return json;
+};
+
+export const createSquarePaymentLink = async (body: Record<string, unknown>) => {
+  return squareFetch<
     | {
-        errors?: SquareError[];
         payment_link?: {
           id?: string;
           url?: string;
@@ -69,14 +108,24 @@ export const createSquarePaymentLink = async (body: Record<string, unknown>) => 
           orders?: Array<{ id?: string }>;
         };
       }
-    | null;
-
-  if (!response.ok) {
-    throw new Error(getSquareErrorMessage(json?.errors, "Could not create the Square checkout link."));
-  }
-
-  return json;
+  >("/v2/online-checkout/payment-links", body, "Could not create the Square checkout link.");
 };
+
+export const createSquareCustomer = async (body: Record<string, unknown>) =>
+  squareFetch<{ customer?: SquareCustomer }>("/v2/customers", body, "Could not create the Square customer.");
+
+export const createSquareCard = async (body: Record<string, unknown>) =>
+  squareFetch<{ card?: SquareCard }>("/v2/cards", body, "Could not save the card on file.");
+
+export const createSquarePayment = async (body: Record<string, unknown>) =>
+  squareFetch<{ payment?: SquarePayment }>("/v2/payments", body, "Could not process the Square payment.");
+
+export const createSquareSubscription = async (body: Record<string, unknown>) =>
+  squareFetch<{ subscription?: SquareSubscription }>(
+    "/v2/subscriptions",
+    body,
+    "Could not create the Square subscription.",
+  );
 
 export const searchSquarePaymentByOrderId = async (orderId: string) => {
   const trimmedOrderId = orderId.trim();
