@@ -1120,6 +1120,33 @@ export function MerchStorefront({ catalog, purchasesEnabled }: MerchStorefrontPr
         onCheckout={startCheckout}
         onClose={closeCartDialog}
       />
+      {purchasesEnabled ? (
+        <button
+          type="button"
+          className="merch-floating-cart"
+          onClick={openCartDialog}
+          aria-label={`Open cart${cartItemCount > 0 ? ` with ${cartItemCount} item${cartItemCount === 1 ? "" : "s"}` : ""}`}
+        >
+          <span className="merch-floating-cart__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" role="presentation" focusable="false">
+              <path
+                d="M7 7h13l-1.5 8.5H9.2L7 7Zm0 0-.8-3H3"
+                fill="none"
+                stroke="currentColor"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth="1.8"
+              />
+              <circle cx="10" cy="19" r="1.5" fill="currentColor" />
+              <circle cx="17" cy="19" r="1.5" fill="currentColor" />
+            </svg>
+          </span>
+          <span className="sr-only">Cart</span>
+          <span className="merch-floating-cart__count" aria-hidden="true">
+            {cartItemCount}
+          </span>
+        </button>
+      ) : null}
 
       <div className="merch-hero">
         <div className="merch-hero__copy">
