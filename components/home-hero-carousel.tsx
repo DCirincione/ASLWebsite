@@ -8,6 +8,7 @@ export function HomeHeroCarousel() {
         <Image
           src={newestHomePic}
           alt=""
+          fill
           priority
           sizes="100vw"
           className="home-hero__carousel-image"

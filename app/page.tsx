@@ -42,47 +42,45 @@ export default async function Home() {
           } as CSSProperties
         }
       >
-        <div className="home-hero__stage">
-          <HomeHeroCarousel />
-          {showHomeBanner ? (
-            <div className="home-banner home-banner--overlay" aria-label="Home page announcement">
-              <div className="home-banner__inner">
-                <span className="home-banner__label">Announcement</span>
-                <p className="home-banner__message">{homeBannerText}</p>
-                {homeBannerButtonHref ? (
-                  <Link
-                    className="button ghost home-banner__button"
-                    href={homeBannerButtonHref}
-                  >
-                    Take Me There
-                  </Link>
-                ) : null}
-              </div>
-            </div>
-          ) : null}
-          <div className="hero__panel">
-            <div className="hero__content">
-              <h1 className="hero__title">
-                Community Sports. Real Competition. Local Impact.
-              </h1>
-              <p className="hero__lede">
-                ALDRICH SPORTS hosts tournaments, leagues, and charity events for
-                all ages. Join the community and be part of something special.
-              </p>
-              <div className="hero__actions">
-                <Link className="button primary" href="#events">
-                  View Upcoming Events
+        <HomeHeroCarousel />
+        {showHomeBanner ? (
+          <div className="home-banner home-banner--overlay" aria-label="Home page announcement">
+            <div className="home-banner__inner">
+              <span className="home-banner__label">Announcement</span>
+              <p className="home-banner__message">{homeBannerText}</p>
+              {homeBannerButtonHref ? (
+                <Link
+                  className="button ghost home-banner__button"
+                  href={homeBannerButtonHref}
+                >
+                  Take Me There
                 </Link>
-                <Link className="button ghost" href="/sports">
-                  Browse Sports
-                </Link>
-              </div>
+              ) : null}
             </div>
           </div>
-          <Link className="hero__arrow" href="#events" aria-label="Scroll to events">
-            ↓
-          </Link>
+        ) : null}
+        <div className="hero__panel">
+          <div className="hero__content">
+            <h1 className="hero__title">
+              Community Sports. Real Competition. Local Impact.
+            </h1>
+            <p className="hero__lede">
+              ALDRICH SPORTS hosts tournaments, leagues, and charity events for
+              all ages. Join the community and be part of something special.
+            </p>
+            <div className="hero__actions">
+              <Link className="button primary" href="#events">
+                View Upcoming Events
+              </Link>
+              <Link className="button ghost" href="/sports">
+                Browse Sports
+              </Link>
+            </div>
+          </div>
         </div>
+        <Link className="hero__arrow" href="#events" aria-label="Scroll to events">
+          ↓
+        </Link>
       </Section>
 
       <Section
