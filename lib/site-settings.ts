@@ -3,6 +3,7 @@ import "server-only";
 import { promises as fs } from "fs";
 import path from "path";
 
+import { getSupabaseServiceRole } from "@/lib/admin-route-auth";
 import {
   DEFAULT_HOME_BANNER_TEXT,
   isHomeBannerButtonTarget,
@@ -26,6 +27,8 @@ export type SiteSettings = {
   homeBanner: HomeBannerSettings;
   merch: MerchSettings;
 };
+
+const SITE_SETTINGS_KEY = "site_settings";
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
   homeBanner: {
@@ -90,10 +93,31 @@ const normalizeSiteSettings = (value?: Partial<SiteSettings> | null): SiteSettin
   };
 };
 
+const readSiteSettingsFromFile = async (): Promise<SiteSettings> => {
+  const raw = await fs.readFile(siteSettingsFilePath, "utf8");
+  return normalizeSiteSettings(JSON.parse(raw) as Partial<SiteSettings>);
+};
+
 export const readSiteSettings = async (): Promise<SiteSettings> => {
+  const supabase = getSupabaseServiceRole();
+  if (supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("app_settings")
+        .select("value")
+        .eq("key", SITE_SETTINGS_KEY)
+        .maybeSingle();
+
+      if (!error && data?.value && typeof data.value === "object" && !Array.isArray(data.value)) {
+        return normalizeSiteSettings(data.value as Partial<SiteSettings>);
+      }
+    } catch {
+      // Fall back to the local file when the database is unavailable.
+    }
+  }
+
   try {
-    const raw = await fs.readFile(siteSettingsFilePath, "utf8");
-    return normalizeSiteSettings(JSON.parse(raw) as Partial<SiteSettings>);
+    return await readSiteSettingsFromFile();
   } catch {
     return DEFAULT_SITE_SETTINGS;
   }
@@ -101,6 +125,25 @@ export const readSiteSettings = async (): Promise<SiteSettings> => {
 
 export const writeSiteSettings = async (value: SiteSettings): Promise<SiteSettings> => {
   const next = normalizeSiteSettings(value);
+
+  const supabase = getSupabaseServiceRole();
+  if (supabase) {
+    const { error } = await supabase.from("app_settings").upsert(
+      {
+        key: SITE_SETTINGS_KEY,
+        value: next,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "key" },
+    );
+
+    if (error) {
+      throw error;
+    }
+
+    return next;
+  }
+
   await fs.mkdir(path.dirname(siteSettingsFilePath), { recursive: true });
   await fs.writeFile(siteSettingsFilePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
   return next;

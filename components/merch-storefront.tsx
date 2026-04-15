@@ -746,7 +746,7 @@ function CartDialog({
                 </div>
                 <div>
                   <span>{shippingFeeLabel}</span>
-                  <strong>{shippingFeeCents != null ? formatCents(shippingFeeCents, currencyCode) : "Added in Square"}</strong>
+                  <strong>{shippingFeeCents != null ? formatCents(shippingFeeCents, currencyCode) : "Calculated at Checkout"}</strong>
                 </div>
                 <div className="merch-cart__total">
                   <span>Total</span>
