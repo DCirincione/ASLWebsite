@@ -948,35 +948,50 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   display: none;
 }
 
+.home-hero__stage {
+  display: contents;
+}
+
 @media (min-width: 901px) {
   .home-hero.hero--image {
     background: #09101e;
+    padding: 0;
   }
 
   .home-hero.hero--full {
-    min-height: clamp(460px, calc(var(--section-viewport-width) * 558 / 1366), 558px);
+    display: block;
+    min-height: 0;
   }
 
   .home-hero.hero--full.hero--with-banner {
-    min-height: calc(clamp(460px, calc(var(--section-viewport-width) * 558 / 1366), 558px) + 92px);
+    padding-top: 0;
+  }
+
+  .home-hero__stage {
+    position: relative;
+    display: block;
+    width: min(calc(var(--section-viewport-width) - 48px), 1220px);
+    max-width: 100%;
+    margin: 0 auto;
   }
 
   .home-hero__carousel {
-    position: absolute;
-    inset: 0;
+    position: relative;
     display: block;
     overflow: hidden;
     pointer-events: none;
+    width: 100%;
   }
 
   .home-hero__carousel-slide {
-    position: absolute;
-    inset: 0;
+    position: relative;
+    width: 100%;
   }
 
   .home-hero__carousel-image {
-    object-fit: cover;
-    object-position: center top;
+    display: block;
+    width: 100%;
+    height: auto;
   }
 
   .home-hero .hero__panel {
