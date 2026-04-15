@@ -6,6 +6,7 @@ const publicRoutes = [
   "",
   "/events",
   "/sports",
+  "/merch",
   "/community",
   "/contact",
   "/sponsors",

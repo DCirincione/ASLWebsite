@@ -12,6 +12,12 @@ Next.js App Router starter with a components-first structure.
 - `npm run lint` – lint the project with ESLint.
 - `npm run build` – create a production build.
 
+## Merch / Printful Setup
+- `PRINTFUL_API_TOKEN` enables the live merch catalog.
+- `PRINTFUL_STORE_ID` is optional if your token already has store context; set it when using an account-level token.
+- `PRINTFUL_PRODUCT_SOURCE` is optional and can be `store` or `sync` depending on how your Printful products are managed.
+- `PRINTFUL_STOREFRONT_URL` is optional and lets merch buttons open your public storefront while checkout is still handled by Printful.
+
 ## Next steps
 - Add new pages in `app/` (for example `app/about/page.tsx`).
 - Extend `components/` with the UI patterns you want to reuse.

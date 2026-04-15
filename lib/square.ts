@@ -34,6 +34,27 @@ type SquareSubscription = {
   plan_variation_id?: string;
 };
 
+type SquareCatalogCategoryReference = {
+  id?: string;
+};
+
+type SquareCatalogItem = {
+  id?: string;
+  type?: string;
+  item_data?: {
+    categories?: SquareCatalogCategoryReference[];
+    reporting_category?: SquareCatalogCategoryReference;
+  };
+};
+
+type SquareCatalogCategory = {
+  id?: string;
+  type?: string;
+  category_data?: {
+    name?: string;
+  };
+};
+
 const getSquareApiToken = () => process.env.SQUARE_ACCESS_TOKEN?.trim() || "";
 const getSquareEnvironment = () => (process.env.SQUARE_ENVIRONMENT?.trim().toLowerCase() || "production");
 
@@ -160,6 +181,65 @@ export const searchSquarePaymentByOrderId = async (orderId: string) => {
   }
 
   return json?.payments?.[0] ?? null;
+};
+
+export const readSquareCatalogItemCollections = async (itemIds: string[]) => {
+  const normalizedItemIds = [...new Set(itemIds.map((id) => id.trim()).filter(Boolean))];
+  if (normalizedItemIds.length === 0) {
+    return new Map<string, string[]>();
+  }
+
+  const itemResponse = await squareFetch<{ objects?: SquareCatalogItem[] }>(
+    "/v2/catalog/batch-retrieve",
+    {
+      object_ids: normalizedItemIds,
+      include_related_objects: false,
+    },
+    "Could not load Square catalog items.",
+  );
+
+  const items = itemResponse.objects ?? [];
+  const categoryIds = [
+    ...new Set(
+      items.flatMap((item) => [
+        ...(item.item_data?.categories?.map((category) => category.id?.trim()).filter(Boolean) ?? []),
+        item.item_data?.reporting_category?.id?.trim() || "",
+      ]).filter(Boolean),
+    ),
+  ];
+
+  if (categoryIds.length === 0) {
+    return new Map<string, string[]>();
+  }
+
+  const categoryResponse = await squareFetch<{ objects?: SquareCatalogCategory[] }>(
+    "/v2/catalog/batch-retrieve",
+    {
+      object_ids: categoryIds,
+      include_related_objects: false,
+    },
+    "Could not load Square catalog categories.",
+  );
+
+  const categoryNameById = new Map(
+    (categoryResponse.objects ?? [])
+      .map((category) => [category.id?.trim(), category.category_data?.name?.trim()] as const)
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1])),
+  );
+
+  return new Map(
+    items.map((item) => {
+      const collectionNames = [
+        ...(item.item_data?.categories?.map((category) => category.id?.trim() || "").filter(Boolean) ?? []),
+        item.item_data?.reporting_category?.id?.trim() || "",
+      ]
+        .filter(Boolean)
+        .map((categoryId) => categoryNameById.get(categoryId))
+        .filter((name): name is string => Boolean(name));
+
+      return [item.id?.trim() || "", [...new Set(collectionNames)]] as const;
+    }).filter((entry): entry is readonly [string, string[]] => Boolean(entry[0])),
+  );
 };
 
 export const verifySquareWebhookSignature = ({

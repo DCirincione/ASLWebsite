@@ -21,6 +21,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "files.cdn.printful.com",
+      },
+      {
+        protocol: "https",
         hostname: "timesreview-images.s3.amazonaws.com",
       },
     ],
