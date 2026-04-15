@@ -76,6 +76,12 @@ const getCheckoutReadyVariants = (product: MerchProduct) =>
 const dedupeLabels = (values: Array<string | null | undefined>) =>
   [...new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])];
 
+const getProductGalleryImages = (product: MerchProduct | null | undefined) => {
+  const gallery = Array.isArray(product?.imageUrls) ? product.imageUrls : [];
+  if (gallery.length > 0) return gallery;
+  return product?.imageUrl ? [product.imageUrl] : [];
+};
+
 const matchesSelectedFilters = (product: MerchProduct, selectedValues: string[], values: string[]) => {
   if (selectedValues.length === 0) return true;
   return values.some((value) => selectedValues.includes(toOptionId(value)));
@@ -266,14 +272,28 @@ function ProductCard({
   onOpenProduct: (product: MerchProduct) => void;
 }) {
   const checkoutVariants = getCheckoutReadyVariants(product);
+  const productImageUrls = getProductGalleryImages(product);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const activeImageUrl = productImageUrls[activeImageIndex] ?? productImageUrls[0] ?? null;
+  const hasMultipleImages = productImageUrls.length > 1;
+
+  const showPreviousImage = () => {
+    if (!hasMultipleImages) return;
+    setActiveImageIndex((current) => (current - 1 + productImageUrls.length) % productImageUrls.length);
+  };
+
+  const showNextImage = () => {
+    if (!hasMultipleImages) return;
+    setActiveImageIndex((current) => (current + 1) % productImageUrls.length);
+  };
 
   return (
     <article className="merch-card">
-      <div className={`merch-card__visual${product.imageUrl ? " merch-card__visual--image" : ""}`}>
-        {product.imageUrl ? (
+      <div className={`merch-card__visual${activeImageUrl ? " merch-card__visual--image" : ""}`}>
+        {activeImageUrl ? (
           <div className="merch-card__image-wrap">
             <Image
-              src={product.imageUrl}
+              src={activeImageUrl}
               alt={product.name}
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 960px) 50vw, (max-width: 1200px) 33vw, 25vw"
@@ -281,11 +301,45 @@ function ProductCard({
             />
           </div>
         ) : null}
+        {hasMultipleImages ? (
+          <>
+            <div className="merch-card__gallery-controls">
+              <button
+                type="button"
+                className="merch-card__gallery-button"
+                onClick={showPreviousImage}
+                aria-label={`Show previous ${product.name} mockup`}
+              >
+                ‹
+              </button>
+              <button
+                type="button"
+                className="merch-card__gallery-button"
+                onClick={showNextImage}
+                aria-label={`Show next ${product.name} mockup`}
+              >
+                ›
+              </button>
+            </div>
+            <div className="merch-card__gallery-dots" aria-label={`${product.name} mockups`}>
+              {productImageUrls.map((imageUrl, index) => (
+                <button
+                  key={imageUrl}
+                  type="button"
+                  className={`merch-card__gallery-dot${activeImageIndex === index ? " is-active" : ""}`}
+                  onClick={() => setActiveImageIndex(index)}
+                  aria-label={`Show ${product.name} mockup ${index + 1}`}
+                  aria-pressed={activeImageIndex === index}
+                />
+              ))}
+            </div>
+          </>
+        ) : null}
         <div className="merch-card__badges">
           <span className="merch-card__badge">{product.category}</span>
           {product.sport ? <span className="merch-card__badge merch-card__badge--muted">{product.sport}</span> : null}
         </div>
-        {!product.imageUrl ? (
+        {!activeImageUrl ? (
           <div className="merch-card__placeholder" aria-hidden="true">
             <span>Aldrich Sports</span>
             <strong>{product.category}</strong>
@@ -353,9 +407,12 @@ function ProductOptionsDialog({
     : [];
   const needsSizeChoice = sizeOptions.length > 1;
   const needsColorChoice = colorOptions.length > 1;
+  const productImageUrls = getProductGalleryImages(product);
+  const firstProductImageUrl = productImageUrls[0] ?? "";
 
   const [selectedSize, setSelectedSize] = useState<string>("");
   const [selectedColor, setSelectedColor] = useState<string>("");
+  const [selectedImageUrl, setSelectedImageUrl] = useState<string>(firstProductImageUrl);
 
   useEffect(() => {
     if (!product) return;
@@ -382,6 +439,8 @@ function ProductOptionsDialog({
   }, [product]);
 
   if (!purchasesEnabled || !product) return null;
+
+  const activeImageUrl = productImageUrls.includes(selectedImageUrl) ? selectedImageUrl : (firstProductImageUrl || null);
 
   const normalizedSelectedColor = colorOptions.includes(selectedColor) ? selectedColor : "";
   const provisionalSizeAvailability = sizeOptions.map((size) => ({
@@ -462,22 +521,49 @@ function ProductOptionsDialog({
 
         <div className="merch-product-dialog__layout">
           <div className="merch-product-dialog__visual">
-            {product.imageUrl ? (
-              <div className="merch-product-dialog__image-wrap">
-                <Image
-                  src={product.imageUrl}
-                  alt={product.name}
-                  fill
-                  sizes="(max-width: 900px) 100vw, 48vw"
-                  className="merch-product-dialog__image"
-                />
+            <div className="merch-product-dialog__stage">
+              {activeImageUrl ? (
+                <div className="merch-product-dialog__image-wrap">
+                  <Image
+                    src={activeImageUrl}
+                    alt={product.name}
+                    fill
+                    sizes="(max-width: 900px) 100vw, 48vw"
+                    className="merch-product-dialog__image"
+                  />
+                </div>
+              ) : (
+                <div className="merch-product-dialog__placeholder" aria-hidden="true">
+                  <span>Aldrich Sports</span>
+                  <strong>{product.category}</strong>
+                </div>
+              )}
+            </div>
+
+            {productImageUrls.length > 1 ? (
+              <div className="merch-product-dialog__thumbnails" aria-label={`${product.name} mockups`}>
+                {productImageUrls.map((imageUrl, index) => (
+                  <button
+                    key={imageUrl}
+                    type="button"
+                    className={`merch-product-dialog__thumbnail${activeImageUrl === imageUrl ? " is-active" : ""}`}
+                    onClick={() => setSelectedImageUrl(imageUrl)}
+                    aria-label={`View ${product.name} mockup ${index + 1}`}
+                    aria-pressed={activeImageUrl === imageUrl}
+                  >
+                    <span className="merch-product-dialog__thumbnail-image-wrap">
+                      <Image
+                        src={imageUrl}
+                        alt=""
+                        fill
+                        sizes="72px"
+                        className="merch-product-dialog__thumbnail-image"
+                      />
+                    </span>
+                  </button>
+                ))}
               </div>
-            ) : (
-              <div className="merch-product-dialog__placeholder" aria-hidden="true">
-                <span>Aldrich Sports</span>
-                <strong>{product.category}</strong>
-              </div>
-            )}
+            ) : null}
           </div>
 
           <div className="merch-product-dialog__copy">

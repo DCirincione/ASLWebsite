@@ -25,6 +25,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "items-images-production.s3.us-west-2.amazonaws.com",
+      },
+      {
+        protocol: "https",
         hostname: "timesreview-images.s3.amazonaws.com",
       },
     ],

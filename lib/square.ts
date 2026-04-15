@@ -42,6 +42,7 @@ type SquareCatalogItem = {
   id?: string;
   type?: string;
   item_data?: {
+    image_ids?: string[];
     categories?: SquareCatalogCategoryReference[];
     reporting_category?: SquareCatalogCategoryReference;
   };
@@ -53,6 +54,19 @@ type SquareCatalogCategory = {
   category_data?: {
     name?: string;
   };
+};
+
+type SquareCatalogImage = {
+  id?: string;
+  type?: string;
+  image_data?: {
+    url?: string;
+  };
+};
+
+export type SquareCatalogItemMerchDetails = {
+  collections: string[];
+  imageUrls: string[];
 };
 
 const getSquareApiToken = () => process.env.SQUARE_ACCESS_TOKEN?.trim() || "";
@@ -183,22 +197,28 @@ export const searchSquarePaymentByOrderId = async (orderId: string) => {
   return json?.payments?.[0] ?? null;
 };
 
-export const readSquareCatalogItemCollections = async (itemIds: string[]) => {
+export const readSquareCatalogItemMerchDetails = async (itemIds: string[]) => {
   const normalizedItemIds = [...new Set(itemIds.map((id) => id.trim()).filter(Boolean))];
   if (normalizedItemIds.length === 0) {
-    return new Map<string, string[]>();
+    return new Map<string, SquareCatalogItemMerchDetails>();
   }
 
-  const itemResponse = await squareFetch<{ objects?: SquareCatalogItem[] }>(
+  const itemResponse = await squareFetch<{ objects?: SquareCatalogItem[]; related_objects?: Array<SquareCatalogCategory | SquareCatalogImage> }>(
     "/v2/catalog/batch-retrieve",
     {
       object_ids: normalizedItemIds,
-      include_related_objects: false,
+      include_related_objects: true,
     },
     "Could not load Square catalog items.",
   );
 
   const items = itemResponse.objects ?? [];
+  const imageUrlById = new Map(
+    (itemResponse.related_objects ?? [])
+      .filter((entry): entry is SquareCatalogImage => entry?.type === "IMAGE")
+      .map((image) => [image.id?.trim(), image.image_data?.url?.trim()] as const)
+      .filter((entry): entry is readonly [string, string] => Boolean(entry[0] && entry[1])),
+  );
   const categoryIds = [
     ...new Set(
       items.flatMap((item) => [
@@ -209,7 +229,24 @@ export const readSquareCatalogItemCollections = async (itemIds: string[]) => {
   ];
 
   if (categoryIds.length === 0) {
-    return new Map<string, string[]>();
+    return new Map(
+      items
+        .map((item) => {
+          const imageUrls = (item.item_data?.image_ids ?? [])
+            .map((imageId) => imageUrlById.get(imageId?.trim() || ""))
+            .filter((url): url is string => Boolean(url));
+          const merchDetails: SquareCatalogItemMerchDetails = {
+            collections: [],
+            imageUrls,
+          };
+
+          return [
+            item.id?.trim() || "",
+            merchDetails,
+          ] as const;
+        })
+        .filter((entry): entry is readonly [string, SquareCatalogItemMerchDetails] => Boolean(entry[0])),
+    );
   }
 
   const categoryResponse = await squareFetch<{ objects?: SquareCatalogCategory[] }>(
@@ -236,9 +273,25 @@ export const readSquareCatalogItemCollections = async (itemIds: string[]) => {
         .filter(Boolean)
         .map((categoryId) => categoryNameById.get(categoryId))
         .filter((name): name is string => Boolean(name));
+      const imageUrls = (item.item_data?.image_ids ?? [])
+        .map((imageId) => imageUrlById.get(imageId?.trim() || ""))
+        .filter((url): url is string => Boolean(url));
 
-      return [item.id?.trim() || "", [...new Set(collectionNames)]] as const;
-    }).filter((entry): entry is readonly [string, string[]] => Boolean(entry[0])),
+      return [
+        item.id?.trim() || "",
+        {
+          collections: [...new Set(collectionNames)],
+          imageUrls,
+        },
+      ] as const;
+    }).filter((entry): entry is readonly [string, SquareCatalogItemMerchDetails] => Boolean(entry[0])),
+  );
+};
+
+export const readSquareCatalogItemCollections = async (itemIds: string[]) => {
+  const details = await readSquareCatalogItemMerchDetails(itemIds);
+  return new Map(
+    [...details.entries()].map(([itemId, entry]) => [itemId, entry.collections] as const),
   );
 };
 

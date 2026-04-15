@@ -1,4 +1,4 @@
-import { readSquareCatalogItemCollections } from "./square";
+import { readSquareCatalogItemMerchDetails } from "./square";
 
 type PrintfulPaging = {
   total?: number;
@@ -110,6 +110,7 @@ export type MerchProduct = {
   priceMax: number | null;
   priceLabel: string;
   imageUrl: string | null;
+  imageUrls: string[];
   ctaUrl: string | null;
   ctaLabel: string;
   availability: string;
@@ -454,33 +455,42 @@ const inferSport = (name: string) => {
   return null;
 };
 
-const resolveProductImage = (
+const dedupeHttpUrls = (values: Array<string | null | undefined>) => {
+  const seen = new Set<string>();
+  const urls: string[] = [];
+
+  for (const value of values) {
+    const normalized = value?.trim() || "";
+    if (!isHttpUrl(normalized) || seen.has(normalized)) continue;
+    seen.add(normalized);
+    urls.push(normalized);
+  }
+
+  return urls;
+};
+
+const resolveVariantFileImageUrl = (file: PrintfulSyncVariantFile) => {
+  const candidates = [file.preview_url, file.thumbnail_url, file.url];
+  return candidates.find((candidate) => isHttpUrl(candidate))?.trim() || null;
+};
+
+const resolveProductImages = (
   product: PrintfulSyncProductSummary | undefined,
   variants: PrintfulSyncVariant[],
 ) => {
-  const previewFile = variants
-    .flatMap((variant) => variant.files ?? [])
-    .find((file) => file.type === "preview" && isHttpUrl(file.preview_url || file.thumbnail_url || file.url));
+  const previewImages = dedupeHttpUrls(variants.flatMap((variant) =>
+    (variant.files ?? [])
+      .filter((file) => (file.type?.trim().toLowerCase() || "") === "preview")
+      .map((file) => resolveVariantFileImageUrl(file)),
+  ));
 
-  if (previewFile) {
-    return previewFile.preview_url || previewFile.thumbnail_url || previewFile.url || null;
+  if (previewImages.length > 0) {
+    return previewImages;
   }
 
-  if (isHttpUrl(product?.thumbnail_url)) {
-    return product?.thumbnail_url || null;
-  }
+  const productImages = variants.flatMap((variant) => dedupeHttpUrls([variant.product?.image]));
 
-  const variantWithProductImage = variants.find((variant) => isHttpUrl(variant.product?.image));
-  if (variantWithProductImage?.product?.image) {
-    return variantWithProductImage.product.image;
-  }
-
-  const variantWithImage = variants.find((variant) =>
-    variant.files?.some((file) => isHttpUrl(file.preview_url || file.thumbnail_url || file.url)),
-  );
-
-  const file = variantWithImage?.files?.find((entry) => isHttpUrl(entry.preview_url || entry.thumbnail_url || entry.url));
-  return file?.preview_url || file?.thumbnail_url || file?.url || product?.thumbnail_url || null;
+  return dedupeHttpUrls([product?.thumbnail_url, ...productImages]);
 };
 
 const isHttpUrl = (value: string | null | undefined) => {
@@ -534,7 +544,8 @@ const mapPrintfulProduct = (
   details: PrintfulSyncProductDetails,
   fallbackId: string,
   storefrontUrl: string | null,
-  collections: string[],
+  squareCollections: string[],
+  squareImageUrls: string[],
   index: number,
 ): MerchProduct | null => {
   const syncProduct = details.sync_product;
@@ -563,6 +574,7 @@ const mapPrintfulProduct = (
   const sport = inferSport(name);
   const externalId = syncProduct?.external_id?.trim() || null;
   const ctaUrl = resolveProductLink(externalId, storefrontUrl);
+  const imageUrls = squareImageUrls.length > 0 ? squareImageUrls : resolveProductImages(syncProduct, variants);
 
   return {
     id: syncProduct?.id != null ? String(syncProduct.id) : fallbackId,
@@ -570,8 +582,8 @@ const mapPrintfulProduct = (
     description: buildDescription(sizes, colors, category),
     category,
     categoryKey: slugifyValue(category),
-    collections,
-    collectionKeys: collections.map((collection) => slugifyValue(collection)),
+    collections: squareCollections,
+    collectionKeys: squareCollections.map((collection) => slugifyValue(collection)),
     sport,
     sportKey: sport ? slugifyValue(sport) : null,
     sizes,
@@ -579,7 +591,8 @@ const mapPrintfulProduct = (
     priceMin,
     priceMax,
     priceLabel: formatPriceRange(priceMin, priceMax),
-    imageUrl: resolveProductImage(syncProduct, variants),
+    imageUrl: imageUrls[0] ?? null,
+    imageUrls,
     ctaUrl,
     ctaLabel: ctaUrl ? (isHttpUrl(externalId) ? "View Product" : "Open Store") : "Coming Soon",
     availability: variants.some((variant) => (variant.availability_status || "").toLowerCase() === "out_of_stock")
@@ -705,22 +718,26 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
       );
     }
 
-    const squareCollectionsByItemId = await readSquareCatalogItemCollections(
+    const squareItemDetailsByItemId = await readSquareCatalogItemMerchDetails(
       dedupeStrings(summaries.map((summary) => summary.external_id)),
-    ).catch(() => new Map<string, string[]>());
+    ).catch(() => new Map());
 
     const detailResults = await Promise.allSettled(
       summaries
         .filter((summary) => summary.id != null && !summary.is_ignored)
         .map((summary, index) =>
           fetchPrintfulProductDetails(String(summary.id), activeMode, storeId || undefined).then((details) =>
-            mapPrintfulProduct(
-              details,
-              `printful-${index}`,
-              storefrontUrl,
-              squareCollectionsByItemId.get(details.sync_product?.external_id?.trim() || "") ?? [],
-              index,
-            ),
+            {
+              const squareItemDetails = squareItemDetailsByItemId.get(details.sync_product?.external_id?.trim() || "");
+              return mapPrintfulProduct(
+                details,
+                `printful-${index}`,
+                storefrontUrl,
+                squareItemDetails?.collections ?? [],
+                squareItemDetails?.imageUrls ?? [],
+                index,
+              );
+            }
           ),
         ),
     );
