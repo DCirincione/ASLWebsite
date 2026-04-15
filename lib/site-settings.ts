@@ -18,8 +18,13 @@ export type HomeBannerSettings = {
   buttonPageHref: string;
 };
 
+export type MerchSettings = {
+  purchasesEnabled: boolean;
+};
+
 export type SiteSettings = {
   homeBanner: HomeBannerSettings;
+  merch: MerchSettings;
 };
 
 const DEFAULT_SITE_SETTINGS: SiteSettings = {
@@ -29,6 +34,9 @@ const DEFAULT_SITE_SETTINGS: SiteSettings = {
     buttonTarget: "none",
     buttonEventId: "",
     buttonPageHref: "",
+  },
+  merch: {
+    purchasesEnabled: true,
   },
 };
 
@@ -72,6 +80,12 @@ const normalizeSiteSettings = (value?: Partial<SiteSettings> | null): SiteSettin
       buttonTarget,
       buttonEventId: buttonTarget === "event" ? buttonEventId : "",
       buttonPageHref: buttonTarget === "page" ? buttonPageHref : "",
+    },
+    merch: {
+      purchasesEnabled:
+        typeof value?.merch?.purchasesEnabled === "boolean"
+          ? value.merch.purchasesEnabled
+          : DEFAULT_SITE_SETTINGS.merch.purchasesEnabled,
     },
   };
 };

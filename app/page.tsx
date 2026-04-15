@@ -85,6 +85,7 @@ export default async function Home() {
 
       <Section
         id="events"
+        className="home-events-section"
         eyebrow="Upcoming"
         title="Upcoming Events"
         description="Check out the latest tournaments and leagues happening near you."

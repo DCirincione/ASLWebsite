@@ -6,60 +6,7 @@
     "buttonEventId": "8ad9baff-5d65-4be1-8268-b51b8115ff5f",
     "buttonPageHref": ""
   },
-  "sundayLeagueSignup": {
-    "infoModal": {
-      "eyebrow": "Sunday League",
-      "title": "CREATE YOUR TEAM (IMPORTANT)",
-      "managerNotice": "Only the Manager should create the team and complete this form.",
-      "actionsIntro": "Once created, you can:",
-      "actionItems": [
-        "Invite/accept/remove players",
-        "Edit team info + logo",
-        "Assign roles (Co-Captain)"
-      ],
-      "hubHeading": "TEAM HUB",
-      "hubIntro": "You'll have access to:",
-      "hubItems": [
-        "Roster, schedule, stats, standings",
-        "Team inbox/messages"
-      ],
-      "importantHeading": "IMPORTANT",
-      "importantNotice": "All players must create an account and join your team on the site.",
-      "closing": "Get your team set up and ready. ⚽"
-    },
-    "form": {
-      "modalEyebrow": "Create a Sunday League Team",
-      "modalTitle": "Create Your Team",
-      "introTitle": "Create a Sunday League Team",
-      "introBody": "Only the team captain should complete this form. By creating a team, the captain is reserving a spot in the Aldrich Sunday League and agrees to submit the required $100 deposit. The remaining balance will be due on the first Sunday of the season. After this form is submitted, the captain will gain access to the team portal, where they can manage their roster, invite players, and update team information.",
-      "captainSectionTitle": "Captain Information",
-      "captainNameLabel": "Full Name",
-      "captainPhoneLabel": "Phone Number",
-      "captainEmailLabel": "Email Address",
-      "captainPlayingPrompt": "Are you also playing on this team?",
-      "captainPlayingYesLabel": "Yes, I am also playing on this team",
-      "captainPlayingNoLabel": "No, I am only managing",
-      "teamSectionTitle": "Team Information",
-      "teamNameLabel": "Team Name",
-      "teamNameHelp": "Can be edited later in the team portal.",
-      "primaryColorLabel": "Primary color (Optional)",
-      "secondaryColorLabel": "Secondary color (Optional)",
-      "accentColorLabel": "Optional accent color",
-      "jerseyDesignLabel": "Preferred Jersey Design / Style",
-      "jerseyDesignHelp": "Optional. Add this if you already know the look you want.",
-      "logoUploadLabel": "Upload Team Logo",
-      "logoDescriptionLabel": "If you do not have a logo yet, describe what you want your logo to look like",
-      "jerseySectionTitle": "Jersey Information",
-      "jerseySectionBody": "Jersey numbers for your 10 included jerseys.",
-      "jerseyNumberLabelPrefix": "Number",
-      "agreementsSectionTitle": "Captain Agreements",
-      "agreementLabels": {
-        "captain_confirmed": "I confirm that I am the captain or authorized manager of this team.",
-        "deposit_required": "I understand a $100 deposit is required to reserve my team's spot.",
-        "balance_due": "I understand the remaining balance is due on the first Sunday of the season.",
-        "approval_not_guaranteed": "I understand that creating a team does not guarantee final approval until payment and league requirements are completed.",
-        "rules_accepted": "I agree to the Aldrich Sunday League rules, roster policies, and captain responsibilities."
-      }
-    }
+  "merch": {
+    "purchasesEnabled": false
   }
 }

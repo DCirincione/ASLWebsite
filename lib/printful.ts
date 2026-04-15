@@ -1,3 +1,5 @@
+import { readSquareCatalogItemCollections } from "./square";
+
 type PrintfulPaging = {
   total?: number;
   offset?: number;
@@ -71,6 +73,27 @@ export type MerchFilterOption = {
   count: number;
 };
 
+export type MerchVariant = {
+  id: string;
+  externalId: string | null;
+  name: string;
+  size: string | null;
+  color: string | null;
+  price: number | null;
+  priceLabel: string;
+  availability: string;
+  checkoutReady: boolean;
+};
+
+export type MerchCheckoutConfig = {
+  enabled: boolean;
+  provider: "square";
+  currencyCode: string;
+  shippingFeeCents: number | null;
+  shippingFeeLabel: string;
+  statusMessage: string | null;
+};
+
 export type MerchProduct = {
   id: string;
   name: string;
@@ -91,6 +114,7 @@ export type MerchProduct = {
   ctaLabel: string;
   availability: string;
   featured: boolean;
+  variants: MerchVariant[];
 };
 
 export type MerchCatalog = {
@@ -98,6 +122,7 @@ export type MerchCatalog = {
   storeName: string | null;
   storefrontUrl: string | null;
   statusMessage: string | null;
+  checkout: MerchCheckoutConfig;
   products: MerchProduct[];
   filters: {
     categories: MerchFilterOption[];
@@ -186,6 +211,37 @@ const getPrintfulProductSource = (): PrintfulProductPathMode | "" => {
 };
 
 export const getPrintfulStorefrontUrl = () => (process.env.PRINTFUL_STOREFRONT_URL?.trim() || "").replace(/\/+$/, "");
+export const MERCH_CHECKOUT_CURRENCY = "USD";
+
+export const getMerchShippingFeeCents = () => {
+  const rawValue = process.env.MERCH_SHIPPING_FEE_CENTS?.trim();
+  if (!rawValue) return null;
+
+  const parsed = Number.parseInt(rawValue, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return null;
+  return parsed;
+};
+
+export const getMerchShippingFeeLabel = () => process.env.MERCH_SHIPPING_FEE_LABEL?.trim() || "Shipping";
+
+export const readMerchCheckoutConfig = (): MerchCheckoutConfig => {
+  const hasSquareAccessToken = Boolean(process.env.SQUARE_ACCESS_TOKEN?.trim());
+  const hasSquareLocationId = Boolean(process.env.SQUARE_LOCATION_ID?.trim());
+  const hasAppUrl = Boolean(process.env.APP_URL?.trim());
+  const shippingFeeCents = getMerchShippingFeeCents();
+
+  return {
+    enabled: hasSquareAccessToken && hasSquareLocationId && hasAppUrl,
+    provider: "square",
+    currencyCode: MERCH_CHECKOUT_CURRENCY,
+    shippingFeeCents,
+    shippingFeeLabel: getMerchShippingFeeLabel(),
+    statusMessage:
+      hasSquareAccessToken && hasSquareLocationId && hasAppUrl
+        ? null
+        : "Square merch checkout is not configured yet.",
+  };
+};
 
 const slugifyValue = (value: string) =>
   value
@@ -244,6 +300,26 @@ const sortCategories = (categories: string[]) =>
     }
 
     return left.localeCompare(right);
+  });
+
+const sortMerchVariants = (variants: MerchVariant[]) =>
+  [...variants].sort((left, right) => {
+    const leftSize = left.size?.trim() || "";
+    const rightSize = right.size?.trim() || "";
+    if (leftSize !== rightSize) {
+      const sortedPair = sortSizes([leftSize, rightSize].filter(Boolean));
+      if (sortedPair.length === 2) {
+        return sortedPair[0] === leftSize ? -1 : 1;
+      }
+
+      if (!leftSize) return -1;
+      if (!rightSize) return 1;
+      return leftSize.localeCompare(rightSize);
+    }
+
+    const leftColor = left.color?.trim() || "";
+    const rightColor = right.color?.trim() || "";
+    return leftColor.localeCompare(rightColor);
   });
 
 const resolvePrintfulHeaders = (storeId?: string) => {
@@ -433,6 +509,27 @@ const buildDescription = (sizes: string[], colors: string[], category: string) =
   return `${category} option with ${sizeText} and ${colorText}.`;
 };
 
+const mapPrintfulVariant = (variant: PrintfulSyncVariant): MerchVariant | null => {
+  const variantId = variant.id != null ? String(variant.id) : "";
+  if (!variantId) return null;
+
+  const price = parsePrice(variant.retail_price);
+  const availability = (variant.availability_status || "").toLowerCase() || "active";
+  const externalId = variant.external_id?.trim() || null;
+
+  return {
+    id: variantId,
+    externalId,
+    name: variant.name?.trim() || variant.product?.name?.trim() || `Variant ${variantId}`,
+    size: variant.size?.trim() || null,
+    color: variant.color?.trim() || null,
+    price,
+    priceLabel: price != null ? currencyFormatter.format(price) : "Price varies",
+    availability,
+    checkoutReady: Boolean(externalId) && availability !== "discontinued",
+  };
+};
+
 const mapPrintfulProduct = (
   details: PrintfulSyncProductDetails,
   fallbackId: string,
@@ -448,6 +545,12 @@ const mapPrintfulProduct = (
     return null;
   }
 
+  const mappedVariants = sortMerchVariants(
+    variants.flatMap((variant) => {
+      const mapped = mapPrintfulVariant(variant);
+      return mapped ? [mapped] : [];
+    }),
+  );
   const sizes = sortSizes(dedupeStrings(variants.map((variant) => variant.size)));
   const colors = dedupeStrings(variants.map((variant) => variant.color)).sort((left, right) => left.localeCompare(right));
   const prices = variants
@@ -483,6 +586,7 @@ const mapPrintfulProduct = (
       ? "out_of_stock"
       : "active",
     featured: index < 3,
+    variants: mappedVariants,
   };
 };
 
@@ -552,12 +656,14 @@ const buildFilterOptions = (products: MerchProduct[]): MerchCatalog["filters"] =
 const buildFallbackCatalog = (statusMessage: string | null): MerchCatalog => {
   const storefrontUrl = getPrintfulStorefrontUrl() || null;
   const products: MerchProduct[] = [];
+  const checkout = readMerchCheckoutConfig();
 
   return {
     source: "fallback",
     storeName: null,
     storefrontUrl,
     statusMessage,
+    checkout,
     products,
     filters: buildFilterOptions(products),
   };
@@ -565,6 +671,7 @@ const buildFallbackCatalog = (statusMessage: string | null): MerchCatalog => {
 
 export async function readMerchCatalog(): Promise<MerchCatalog> {
   const token = getPrintfulApiToken();
+  const checkout = readMerchCheckoutConfig();
 
   if (!token) {
     return buildFallbackCatalog(
@@ -641,6 +748,7 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
       statusMessage: detailResults.some((result) => result.status === "rejected")
         ? "Some Printful items could not be loaded, so the storefront is showing the products that were available."
         : null,
+      checkout,
       products,
       filters: buildFilterOptions(products),
     };
@@ -649,4 +757,3 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
     return buildFallbackCatalog(message);
   }
 }
-import { readSquareCatalogItemCollections } from "./square";

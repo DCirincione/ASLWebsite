@@ -5,6 +5,7 @@ import { MerchStorefront } from "@/components/merch-storefront";
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
 import { readMerchCatalog } from "@/lib/printful";
+import { readSiteSettings } from "@/lib/site-settings";
 
 export const metadata: Metadata = {
   title: "Merch",
@@ -14,12 +15,12 @@ export const metadata: Metadata = {
 export default async function MerchPage() {
   noStore();
 
-  const catalog = await readMerchCatalog();
+  const [catalog, siteSettings] = await Promise.all([readMerchCatalog(), readSiteSettings()]);
 
   return (
     <PageShell>
       <Section id="merch-page" className="merch-section" title="Merchandise" headingLevel="h1" showHeader={false}>
-        <MerchStorefront catalog={catalog} />
+        <MerchStorefront catalog={catalog} purchasesEnabled={siteSettings.merch.purchasesEnabled} />
       </Section>
     </PageShell>
   );

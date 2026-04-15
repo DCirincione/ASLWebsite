@@ -2,12 +2,13 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-import type { MerchCatalog, MerchFilterOption, MerchProduct } from "@/lib/printful";
+import type { MerchCatalog, MerchFilterOption, MerchProduct, MerchVariant } from "@/lib/printful";
 
 type MerchStorefrontProps = {
   catalog: MerchCatalog;
+  purchasesEnabled: boolean;
 };
 
 type FilterState = {
@@ -29,6 +30,25 @@ type FilterGroupKey =
 
 type FilterDropdownId = "sports" | "gender" | "collection" | "sizes" | "colors";
 
+type MerchCartItem = {
+  productId: string;
+  variantId: string;
+  quantity: number;
+};
+
+type MerchCartDetail = MerchCartItem & {
+  product: MerchProduct;
+  variant: MerchVariant;
+  lineTotal: number;
+};
+
+type MerchCheckoutStatus =
+  | { type: "idle"; message?: undefined }
+  | { type: "loading"; message: string }
+  | { type: "error"; message: string };
+
+const MERCH_CART_STORAGE_KEY = "asl-merch-cart-v2";
+
 const toOptionId = (value: string) =>
   value
     .trim()
@@ -39,6 +59,22 @@ const toOptionId = (value: string) =>
 
 const toggleSelection = (current: string[], value: string) =>
   current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value];
+
+const formatCurrency = (amount: number, currencyCode: string) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currencyCode,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+
+const formatCents = (amountCents: number, currencyCode: string) => formatCurrency(amountCents / 100, currencyCode);
+
+const getCheckoutReadyVariants = (product: MerchProduct) =>
+  product.variants.filter((variant) => variant.checkoutReady && variant.availability !== "discontinued");
+
+const dedupeLabels = (values: Array<string | null | undefined>) =>
+  [...new Set(values.map((value) => value?.trim()).filter(Boolean) as string[])];
 
 const matchesSelectedFilters = (product: MerchProduct, selectedValues: string[], values: string[]) => {
   if (selectedValues.length === 0) return true;
@@ -132,6 +168,27 @@ const isGenderCollectionOption = (option: MerchFilterOption) =>
   /(^|-)women-s($|-)/.test(option.id) ||
   /(^|-)youth($|-)/.test(option.id);
 
+const parseStoredCartItems = (value: string | null): MerchCartItem[] => {
+  if (!value) return [];
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const item = entry as Partial<MerchCartItem>;
+      const productId = typeof item.productId === "string" ? item.productId.trim() : "";
+      const variantId = typeof item.variantId === "string" ? item.variantId.trim() : "";
+      const quantity = typeof item.quantity === "number" && Number.isFinite(item.quantity) ? Math.max(1, Math.floor(item.quantity)) : 1;
+      if (!productId || !variantId) return [];
+      return [{ productId, variantId, quantity }];
+    });
+  } catch {
+    return [];
+  }
+};
+
 function FilterGroup({
   groupId,
   title,
@@ -195,7 +252,21 @@ function FilterGroup({
   );
 }
 
-function ProductCard({ product }: { product: MerchProduct }) {
+function ProductCard({
+  product,
+  purchasesEnabled,
+  checkoutEnabled,
+  checkoutStatusMessage,
+  onOpenProduct,
+}: {
+  product: MerchProduct;
+  purchasesEnabled: boolean;
+  checkoutEnabled: boolean;
+  checkoutStatusMessage: string | null;
+  onOpenProduct: (product: MerchProduct) => void;
+}) {
+  const checkoutVariants = getCheckoutReadyVariants(product);
+
   return (
     <article className="merch-card">
       <div className={`merch-card__visual${product.imageUrl ? " merch-card__visual--image" : ""}`}>
@@ -230,26 +301,535 @@ function ProductCard({ product }: { product: MerchProduct }) {
           </div>
         </div>
 
-        {product.ctaUrl ? (
+        {!purchasesEnabled ? (
+          <span className="merch-card__cta merch-card__cta--disabled">
+            Coming Soon
+          </span>
+        ) : checkoutEnabled && checkoutVariants.length > 0 ? (
+          <button
+            type="button"
+            className="button primary merch-card__cta"
+            onClick={() => onOpenProduct(product)}
+          >
+            View Details
+          </button>
+        ) : product.ctaUrl ? (
           <a className="button primary merch-card__cta" href={product.ctaUrl} target="_blank" rel="noreferrer">
             {product.ctaLabel}
           </a>
         ) : (
-          <span className="merch-card__cta merch-card__cta--disabled">Available Soon</span>
+          <span className="merch-card__cta merch-card__cta--disabled">
+            {checkoutStatusMessage || "Checkout Unavailable"}
+          </span>
         )}
       </div>
     </article>
   );
 }
 
-export function MerchStorefront({ catalog }: MerchStorefrontProps) {
+function ProductOptionsDialog({
+  product,
+  purchasesEnabled,
+  checkoutEnabled,
+  checkoutStatusMessage,
+  currencyCode,
+  onAddToCart,
+  onClose,
+}: {
+  product: MerchProduct | null;
+  purchasesEnabled: boolean;
+  checkoutEnabled: boolean;
+  checkoutStatusMessage: string | null;
+  currencyCode: string;
+  onAddToCart: (product: MerchProduct, variant: MerchVariant) => void;
+  onClose: () => void;
+}) {
+  const checkoutVariants = product ? getCheckoutReadyVariants(product) : [];
+  const sizeOptions = product
+    ? product.sizes.filter((size) => checkoutVariants.some((variant) => variant.size === size))
+    : [];
+  const colorOptions = product
+    ? product.colors.filter((color) => checkoutVariants.some((variant) => variant.color === color))
+    : [];
+  const needsSizeChoice = sizeOptions.length > 1;
+  const needsColorChoice = colorOptions.length > 1;
+
+  const [selectedSize, setSelectedSize] = useState<string>("");
+  const [selectedColor, setSelectedColor] = useState<string>("");
+
+  useEffect(() => {
+    if (!product) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [product, onClose]);
+
+  useEffect(() => {
+    if (!product) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [product]);
+
+  if (!purchasesEnabled || !product) return null;
+
+  const normalizedSelectedColor = colorOptions.includes(selectedColor) ? selectedColor : "";
+  const provisionalSizeAvailability = sizeOptions.map((size) => ({
+    label: size,
+    disabled:
+      !checkoutVariants.some(
+        (variant) => variant.size === size && (!normalizedSelectedColor || variant.color === normalizedSelectedColor),
+      ),
+  }));
+  const enabledSizes = provisionalSizeAvailability.filter((option) => !option.disabled).map((option) => option.label);
+  const effectiveSelectedSize =
+    selectedSize && enabledSizes.includes(selectedSize)
+      ? selectedSize
+      : enabledSizes.length === 1
+        ? enabledSizes[0]
+        : "";
+
+  const provisionalColorAvailability = colorOptions.map((color) => ({
+    label: color,
+    disabled:
+      !checkoutVariants.some(
+        (variant) => variant.color === color && (!effectiveSelectedSize || variant.size === effectiveSelectedSize),
+      ),
+  }));
+  const enabledColors = provisionalColorAvailability.filter((option) => !option.disabled).map((option) => option.label);
+  const effectiveSelectedColor =
+    selectedColor && enabledColors.includes(selectedColor)
+      ? selectedColor
+      : enabledColors.length === 1
+        ? enabledColors[0]
+        : "";
+
+  const sizeAvailability = sizeOptions.map((size) => ({
+    label: size,
+    disabled:
+      !checkoutVariants.some(
+        (variant) => variant.size === size && (!effectiveSelectedColor || variant.color === effectiveSelectedColor),
+      ),
+  }));
+  const colorAvailability = colorOptions.map((color) => ({
+    label: color,
+    disabled:
+      !checkoutVariants.some(
+        (variant) => variant.color === color && (!effectiveSelectedSize || variant.size === effectiveSelectedSize),
+      ),
+  }));
+
+  const selectedVariant =
+    needsSizeChoice && !effectiveSelectedSize
+      ? null
+      : needsColorChoice && !effectiveSelectedColor
+        ? null
+        : checkoutVariants.find(
+            (variant) =>
+              (!effectiveSelectedSize || variant.size === effectiveSelectedSize) &&
+              (!effectiveSelectedColor || variant.color === effectiveSelectedColor),
+          ) ?? (checkoutVariants.length === 1 ? checkoutVariants[0] : null);
+
+  const canAddToCart = checkoutEnabled && Boolean(selectedVariant);
+  const priceLabel =
+    selectedVariant?.price != null
+      ? formatCurrency(selectedVariant.price, currencyCode)
+      : product.priceLabel;
+
+  const handleAddToCart = () => {
+    if (!selectedVariant) return;
+    onAddToCart(product, selectedVariant);
+    onClose();
+  };
+
+  return (
+    <div className="merch-product-dialog" role="dialog" aria-modal="true" aria-labelledby="merch-product-dialog-title">
+      <button type="button" className="merch-product-dialog__backdrop" onClick={onClose} aria-label="Close product details" />
+      <div className="merch-product-dialog__panel">
+        <button type="button" className="merch-product-dialog__close" onClick={onClose} aria-label="Close product details">
+          ×
+        </button>
+
+        <div className="merch-product-dialog__layout">
+          <div className="merch-product-dialog__visual">
+            {product.imageUrl ? (
+              <div className="merch-product-dialog__image-wrap">
+                <Image
+                  src={product.imageUrl}
+                  alt={product.name}
+                  fill
+                  sizes="(max-width: 900px) 100vw, 48vw"
+                  className="merch-product-dialog__image"
+                />
+              </div>
+            ) : (
+              <div className="merch-product-dialog__placeholder" aria-hidden="true">
+                <span>Aldrich Sports</span>
+                <strong>{product.category}</strong>
+              </div>
+            )}
+          </div>
+
+          <div className="merch-product-dialog__copy">
+            <div className="merch-card__badges">
+              <span className="merch-card__badge">{product.category}</span>
+              {product.sport ? <span className="merch-card__badge merch-card__badge--muted">{product.sport}</span> : null}
+            </div>
+
+            <div className="merch-product-dialog__header">
+              <h3 id="merch-product-dialog-title">{product.name}</h3>
+              <p>{priceLabel}</p>
+            </div>
+
+            <p className="merch-product-dialog__description">{product.description}</p>
+
+            {product.collections.length > 0 ? (
+              <p className="merch-product-dialog__meta">
+                <span>Collections</span>
+                <strong>{product.collections.join(" • ")}</strong>
+              </p>
+            ) : null}
+
+            {(sizeOptions.length > 0 || colorOptions.length > 0) ? (
+              <div className="merch-product-dialog__options">
+                {sizeOptions.length > 0 ? (
+                  <label className="merch-card__option">
+                    <span className="merch-card__option-label">Size</span>
+                    <select
+                      className="merch-card__option-select"
+                      value={effectiveSelectedSize}
+                      onChange={(event) => setSelectedSize(event.target.value)}
+                      disabled={!checkoutEnabled || sizeOptions.length === 1}
+                    >
+                      {needsSizeChoice ? <option value="">Select size</option> : null}
+                      {sizeAvailability.map((option) => (
+                        <option key={option.label} value={option.label} disabled={option.disabled}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+
+                {colorOptions.length > 0 ? (
+                  <label className="merch-card__option">
+                    <span className="merch-card__option-label">Color</span>
+                    <select
+                      className="merch-card__option-select"
+                      value={effectiveSelectedColor}
+                      onChange={(event) => setSelectedColor(event.target.value)}
+                      disabled={!checkoutEnabled || colorOptions.length === 1}
+                    >
+                      {needsColorChoice ? <option value="">Select color</option> : null}
+                      {colorAvailability.map((option) => (
+                        <option key={option.label} value={option.label} disabled={option.disabled}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </div>
+            ) : null}
+
+            {checkoutEnabled ? (
+              <button
+                type="button"
+                className={`button primary merch-card__cta${canAddToCart ? "" : " merch-card__cta--disabled-button"}`}
+                onClick={handleAddToCart}
+                disabled={!canAddToCart}
+              >
+                {selectedVariant ? "Add To Cart" : "Select Options"}
+              </button>
+            ) : product.ctaUrl ? (
+              <a className="button primary merch-card__cta" href={product.ctaUrl} target="_blank" rel="noreferrer">
+                {product.ctaLabel}
+              </a>
+            ) : (
+              <span className="merch-card__cta merch-card__cta--disabled">
+                {checkoutStatusMessage || "Checkout Unavailable"}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CartDialog({
+  isOpen,
+  purchasesEnabled,
+  cartDetails,
+  cartItemCount,
+  cartSubtotal,
+  shippingFeeCents,
+  cartTotal,
+  currencyCode,
+  shippingFeeLabel,
+  checkoutEnabled,
+  checkoutStatus,
+  checkoutStatusMessage,
+  onUpdateCartQuantity,
+  onRemoveFromCart,
+  onClearCart,
+  onCheckout,
+  onClose,
+}: {
+  isOpen: boolean;
+  purchasesEnabled: boolean;
+  cartDetails: MerchCartDetail[];
+  cartItemCount: number;
+  cartSubtotal: number;
+  shippingFeeCents: number | null;
+  cartTotal: number;
+  currencyCode: string;
+  shippingFeeLabel: string;
+  checkoutEnabled: boolean;
+  checkoutStatus: MerchCheckoutStatus;
+  checkoutStatusMessage: string | null;
+  onUpdateCartQuantity: (productId: string, variantId: string, nextQuantity: number) => void;
+  onRemoveFromCart: (productId: string, variantId: string) => void;
+  onClearCart: () => void;
+  onCheckout: () => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        onClose();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isOpen]);
+
+  if (!purchasesEnabled || !isOpen) return null;
+
+  return (
+    <div className="merch-cart-dialog" role="dialog" aria-modal="true" aria-labelledby="merch-cart-dialog-title">
+      <button type="button" className="merch-cart-dialog__backdrop" onClick={onClose} aria-label="Close cart" />
+      <div className="merch-cart-dialog__panel">
+        <button type="button" className="merch-cart-dialog__close" onClick={onClose} aria-label="Close cart">
+          ×
+        </button>
+
+        <section className="merch-cart merch-cart--dialog" aria-label="Merch cart">
+          <div className="merch-cart__header">
+            <div className="merch-cart__header-copy">
+              <p className="merch-results__eyebrow">Cart</p>
+              <div className="merch-cart__header-row">
+                <h3 id="merch-cart-dialog-title">Your Cart</h3>
+                <span className="merch-cart__count-pill">
+                  {cartItemCount} item{cartItemCount === 1 ? "" : "s"}
+                </span>
+              </div>
+            </div>
+            {cartDetails.length > 0 ? (
+              <button type="button" className="button ghost merch-cart__clear" onClick={onClearCart}>
+                Clear Cart
+              </button>
+            ) : null}
+          </div>
+
+          <div className="merch-cart__body">
+            <div className="merch-cart__items-panel">
+              {cartDetails.length > 0 ? (
+                <div className="merch-cart__items">
+                  {cartDetails.map((item) => (
+                    <div key={`${item.product.id}:${item.variant.id}`} className="merch-cart__item">
+                      <div className="merch-cart__item-overview">
+                        <div className="merch-cart__item-media">
+                          {item.product.imageUrl ? (
+                            <Image
+                              src={item.product.imageUrl}
+                              alt={item.product.name}
+                              fill
+                              sizes="88px"
+                              className="merch-cart__item-image"
+                            />
+                          ) : (
+                            <span className="merch-cart__item-fallback" aria-hidden="true">
+                              {item.product.category}
+                            </span>
+                          )}
+                        </div>
+                        <div className="merch-cart__item-copy">
+                          <strong>{item.product.name}</strong>
+                          <span>
+                            {dedupeLabels([item.variant.size, item.variant.color]).join(" • ") || item.variant.name}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="merch-cart__item-actions">
+                        <div className="merch-cart__item-pricing">
+                          <span>
+                            {item.variant.price != null
+                              ? `${formatCurrency(item.variant.price, currencyCode)} each`
+                              : "Price varies"}
+                          </span>
+                          <strong>{formatCurrency(item.lineTotal, currencyCode)}</strong>
+                        </div>
+                        <div className="merch-cart__item-controls">
+                          <div className="merch-cart__quantity" aria-label={`${item.product.name} quantity`}>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateCartQuantity(item.product.id, item.variant.id, item.quantity - 1)}
+                              aria-label={`Decrease ${item.product.name} quantity`}
+                            >
+                              −
+                            </button>
+                            <span>{item.quantity}</span>
+                            <button
+                              type="button"
+                              onClick={() => onUpdateCartQuantity(item.product.id, item.variant.id, item.quantity + 1)}
+                              aria-label={`Increase ${item.product.name} quantity`}
+                            >
+                              +
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            className="merch-cart__remove"
+                            onClick={() => onRemoveFromCart(item.product.id, item.variant.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="merch-cart__empty-state">
+                  <p className="merch-cart__empty">Add products to your cart to start checkout.</p>
+                  <span>Choose a product, pick your options, and it will show up here.</span>
+                </div>
+              )}
+            </div>
+
+            <div className="merch-cart__summary">
+              <div className="merch-cart__summary-header">
+                <p className="merch-results__eyebrow">Summary</p>
+                <strong>Secure Square Checkout</strong>
+              </div>
+
+              <div className="merch-cart__totals">
+                <div>
+                  <span>Subtotal</span>
+                  <strong>{formatCurrency(cartSubtotal, currencyCode)}</strong>
+                </div>
+                <div>
+                  <span>{shippingFeeLabel}</span>
+                  <strong>{shippingFeeCents != null ? formatCents(shippingFeeCents, currencyCode) : "Added in Square"}</strong>
+                </div>
+                <div className="merch-cart__total">
+                  <span>Total</span>
+                  <strong>{formatCurrency(cartTotal, currencyCode)}</strong>
+                </div>
+              </div>
+
+              {checkoutStatus.type === "error" ? (
+                <p className="merch-cart__status merch-cart__status--error">{checkoutStatus.message}</p>
+              ) : null}
+              {checkoutStatus.type === "loading" ? (
+                <p className="merch-cart__status">{checkoutStatus.message}</p>
+              ) : null}
+              {!checkoutEnabled && checkoutStatusMessage ? (
+                <p className="merch-cart__status merch-cart__status--error">{checkoutStatusMessage}</p>
+              ) : null}
+              {checkoutEnabled && shippingFeeCents == null ? (
+                <p className="merch-cart__status">
+                  Shipping is not being added from the site yet. Configure a flat Square shipping fee before going live.
+                </p>
+              ) : null}
+
+              <button
+                type="button"
+                className="button primary merch-cart__checkout"
+                onClick={onCheckout}
+                disabled={!checkoutEnabled || cartDetails.length === 0 || checkoutStatus.type === "loading"}
+              >
+                {checkoutStatus.type === "loading" ? "Opening Checkout..." : "Checkout With Square"}
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+}
+
+export function MerchStorefront({ catalog, purchasesEnabled }: MerchStorefrontProps) {
   const [activeCategory, setActiveCategory] = useState("all");
+  const [activeProductId, setActiveProductId] = useState<string | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
   const [openFilterGroup, setOpenFilterGroup] = useState<FilterDropdownId | null>(null);
   const [selectedSportCollections, setSelectedSportCollections] = useState<string[]>([]);
   const [selectedGenderCollections, setSelectedGenderCollections] = useState<string[]>([]);
   const [selectedCollections, setSelectedCollections] = useState<string[]>([]);
   const [selectedSizes, setSelectedSizes] = useState<string[]>([]);
   const [selectedColors, setSelectedColors] = useState<string[]>([]);
+  const [cartItems, setCartItems] = useState<MerchCartItem[]>([]);
+  const [cartReady, setCartReady] = useState(false);
+  const [checkoutStatus, setCheckoutStatus] = useState<MerchCheckoutStatus>({ type: "idle" });
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setCartItems(parseStoredCartItems(window.localStorage.getItem(MERCH_CART_STORAGE_KEY)));
+    setCartReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !cartReady) return;
+    window.localStorage.setItem(MERCH_CART_STORAGE_KEY, JSON.stringify(cartItems));
+  }, [cartItems, cartReady]);
+
+  useEffect(() => {
+    setCartItems((current) =>
+      current.flatMap((item) => {
+        const product = catalog.products.find((entry) => entry.id === item.productId);
+        const variant = product?.variants.find((entry) => entry.id === item.variantId);
+        if (!product || !variant || !variant.checkoutReady || variant.availability === "discontinued") {
+          return [];
+        }
+
+        return [{ ...item, quantity: Math.max(1, item.quantity) }];
+      }),
+    );
+  }, [catalog.products]);
+
+  useEffect(() => {
+    if (purchasesEnabled) return;
+    setActiveProductId(null);
+    setIsCartOpen(false);
+    setCheckoutStatus({ type: "idle" });
+  }, [purchasesEnabled]);
 
   const categoryCards = [
     {
@@ -282,6 +862,9 @@ export function MerchStorefront({ catalog }: MerchStorefrontProps) {
   };
 
   const filteredProducts = catalog.products.filter((product) => productMatchesFilterState(product, filterState));
+  const activeProduct = activeProductId
+    ? catalog.products.find((product) => product.id === activeProductId) ?? null
+    : null;
 
   const categoryAvailability = new Map(
     categoryCards.map((category) => [
@@ -389,6 +972,32 @@ export function MerchStorefront({ catalog }: MerchStorefrontProps) {
     selectedSizes.length > 0 ||
     selectedColors.length > 0;
 
+  const cartDetails: MerchCartDetail[] = cartItems.flatMap((item) => {
+    const product = catalog.products.find((entry) => entry.id === item.productId);
+    const variant = product?.variants.find((entry) => entry.id === item.variantId);
+    if (!product || !variant) return [];
+
+    return [{
+      ...item,
+      product,
+      variant,
+      lineTotal: variant.price != null ? variant.price * item.quantity : 0,
+    }];
+  });
+
+  const cartSubtotal = cartDetails.reduce((sum, item) => sum + item.lineTotal, 0);
+  const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const shippingFeeCents = cartItemCount > 0 ? catalog.checkout.shippingFeeCents : null;
+  const shippingFee = shippingFeeCents != null ? shippingFeeCents / 100 : 0;
+  const cartTotal = cartSubtotal + shippingFee;
+  const checkoutEnabled = purchasesEnabled && catalog.checkout.enabled;
+  const checkoutStatusMessage = purchasesEnabled
+    ? catalog.checkout.statusMessage
+    : "Merch purchases are coming soon.";
+  const storefrontStatusMessage = purchasesEnabled
+    ? catalog.statusMessage
+    : "Merch purchases are coming soon. Browse the catalog now and check back later to order.";
+
   const clearFilters = () => {
     setActiveCategory("all");
     setSelectedSportCollections([]);
@@ -402,8 +1011,116 @@ export function MerchStorefront({ catalog }: MerchStorefrontProps) {
     setOpenFilterGroup((current) => (current === groupId ? null : groupId));
   };
 
+  const addToCart = (product: MerchProduct, variant: MerchVariant) => {
+    setCheckoutStatus({ type: "idle" });
+    setCartItems((current) => {
+      const existingItem = current.find(
+        (entry) => entry.productId === product.id && entry.variantId === variant.id,
+      );
+
+      if (existingItem) {
+        return current.map((entry) =>
+          entry.productId === product.id && entry.variantId === variant.id
+            ? { ...entry, quantity: entry.quantity + 1 }
+            : entry,
+        );
+      }
+
+      return [...current, { productId: product.id, variantId: variant.id, quantity: 1 }];
+    });
+  };
+
+  const updateCartQuantity = (productId: string, variantId: string, nextQuantity: number) => {
+    setCartItems((current) =>
+      current.flatMap((item) => {
+        if (item.productId !== productId || item.variantId !== variantId) return [item];
+        if (nextQuantity <= 0) return [];
+        return [{ ...item, quantity: nextQuantity }];
+      }),
+    );
+  };
+
+  const removeFromCart = (productId: string, variantId: string) => {
+    setCartItems((current) =>
+      current.filter((item) => !(item.productId === productId && item.variantId === variantId)),
+    );
+  };
+
+  const clearCart = () => {
+    setCartItems([]);
+    setCheckoutStatus({ type: "idle" });
+  };
+
+  const closeProductDialog = () => setActiveProductId(null);
+  const closeCartDialog = () => setIsCartOpen(false);
+
+  const openCartDialog = () => {
+    if (!purchasesEnabled) return;
+    setActiveProductId(null);
+    setOpenFilterGroup(null);
+    setIsCartOpen(true);
+  };
+
+  const startCheckout = async () => {
+    if (!checkoutEnabled || cartItems.length === 0) return;
+
+    setCheckoutStatus({ type: "loading", message: "Opening secure Square checkout..." });
+
+    try {
+      const response = await fetch("/api/merch/checkout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ items: cartItems }),
+      });
+
+      const json = (await response.json().catch(() => null)) as { checkoutUrl?: string; error?: string } | null;
+      if (!response.ok || !json?.checkoutUrl) {
+        throw new Error(json?.error ?? "Could not start the merch checkout.");
+      }
+
+      window.location.assign(json.checkoutUrl);
+    } catch (error) {
+      setCheckoutStatus({
+        type: "error",
+        message: error instanceof Error ? error.message : "Could not start the merch checkout.",
+      });
+    }
+  };
+
   return (
     <div className="merch-storefront">
+      <ProductOptionsDialog
+        key={activeProduct?.id ?? "merch-dialog"}
+        product={activeProduct}
+        purchasesEnabled={purchasesEnabled}
+        checkoutEnabled={checkoutEnabled}
+        checkoutStatusMessage={checkoutStatusMessage}
+        currencyCode={catalog.checkout.currencyCode}
+        onAddToCart={addToCart}
+        onClose={closeProductDialog}
+      />
+      <CartDialog
+        isOpen={isCartOpen}
+        purchasesEnabled={purchasesEnabled}
+        cartDetails={cartDetails}
+        cartItemCount={cartItemCount}
+        cartSubtotal={cartSubtotal}
+        shippingFeeCents={shippingFeeCents}
+        cartTotal={cartTotal}
+        currencyCode={catalog.checkout.currencyCode}
+        shippingFeeLabel={catalog.checkout.shippingFeeLabel}
+        checkoutEnabled={checkoutEnabled}
+        checkoutStatus={checkoutStatus}
+        checkoutStatusMessage={checkoutStatusMessage}
+        onUpdateCartQuantity={updateCartQuantity}
+        onRemoveFromCart={removeFromCart}
+        onClearCart={clearCart}
+        onCheckout={startCheckout}
+        onClose={closeCartDialog}
+      />
+
       <div className="merch-hero">
         <div className="merch-hero__copy">
           <p className="merch-hero__eyebrow">Merch</p>
@@ -416,7 +1133,15 @@ export function MerchStorefront({ catalog }: MerchStorefrontProps) {
             <Link className="button primary" href="#merch-catalog-start">
               Shop The Collection
             </Link>
-            {catalog.storefrontUrl ? (
+            {purchasesEnabled ? (
+              <button type="button" className="button ghost merch-hero__cart-button" onClick={openCartDialog}>
+                <span>View Cart</span>
+                <span className="merch-hero__cart-count">
+                  {cartItemCount}
+                </span>
+              </button>
+            ) : null}
+            {purchasesEnabled && catalog.storefrontUrl ? (
               <a className="button ghost" href={catalog.storefrontUrl} target="_blank" rel="noreferrer">
                 Open Full Store
               </a>
@@ -425,9 +1150,9 @@ export function MerchStorefront({ catalog }: MerchStorefrontProps) {
         </div>
       </div>
 
-      {catalog.statusMessage ? (
+      {storefrontStatusMessage ? (
         <div className={`merch-status merch-status--${catalog.source}`}>
-          <p>{catalog.statusMessage}</p>
+          <p>{storefrontStatusMessage}</p>
         </div>
       ) : null}
 
@@ -559,7 +1284,20 @@ export function MerchStorefront({ catalog }: MerchStorefrontProps) {
 
         <div className="merch-grid" aria-live="polite">
           {filteredProducts.length > 0 ? (
-            filteredProducts.map((product) => <ProductCard key={product.id} product={product} />)
+            filteredProducts.map((product) => (
+              <ProductCard
+                key={product.id}
+                product={product}
+                purchasesEnabled={purchasesEnabled}
+                checkoutEnabled={checkoutEnabled}
+                checkoutStatusMessage={checkoutStatusMessage}
+                onOpenProduct={(nextProduct) => {
+                  if (!purchasesEnabled) return;
+                  setIsCartOpen(false);
+                  setActiveProductId(nextProduct.id);
+                }}
+              />
+            ))
           ) : (
             <div className="merch-empty-state">
               <h3>{catalog.products.length === 0 ? "No merch is live yet." : "No products match that filter combination."}</h3>

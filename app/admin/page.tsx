@@ -166,6 +166,18 @@ type AnnouncementFormState = {
   message: string;
   recipientIds: string[];
 };
+type AdminSiteSettings = {
+  homeBanner?: {
+    enabled?: boolean;
+    text?: string;
+    buttonTarget?: HomeBannerButtonTarget;
+    buttonEventId?: string;
+    buttonPageHref?: string;
+  };
+  merch?: {
+    purchasesEnabled?: boolean;
+  };
+};
 
 const isJsonRecord = (value: unknown): value is Record<string, JsonValue | undefined> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -501,6 +513,7 @@ export default function AdminPage() {
   const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
   const [communitySponsorsStatus, setCommunitySponsorsStatus] = useState<FormStatus>({ type: "idle" });
   const [siteSettingsStatus, setSiteSettingsStatus] = useState<FormStatus>({ type: "idle" });
+  const [merchSettingsStatus, setMerchSettingsStatus] = useState<FormStatus>({ type: "idle" });
   const [announcementStatus, setAnnouncementStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [partnerApprovalNotes, setPartnerApprovalNotes] = useState<Record<string, string>>({});
@@ -611,6 +624,7 @@ export default function AdminPage() {
     homeBannerButtonTarget: "none" as HomeBannerButtonTarget,
     homeBannerButtonEventId: "",
     homeBannerButtonPageHref: "",
+    merchPurchasesEnabled: true,
   });
   const [announcementForm, setAnnouncementForm] = useState<AnnouncementFormState>(createEmptyAnnouncementForm());
   const [announcementRecipientSearch, setAnnouncementRecipientSearch] = useState("");
@@ -941,23 +955,18 @@ export default function AdminPage() {
   const loadSiteSettings = async () => {
     setLoadingSiteSettings(true);
     setSiteSettingsStatus({ type: "idle" });
+    setMerchSettingsStatus({ type: "idle" });
     try {
       const response = await fetch("/api/admin/site-settings");
       const json = await response.json();
       if (!response.ok) {
-        setSiteSettingsStatus({ type: "error", message: json?.error ?? "Could not load site settings." });
+        const message = json?.error ?? "Could not load site settings.";
+        setSiteSettingsStatus({ type: "error", message });
+        setMerchSettingsStatus({ type: "error", message });
         return;
       }
 
-      const settings = (json?.settings ?? {}) as {
-        homeBanner?: {
-          enabled?: boolean;
-          text?: string;
-          buttonTarget?: HomeBannerButtonTarget;
-          buttonEventId?: string;
-          buttonPageHref?: string;
-        };
-      };
+      const settings = (json?.settings ?? {}) as AdminSiteSettings;
 
       setSiteSettingsForm({
         homeBannerEnabled: Boolean(settings.homeBanner?.enabled),
@@ -976,9 +985,14 @@ export default function AdminPage() {
           typeof settings.homeBanner?.buttonPageHref === "string"
             ? settings.homeBanner.buttonPageHref
             : "",
+        merchPurchasesEnabled:
+          typeof settings.merch?.purchasesEnabled === "boolean"
+            ? settings.merch.purchasesEnabled
+            : true,
       });
     } catch {
       setSiteSettingsStatus({ type: "error", message: "Could not load site settings." });
+      setMerchSettingsStatus({ type: "error", message: "Could not load site settings." });
     } finally {
       setLoadingSiteSettings(false);
     }
@@ -3500,15 +3514,7 @@ export default function AdminPage() {
         return;
       }
 
-      const settings = (json?.settings ?? {}) as {
-        homeBanner?: {
-          enabled?: boolean;
-          text?: string;
-          buttonTarget?: HomeBannerButtonTarget;
-          buttonEventId?: string;
-          buttonPageHref?: string;
-        };
-      };
+      const settings = (json?.settings ?? {}) as AdminSiteSettings;
 
       setSiteSettingsForm({
         homeBannerEnabled: Boolean(settings.homeBanner?.enabled),
@@ -3527,10 +3533,74 @@ export default function AdminPage() {
           typeof settings.homeBanner?.buttonPageHref === "string"
             ? settings.homeBanner.buttonPageHref
             : homeBannerButtonPageHref,
+        merchPurchasesEnabled:
+          typeof settings.merch?.purchasesEnabled === "boolean"
+            ? settings.merch.purchasesEnabled
+            : siteSettingsForm.merchPurchasesEnabled,
       });
       setSiteSettingsStatus({ type: "success", message: "Home page banner settings updated." });
     } catch {
       setSiteSettingsStatus({ type: "error", message: "Could not update site settings." });
+    }
+  };
+
+  const handleSaveMerchSettings = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setMerchSettingsStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    setMerchSettingsStatus({ type: "loading" });
+    try {
+      const response = await fetch("/api/admin/site-settings", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          merch: {
+            purchasesEnabled: siteSettingsForm.merchPurchasesEnabled,
+          },
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setMerchSettingsStatus({ type: "error", message: json?.error ?? "Could not update merch settings." });
+        return;
+      }
+
+      const settings = (json?.settings ?? {}) as AdminSiteSettings;
+
+      setSiteSettingsForm({
+        homeBannerEnabled: Boolean(settings.homeBanner?.enabled),
+        homeBannerText:
+          typeof settings.homeBanner?.text === "string"
+            ? settings.homeBanner.text
+            : siteSettingsForm.homeBannerText,
+        homeBannerButtonTarget: settings.homeBanner?.buttonTarget === "event" || settings.homeBanner?.buttonTarget === "page"
+          ? settings.homeBanner.buttonTarget
+          : siteSettingsForm.homeBannerButtonTarget,
+        homeBannerButtonEventId:
+          typeof settings.homeBanner?.buttonEventId === "string"
+            ? settings.homeBanner.buttonEventId
+            : siteSettingsForm.homeBannerButtonEventId,
+        homeBannerButtonPageHref:
+          typeof settings.homeBanner?.buttonPageHref === "string"
+            ? settings.homeBanner.buttonPageHref
+            : siteSettingsForm.homeBannerButtonPageHref,
+        merchPurchasesEnabled:
+          typeof settings.merch?.purchasesEnabled === "boolean"
+            ? settings.merch.purchasesEnabled
+            : siteSettingsForm.merchPurchasesEnabled,
+      });
+      setMerchSettingsStatus({ type: "success", message: "Merch storefront settings updated." });
+    } catch {
+      setMerchSettingsStatus({ type: "error", message: "Could not update merch settings." });
     }
   };
 
@@ -5385,7 +5455,7 @@ export default function AdminPage() {
               <>
                 <section className="account-card account-card__summary">
                   <h2>Settings</h2>
-                  <p className="muted">Control site-wide banners and send inbox announcements to site members.</p>
+                  <p className="muted">Control site-wide banners, merch availability, and send inbox announcements to site members.</p>
                 </section>
                 <section className="account-card">
                   <div className="account-card__header">
@@ -5497,13 +5567,46 @@ export default function AdminPage() {
                     </div>
                     <div className="cta-row">
                       <button className="button primary" type="submit" disabled={siteSettingsStatus.type === "loading"}>
-                        {siteSettingsStatus.type === "loading" ? "Saving..." : "Save Settings"}
+                        {siteSettingsStatus.type === "loading" ? "Saving..." : "Save Banner Settings"}
                       </button>
                     </div>
                   </form>
                   {siteSettingsStatus.message ? (
                     <p className={`form-help ${siteSettingsStatus.type === "error" ? "error" : "muted"}`}>
                       {siteSettingsStatus.message}
+                    </p>
+                  ) : null}
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Merch Storefront</h2>
+                      <p className="muted">Keep the catalog visible while controlling whether customers can purchase merch from the site.</p>
+                    </div>
+                  </div>
+                  <form className="register-form" onSubmit={handleSaveMerchSettings}>
+                    <div className="form-control checkbox-control" style={{ justifySelf: "start" }}>
+                      <label className="checkbox-label">
+                        <input
+                          type="checkbox"
+                          checked={siteSettingsForm.merchPurchasesEnabled}
+                          onChange={(e) => updateSiteSettings("merchPurchasesEnabled", e.target.checked)}
+                        />
+                        <span>Allow merch purchases</span>
+                      </label>
+                      <p className="form-help muted">
+                        When disabled, the merch page still shows products, but purchase actions switch to Coming Soon.
+                      </p>
+                    </div>
+                    <div className="cta-row">
+                      <button className="button primary" type="submit" disabled={merchSettingsStatus.type === "loading"}>
+                        {merchSettingsStatus.type === "loading" ? "Saving..." : "Save Merch Settings"}
+                      </button>
+                    </div>
+                  </form>
+                  {merchSettingsStatus.message ? (
+                    <p className={`form-help ${merchSettingsStatus.type === "error" ? "error" : "muted"}`}>
+                      {merchSettingsStatus.message}
                     </p>
                   ) : null}
                 </section>

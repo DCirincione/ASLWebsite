@@ -28,14 +28,39 @@ export async function PUT(req: NextRequest) {
         buttonEventId?: string;
         buttonPageHref?: string;
       };
+      merch?: {
+        purchasesEnabled?: boolean;
+      };
     };
 
-    const enabled = Boolean(body.homeBanner?.enabled);
-    const text = typeof body.homeBanner?.text === "string" ? body.homeBanner.text.trim() : "";
-    const buttonTarget = isHomeBannerButtonTarget(body.homeBanner?.buttonTarget) ? body.homeBanner.buttonTarget : "none";
-    const buttonEventId = typeof body.homeBanner?.buttonEventId === "string" ? body.homeBanner.buttonEventId.trim() : "";
-    const rawButtonPageHref = typeof body.homeBanner?.buttonPageHref === "string" ? body.homeBanner.buttonPageHref.trim() : "";
+    const currentSettings = await readSiteSettings();
+    const enabled =
+      typeof body.homeBanner?.enabled === "boolean"
+        ? body.homeBanner.enabled
+        : currentSettings.homeBanner.enabled;
+    const text =
+      typeof body.homeBanner?.text === "string"
+        ? body.homeBanner.text.trim()
+        : currentSettings.homeBanner.text;
+    const buttonTarget =
+      body.homeBanner == null
+        ? currentSettings.homeBanner.buttonTarget
+        : isHomeBannerButtonTarget(body.homeBanner.buttonTarget)
+          ? body.homeBanner.buttonTarget
+          : "none";
+    const buttonEventId =
+      typeof body.homeBanner?.buttonEventId === "string"
+        ? body.homeBanner.buttonEventId.trim()
+        : currentSettings.homeBanner.buttonEventId;
+    const rawButtonPageHref =
+      typeof body.homeBanner?.buttonPageHref === "string"
+        ? body.homeBanner.buttonPageHref.trim()
+        : currentSettings.homeBanner.buttonPageHref;
     const buttonPageHref = isHomeBannerPageHref(rawButtonPageHref) ? rawButtonPageHref : "";
+    const purchasesEnabled =
+      typeof body.merch?.purchasesEnabled === "boolean"
+        ? body.merch.purchasesEnabled
+        : currentSettings.merch.purchasesEnabled;
 
     if (enabled && !text) {
       return NextResponse.json({ error: "Banner text is required when the banner is enabled." }, { status: 400 });
@@ -54,6 +79,9 @@ export async function PUT(req: NextRequest) {
         buttonTarget,
         buttonEventId: buttonTarget === "event" ? buttonEventId : "",
         buttonPageHref: buttonTarget === "page" ? buttonPageHref : "",
+      },
+      merch: {
+        purchasesEnabled,
       },
     });
 
