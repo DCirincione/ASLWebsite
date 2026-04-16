@@ -1,9 +1,17 @@
 import type { Metadata } from "next";
+import { Anton } from "next/font/google";
 import Script from "next/script";
 
 import { SITE_ALTERNATE_NAMES, SITE_DESCRIPTION, SITE_NAME, SITE_SOCIALS, SITE_TITLE, SITE_URL } from "@/lib/site-metadata";
 
 import "./globals.css";
+
+const anton = Anton({
+  subsets: ["latin"],
+  weight: "400",
+  display: "swap",
+  variable: "--font-anton",
+});
 
 const accessibilityBootstrapScript = `
 (() => {
@@ -142,7 +150,13 @@ export default function RootLayout({
   };
 
   return (
-    <html lang="en" data-scroll-behavior="smooth" data-theme="light" suppressHydrationWarning>
+    <html
+      lang="en"
+      className={anton.variable}
+      data-scroll-behavior="smooth"
+      data-theme="light"
+      suppressHydrationWarning
+    >
       <body>
         <Script
           id="accessibility-bootstrap"

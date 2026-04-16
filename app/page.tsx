@@ -32,17 +32,17 @@ export default async function Home() {
       <Section
         id="home"
         className={`hero hero--image hero--full home-hero${showHomeBanner ? " hero--with-banner" : ""}`}
-        title="Community Sports. Real Competition. Local Impact."
+        title="Long Islands Sports Hub"
         description=""
         headingLevel="h1"
         showHeader={false}
         style={
           {
-            "--hero-image": "url('/Hero.jpg')",
+            "--hero-image":
+              "url('/home-hero/ErickMoralesPlayingSoccerAldrichSportsLongIslandNewYorkSoccerLandingPage.png')",
           } as CSSProperties
         }
       >
-        <div className="home-hero__backdrop" aria-hidden="true" />
         {showHomeBanner ? (
           <div className="home-banner home-banner--overlay" aria-label="Home page announcement">
             <div className="home-banner__inner">
@@ -63,10 +63,11 @@ export default async function Home() {
           <HomeHeroCarousel />
           <div className="hero__panel">
             <div className="hero__content">
-              <h1 className="hero__title">
-                Community Sports. Real Competition. Local Impact.
+              <h1 className="hero__title home-hero__title">
+                <span className="home-hero__title-line">Long Islands</span>
+                <span className="home-hero__title-line">Sports Hub</span>
               </h1>
-              <p className="hero__lede">
+              <p className="hero__lede sr-only">
                 ALDRICH SPORTS hosts tournaments, leagues, and charity events for
                 all ages. Join the community and be part of something special.
               </p>
