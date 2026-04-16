@@ -12,12 +12,6 @@ const accessibilityBootstrapScript = `
   let fontScale = 1;
   let theme = "light";
   let highlightLinks = "off";
-  const platformSource = (
-    navigator.userAgentData?.platform ||
-    navigator.platform ||
-    navigator.userAgent ||
-    ""
-  ).toLowerCase();
 
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
@@ -37,13 +31,6 @@ const accessibilityBootstrapScript = `
 
   root.dataset.fontScale = String(fontScale);
   root.dataset.theme = theme;
-  root.dataset.platform = platformSource.includes("win")
-    ? "windows"
-    : platformSource.includes("mac")
-      ? "macos"
-      : /iphone|ipad|ipod/.test(platformSource)
-        ? "ios"
-        : "other";
   root.style.setProperty("--font-scale", String(fontScale));
   if (highlightLinks === "on") {
     root.classList.add("highlight-links");
