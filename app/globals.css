@@ -951,7 +951,7 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 @media (min-width: 901px) {
   .home-hero.hero--image {
     background: #09101e;
-    --home-hero-height: clamp(460px, calc(min(var(--section-viewport-width), 1500px) * 558 / 1366), 612px);
+    --home-hero-height: clamp(452px, calc(min(var(--section-viewport-width), 1460px) * 558 / 1366), 596px);
   }
 
   .home-hero.hero--full {
@@ -982,9 +982,9 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 
   .home-hero .hero__panel {
     position: absolute;
-    left: clamp(88px, 17vw, 242px);
+    left: clamp(124px, 18.5vw, 282px);
     right: auto;
-    bottom: clamp(8px, 1.4vw, 18px);
+    bottom: clamp(12px, 1.2vw, 24px);
     width: fit-content;
     max-width: calc(100% - clamp(112px, 21vw, 290px));
     padding: 0;
