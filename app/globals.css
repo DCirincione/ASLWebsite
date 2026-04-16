@@ -948,10 +948,20 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   display: none;
 }
 
+.home-hero__backdrop {
+  display: none;
+}
+
+.home-hero__stage {
+  width: 100%;
+}
+
 @media (min-width: 901px) {
   .home-hero.hero--image {
+    --home-hero-stage-width: min(var(--section-viewport-width), 1366px);
+    --home-hero-height: calc(var(--home-hero-stage-width) * 558 / 1366);
     background: #09101e;
-    --home-hero-height: clamp(452px, calc(min(var(--section-viewport-width), 1460px) * 558 / 1366), 596px);
+    padding: 0;
   }
 
   .home-hero.hero--full {
@@ -960,6 +970,29 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 
   .home-hero.hero--full.hero--with-banner {
     min-height: calc(var(--home-hero-height) + 92px);
+  }
+
+  .home-hero__backdrop {
+    position: absolute;
+    inset: 0;
+    display: block;
+    background:
+      linear-gradient(180deg, rgba(9, 16, 30, 0.24), rgba(9, 16, 30, 0.54)),
+      url("/home-hero/newestHomePic.png") center top / cover no-repeat;
+    filter: blur(26px) saturate(0.88) brightness(0.78);
+    transform: scale(1.08);
+    transform-origin: center;
+    opacity: 0.85;
+    pointer-events: none;
+  }
+
+  .home-hero__stage {
+    position: relative;
+    width: var(--home-hero-stage-width);
+    aspect-ratio: 1366 / 558;
+    margin: 0 auto;
+    z-index: 1;
+    overflow: hidden;
   }
 
   .home-hero__carousel {
@@ -982,11 +1015,11 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 
   .home-hero .hero__panel {
     position: absolute;
-    left: clamp(124px, 18.5vw, 282px);
+    left: 17.7%;
     right: auto;
-    bottom: clamp(12px, 1.2vw, 24px);
+    bottom: 9.3%;
     width: fit-content;
-    max-width: calc(100% - clamp(112px, 21vw, 290px));
+    max-width: 46%;
     padding: 0;
     margin: 0;
     z-index: 1;
@@ -996,7 +1029,7 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
     position: absolute;
     left: 50%;
     right: auto;
-    bottom: 20px;
+    bottom: 18px;
     z-index: 1;
   }
 

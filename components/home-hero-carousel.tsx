@@ -10,7 +10,7 @@ export function HomeHeroCarousel() {
           alt=""
           fill
           priority
-          sizes="100vw"
+          sizes="(max-width: 1366px) 100vw, 1366px"
           className="home-hero__carousel-image"
         />
       </div>
