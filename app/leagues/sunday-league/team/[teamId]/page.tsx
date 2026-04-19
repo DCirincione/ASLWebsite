@@ -74,7 +74,28 @@ type TeamMemberProfile = {
   positions: string[] | null;
 };
 
-type InviteSearchProfile = Pick<TeamMemberProfile, "id" | "name" | "avatar_url" | "positions">;
+type InviteSearchProfile = TeamMemberProfile & {
+  free_agent_member_id: string;
+  email: string | null;
+  phone_number: string | null;
+  age: string | null;
+  preferred_positions: string | null;
+  position_groups: string[];
+  secondary_position: string | null;
+  dominant_foot: string | null;
+  skill_level_label: string | null;
+  experience_level: string | null;
+  strengths: string | null;
+  weaknesses: string | null;
+  play_style: string | null;
+  sunday_availability: string | null;
+  known_conflicts: string | null;
+  skill_level: number | null;
+  sports: string[] | null;
+  about: string | null;
+  height_cm: string | null;
+  weight_lbs: number | null;
+};
 
 type TeamMemberRecord = SundayLeagueTeamMember & {
   displayName: string;
@@ -138,6 +159,7 @@ export default function SundayLeagueTeamPortalPage() {
   const [showJoinRequests, setShowJoinRequests] = useState(false);
   const [saveState, setSaveState] = useState<{ type: "idle" | "loading" | "success" | "error"; message?: string }>({ type: "idle" });
   const [inviteSuggestions, setInviteSuggestions] = useState<InviteSearchProfile[]>([]);
+  const [selectedInviteProfileId, setSelectedInviteProfileId] = useState<string | null>(null);
   const [inviteSuggestionsLoading, setInviteSuggestionsLoading] = useState(false);
   const [inviteState, setInviteState] = useState<{ type: "idle" | "loading" | "success" | "error"; message?: string }>({ type: "idle" });
   const [memberActionStates, setMemberActionStates] = useState<Record<string, { type: "idle" | "loading" | "success" | "error"; message?: string }>>({});
@@ -175,7 +197,7 @@ export default function SundayLeagueTeamPortalPage() {
       if (profileIds.size > 0) {
         const { data: profileData } = await supabase
           .from("profiles")
-          .select("id,name,avatar_url,country_code,positions")
+          .select("id,name,avatar_url,positions")
           .in("id", Array.from(profileIds));
 
         for (const profile of (profileData ?? []) as TeamMemberProfile[]) {
@@ -330,27 +352,31 @@ export default function SundayLeagueTeamPortalPage() {
   }, [isEditing]);
 
   useEffect(() => {
-    if (!currentUserId) {
-      setSeenJoinRequestVersions({});
-      return;
-    }
-
-    try {
-      const storedValue = window.localStorage.getItem(`asl-sunday-league-join-requests-seen:${currentUserId}:${teamId}`);
-      if (!storedValue) {
+    const timeoutId = window.setTimeout(() => {
+      if (!currentUserId) {
         setSeenJoinRequestVersions({});
         return;
       }
 
-      const parsedValue = JSON.parse(storedValue);
-      setSeenJoinRequestVersions(
-        parsedValue && typeof parsedValue === "object" && !Array.isArray(parsedValue)
-          ? (parsedValue as Record<string, string>)
-          : {},
-      );
-    } catch {
-      setSeenJoinRequestVersions({});
-    }
+      try {
+        const storedValue = window.localStorage.getItem(`asl-sunday-league-join-requests-seen:${currentUserId}:${teamId}`);
+        if (!storedValue) {
+          setSeenJoinRequestVersions({});
+          return;
+        }
+
+        const parsedValue = JSON.parse(storedValue);
+        setSeenJoinRequestVersions(
+          parsedValue && typeof parsedValue === "object" && !Array.isArray(parsedValue)
+            ? (parsedValue as Record<string, string>)
+            : {},
+        );
+      } catch {
+        setSeenJoinRequestVersions({});
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [currentUserId, teamId]);
 
   const historyRows = useMemo(() => buildTeamHistory(team), [team]);
@@ -403,11 +429,14 @@ export default function SundayLeagueTeamPortalPage() {
       return accumulator;
     }, {});
 
-    setSeenJoinRequestVersions(nextSeenVersions);
+    const timeoutId = window.setTimeout(() => {
+      setSeenJoinRequestVersions(nextSeenVersions);
+    }, 0);
 
     try {
       window.localStorage.setItem(`asl-sunday-league-join-requests-seen:${currentUserId}:${teamId}`, JSON.stringify(nextSeenVersions));
     } catch {}
+    return () => window.clearTimeout(timeoutId);
   }, [currentUserId, pendingJoinRequests, showJoinRequests, teamId]);
   const jerseyNumberLabels = useMemo(() => {
     if (!form) return [];
@@ -441,6 +470,10 @@ export default function SundayLeagueTeamPortalPage() {
 
     return blockedIds;
   }, [team, teamMembers]);
+  const selectedInviteProfile = useMemo(
+    () => inviteSuggestions.find((profile) => profile.id === selectedInviteProfileId) ?? inviteSuggestions[0] ?? null,
+    [inviteSuggestions, selectedInviteProfileId],
+  );
 
   const updateForm = <Key extends keyof TeamPortalFormState>(key: Key, value: TeamPortalFormState[Key]) => {
     setForm((prev) => (prev ? { ...prev, [key]: value } : prev));
@@ -493,10 +526,10 @@ export default function SundayLeagueTeamPortalPage() {
 
     const profileMap = new Map<string, TeamMemberProfile>();
     if (profileIds.size > 0) {
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("id,name,avatar_url,country_code,positions")
-        .in("id", Array.from(profileIds));
+        const { data: profileData } = await supabase
+          .from("profiles")
+          .select("id,name,avatar_url,positions")
+          .in("id", Array.from(profileIds));
 
       for (const profile of (profileData ?? []) as TeamMemberProfile[]) {
         profileMap.set(profile.id, profile);
@@ -782,46 +815,44 @@ export default function SundayLeagueTeamPortalPage() {
     const loadInviteSuggestions = async () => {
       if (!supabase || !team || !showInviteModal) {
         setInviteSuggestions([]);
+        setSelectedInviteProfileId(null);
         return;
       }
 
       setInviteSuggestionsLoading(true);
-      const [profilesResponse, teamsResponse, acceptedMembersResponse] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("id,name,avatar_url,positions")
-          .order("name", { ascending: true })
-          .limit(100),
-        supabase.from("sunday_league_teams").select("user_id"),
-        supabase
-          .from("sunday_league_team_members")
-          .select("player_user_id,status")
-          .eq("status", "accepted"),
-      ]);
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData.session?.access_token ?? null;
 
-      if (profilesResponse.error || !profilesResponse.data) {
+      if (!accessToken) {
         setInviteSuggestions([]);
+        setSelectedInviteProfileId(null);
         setInviteSuggestionsLoading(false);
         return;
       }
 
-      const unavailableIds = new Set<string>(inviteablePlayerIds);
+      const response = await fetch(`/api/sunday-league/free-agents?teamId=${encodeURIComponent(team.id)}`, {
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+        },
+      });
 
-      for (const captain of (teamsResponse.data ?? []) as Array<{ user_id: string }>) {
-        if (captain.user_id) {
-          unavailableIds.add(captain.user_id);
-        }
+      const json = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            freeAgents?: InviteSearchProfile[];
+          }
+        | null;
+
+      if (!response.ok || !json?.freeAgents) {
+        setInviteSuggestions([]);
+        setSelectedInviteProfileId(null);
+        setInviteSuggestionsLoading(false);
+        return;
       }
 
-      for (const member of (acceptedMembersResponse.data ?? []) as Array<{ player_user_id?: string | null }>) {
-        if (member.player_user_id) {
-          unavailableIds.add(member.player_user_id);
-        }
-      }
-
-      setInviteSuggestions(
-        (profilesResponse.data as InviteSearchProfile[]).filter((profile) => !unavailableIds.has(profile.id)),
-      );
+      const nextSuggestions = json.freeAgents.filter((profile) => !inviteablePlayerIds.has(profile.id));
+      setInviteSuggestions(nextSuggestions);
+      setSelectedInviteProfileId((prev) => (nextSuggestions.some((profile) => profile.id === prev) ? prev : nextSuggestions[0]?.id ?? null));
       setInviteSuggestionsLoading(false);
     };
 
@@ -999,7 +1030,7 @@ export default function SundayLeagueTeamPortalPage() {
                         {isEditing ? "Close Edit" : "Edit Team"}
                       </button>
                       <button className="button ghost" type="button" onClick={() => setShowInviteModal(true)}>
-                        Invite Players
+                        Free Agent Portal
                       </button>
                       <button className="button ghost sunday-league-team-board__action-button" type="button" onClick={() => setShowJoinRequests((prev) => !prev)}>
                         {showJoinRequests ? "Close Requests" : "Join Requests"}
@@ -1374,18 +1405,19 @@ export default function SundayLeagueTeamPortalPage() {
 
           {team && showInviteModal ? (
             <div className="register-modal-backdrop" role="dialog" aria-modal="true">
-              <div className="register-modal sunday-league-invite-modal">
+              <div className="register-modal sunday-league-invite-modal sunday-league-free-agent-modal">
                 <div className="register-modal__header">
                   <div>
-                    <p className="eyebrow">Invite Players</p>
-                    <h2>Available Players</h2>
-                    <p className="muted">Anyone listed here is not captaining a Sunday League team and is not already on your roster.</p>
+                    <p className="eyebrow">Captain Tools</p>
+                    <h2>Free Agent Portal</h2>
+                    <p className="muted">Browse unattached Sunday League players, open their full details, and invite them directly to your roster.</p>
                   </div>
                   <button
                     className="button ghost"
                     type="button"
                     onClick={() => {
                       setShowInviteModal(false);
+                      setSelectedInviteProfileId(null);
                       setInviteState({ type: "idle" });
                     }}
                   >
@@ -1399,38 +1431,171 @@ export default function SundayLeagueTeamPortalPage() {
                   </p>
                 ) : null}
 
-                {inviteSuggestionsLoading ? <p className="muted">Loading available players...</p> : null}
+                {inviteSuggestionsLoading ? <p className="muted">Loading free agents...</p> : null}
                 {!inviteSuggestionsLoading && inviteSuggestions.length === 0 ? (
-                  <p className="muted">No available players to invite right now.</p>
+                  <p className="muted">No free agents are available right now.</p>
                 ) : null}
 
                 {!inviteSuggestionsLoading && inviteSuggestions.length > 0 ? (
-                  <ul className="list list--grid sunday-league-invite-modal__list">
-                    {inviteSuggestions.map((profile) => (
-                      <li key={profile.id} className="team-card sunday-league-invite-modal__item">
-                        <div className="team-card__logo">
-                          <AvatarImage src={profile.avatar_url} alt="" />
+                  <div className="sunday-league-free-agent-modal__body">
+                    <div className="sunday-league-team-board__roster sunday-league-free-agent-modal__roster">
+                      {inviteSuggestions.map((profile) => {
+                        const customFlagAsset = getCountryFlagAsset(profile.country_code);
+                        const playerName = formatSundayLeaguePlayerName(profile.name?.trim() || "Player");
+                        const skillBadge = profile.skill_level ?? "FA";
+                        const positionLabel = profile.positions?.[0] ?? profile.position_groups[0] ?? "Free Agent";
+
+                        return (
+                          <button
+                            key={profile.id}
+                            type="button"
+                            className={`sunday-league-team-board__player-card sunday-league-team-board__player-card--button${
+                              selectedInviteProfile?.id === profile.id ? " is-selected" : ""
+                            }`}
+                            onClick={() => setSelectedInviteProfileId(profile.id)}
+                          >
+                            <div className="sunday-league-team-board__player-avatar-wrap">
+                              <div className="sunday-league-team-board__player-avatar">
+                                <AvatarImage src={profile.avatar_url} alt={profile.name?.trim() || "Player"} objectPosition="center 57%" />
+                              </div>
+                            </div>
+                            <div className="sunday-league-team-board__player-panel">
+                              <div className="sunday-league-team-board__player-identity">
+                                <p className="sunday-league-team-board__player-name">
+                                  <span className="sunday-league-team-board__player-name-line">{playerName.topLine}</span>
+                                  <span className="sunday-league-team-board__player-name-line">{playerName.bottomLine}</span>
+                                </p>
+                                <p className="sunday-league-team-board__player-position">{positionLabel}</p>
+                              </div>
+                              <div className="sunday-league-team-board__player-row">
+                                {customFlagAsset ? (
+                                  <span className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(profile.country_code) ?? undefined}>
+                                    <Image
+                                      src={customFlagAsset.src}
+                                      alt=""
+                                      width={customFlagAsset.width}
+                                      height={customFlagAsset.height}
+                                      className="sunday-league-team-board__player-flag-image"
+                                      style={{ width: "34px", height: "auto" }}
+                                    />
+                                  </span>
+                                ) : countryCodeToFlag(profile.country_code) ? (
+                                  <p className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(profile.country_code) ?? undefined}>
+                                    {countryCodeToFlag(profile.country_code)}
+                                  </p>
+                                ) : (
+                                  <span className="sunday-league-team-board__player-flag sunday-league-team-board__player-flag--empty" aria-hidden />
+                                )}
+                                <p className="sunday-league-team-board__player-number">{skillBadge}</p>
+                                <div className="sunday-league-team-board__player-badge">
+                                  <TeamLogoImage src="/free-agent-placeholder.svg" alt="" fill sizes="42px" />
+                                </div>
+                              </div>
+                              <div className="sunday-league-team-board__player-division">
+                                <p className="sunday-league-team-board__player-division-label">FREE AGENT</p>
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {selectedInviteProfile ? (
+                      <article className="sunday-league-free-agent-modal__detail">
+                        <div className="sunday-league-free-agent-modal__detail-header">
+                          <div className="sunday-league-free-agent-modal__detail-avatar">
+                            <AvatarImage src={selectedInviteProfile.avatar_url} alt={selectedInviteProfile.name?.trim() || "Player"} />
+                          </div>
+                          <div className="sunday-league-free-agent-modal__detail-copy">
+                            <p className="eyebrow">Selected Free Agent</p>
+                            <h3>{selectedInviteProfile.name?.trim() || "Player"}</h3>
+                            <p className="muted">
+                              {selectedInviteProfile.preferred_positions?.trim()
+                                || selectedInviteProfile.positions?.join(", ")
+                                || selectedInviteProfile.position_groups.join(", ")
+                                || "Sunday League player"}
+                            </p>
+                          </div>
                         </div>
-                        <div className="team-card__info">
-                          <p className="list__title">{profile.name?.trim() || "Player"}</p>
-                          <p className="muted">{profile.positions?.[0] ?? "Community player"}</p>
+
+                        <div className="sunday-league-free-agent-modal__stats">
+                          <div className="sunday-league-free-agent-modal__stat">
+                            <span>Age</span>
+                            <strong>{selectedInviteProfile.age || "—"}</strong>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__stat">
+                            <span>Skill</span>
+                            <strong>{selectedInviteProfile.skill_level_label || "—"}</strong>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__stat">
+                            <span>Experience</span>
+                            <strong>{selectedInviteProfile.experience_level || "—"}</strong>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__stat">
+                            <span>Dominant Foot</span>
+                            <strong>{selectedInviteProfile.dominant_foot || "—"}</strong>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__stat">
+                            <span>Height</span>
+                            <strong>{selectedInviteProfile.height_cm || "—"}</strong>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__stat">
+                            <span>Weight</span>
+                            <strong>{selectedInviteProfile.weight_lbs ? `${selectedInviteProfile.weight_lbs} lbs` : "—"}</strong>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__stat">
+                            <span>Availability</span>
+                            <strong>{selectedInviteProfile.sunday_availability || "—"}</strong>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__stat">
+                            <span>Contact</span>
+                            <strong>{selectedInviteProfile.phone_number || selectedInviteProfile.email || "—"}</strong>
+                          </div>
                         </div>
-                        <div className="sunday-league-invite-modal__actions">
-                          <Link className="button ghost sunday-league-invite-modal__button sunday-league-invite-modal__button--ghost" href={`/profiles/${profile.id}`}>
-                            View
+
+                        <div className="sunday-league-free-agent-modal__meta">
+                          <div className="sunday-league-free-agent-modal__meta-item">
+                            <span className="eyebrow">Position Groups</span>
+                            <p>{selectedInviteProfile.position_groups.join(", ") || "—"}</p>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__meta-item">
+                            <span className="eyebrow">Secondary Position</span>
+                            <p>{selectedInviteProfile.secondary_position || "—"}</p>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__meta-item">
+                            <span className="eyebrow">Strengths</span>
+                            <p>{selectedInviteProfile.strengths || "—"}</p>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__meta-item">
+                            <span className="eyebrow">Weaknesses</span>
+                            <p>{selectedInviteProfile.weaknesses || "—"}</p>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__meta-item">
+                            <span className="eyebrow">Play Style</span>
+                            <p>{selectedInviteProfile.play_style || selectedInviteProfile.about || "—"}</p>
+                          </div>
+                          <div className="sunday-league-free-agent-modal__meta-item">
+                            <span className="eyebrow">Known Conflicts</span>
+                            <p>{selectedInviteProfile.known_conflicts || "None listed"}</p>
+                          </div>
+                        </div>
+
+                        <div className="sunday-league-free-agent-modal__actions">
+                          <Link className="button ghost sunday-league-invite-modal__button sunday-league-invite-modal__button--ghost" href={`/profiles/${selectedInviteProfile.id}`}>
+                            View Profile
                           </Link>
                           <button
                             className="button primary sunday-league-invite-modal__button"
                             type="button"
-                            onClick={() => void handleInvitePlayer(profile)}
+                            onClick={() => void handleInvitePlayer(selectedInviteProfile)}
                             disabled={inviteState.type === "loading"}
                           >
-                            {inviteState.type === "loading" ? "Inviting..." : "Invite"}
+                            {inviteState.type === "loading" ? "Inviting..." : "Invite to Team"}
                           </button>
                         </div>
-                      </li>
-                    ))}
-                  </ul>
+                      </article>
+                    ) : null}
+                  </div>
                 ) : null}
 
                 {pendingInvites.length > 0 ? (

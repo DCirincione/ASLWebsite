@@ -167,7 +167,7 @@ export default function SundayLeaguePublicTeamPage() {
       if (profileIds.size > 0) {
         const { data: profileData } = await supabase
           .from("profiles")
-          .select("id,name,avatar_url,country_code,positions")
+          .select("id,name,avatar_url,positions")
           .in("id", Array.from(profileIds));
 
         for (const profile of (profileData ?? []) as TeamMemberProfile[]) {
@@ -236,10 +236,11 @@ export default function SundayLeaguePublicTeamPage() {
   const historyRows = useMemo(() => buildTeamHistory(team), [team]);
   const establishedLabel = useMemo(() => getEstablishedLabel(team), [team]);
   const membershipByTeamId = useMemo(() => {
-    const rank = { accepted: 3, pending: 2, declined: 1 } as const;
+    const rank = { accepted: 4, pending: 3, declined: 2, free_agent: 1 } as const;
     const map = new Map<string, SundayLeagueTeamMember>();
 
     for (const membership of myMemberships) {
+      if (!membership.team_id) continue;
       const existing = map.get(membership.team_id);
       if (!existing || rank[membership.status] > rank[existing.status]) {
         map.set(membership.team_id, membership);
@@ -249,7 +250,7 @@ export default function SundayLeaguePublicTeamPage() {
     return map;
   }, [myMemberships]);
   const acceptedMembership = useMemo(
-    () => myMemberships.find((membership) => membership.status === "accepted") ?? null,
+    () => myMemberships.find((membership) => membership.status === "accepted" && membership.team_id) ?? null,
     [myMemberships],
   );
   const currentTeamMembership = useMemo(

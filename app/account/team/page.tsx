@@ -79,12 +79,16 @@ export default function AccountTeamPage() {
     const memberships = Array.from(membershipMap.values());
     const managedTeamIds = new Set(captainList.map((team) => team.id));
     for (const membership of memberships) {
-      if (membership.status === "accepted" && membership.role === "co_captain") {
+      if (membership.status === "accepted" && membership.role === "co_captain" && membership.team_id) {
         managedTeamIds.add(membership.team_id);
       }
     }
 
-    const relatedTeamIds = Array.from(new Set([...memberships.map((membership) => membership.team_id), ...managedTeamIds]));
+    const relatedTeamIds = Array.from(
+      new Set(
+        [...memberships.map((membership) => membership.team_id).filter((teamId): teamId is string => Boolean(teamId)), ...managedTeamIds],
+      ),
+    );
     let teamMap = new Map<string, AccountSundayLeagueTeam>();
 
     if (relatedTeamIds.length > 0) {
@@ -96,7 +100,7 @@ export default function AccountTeamPage() {
       teamMap = new Map((teamData ?? []).map((team) => [team.id, team as AccountSundayLeagueTeam]));
     }
 
-    const acceptedMemberships = memberships.filter((membership) => membership.status === "accepted");
+    const acceptedMemberships = memberships.filter((membership) => membership.status === "accepted" && membership.team_id);
     const captainManagedTeams: TeamMembershipEntry[] = captainList.map((team) => ({
       team,
       membership: null,
@@ -105,6 +109,9 @@ export default function AccountTeamPage() {
     }));
     const coCaptainManagedTeams = acceptedMemberships.reduce<TeamMembershipEntry[]>((entries, membership) => {
       if (membership.role !== "co_captain") {
+        return entries;
+      }
+      if (!membership.team_id) {
         return entries;
       }
 
@@ -129,6 +136,10 @@ export default function AccountTeamPage() {
     setManagedTeams([...captainManagedTeams, ...coCaptainManagedTeams]);
     setJoinedTeams(
       acceptedMemberships.reduce<TeamMembershipEntry[]>((entries, membership) => {
+        if (!membership.team_id) {
+          return entries;
+        }
+
         const team = teamMap.get(membership.team_id);
         if (!team || managedTeamIds.has(team.id)) {
           return entries;
@@ -148,7 +159,7 @@ export default function AccountTeamPage() {
         .filter((membership) => membership.source === "captain_invite" && membership.status === "pending")
         .map((membership) => ({
           ...membership,
-          team: teamMap.get(membership.team_id) ?? null,
+          team: membership.team_id ? teamMap.get(membership.team_id) ?? null : null,
         })),
     );
     setStatus("ready");

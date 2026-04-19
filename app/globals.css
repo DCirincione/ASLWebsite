@@ -159,6 +159,7 @@ html[data-theme="dark"] .sunday-league-table td {
 }
 
 html[data-theme="dark"] .sunday-league-team-form input,
+html[data-theme="dark"] .sunday-league-team-form select,
 html[data-theme="dark"] .sunday-league-team-form textarea,
 html[data-theme="dark"] .sunday-league-inquiries__form input,
 html[data-theme="dark"] .sunday-league-inquiries__form textarea {
@@ -167,10 +168,21 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea {
 }
 
 html[data-theme="dark"] .sunday-league-team-form input:focus,
+html[data-theme="dark"] .sunday-league-team-form select:focus,
 html[data-theme="dark"] .sunday-league-team-form textarea:focus,
 html[data-theme="dark"] .sunday-league-inquiries__form input:focus,
 html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   background: rgba(15, 23, 42, 0.98);
+}
+
+html[data-theme="dark"] .sunday-league-team-form select {
+  color-scheme: dark;
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] .sunday-league-team-form select option {
+  color: #e2e8f0;
+  background: #0f172a;
 }
 
 html[data-theme="dark"] .event-card {
@@ -1797,6 +1809,7 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 }
 
 .sunday-league-team-form input,
+.sunday-league-team-form select,
 .sunday-league-team-form textarea {
   width: 100%;
   border: 1px solid rgba(148, 163, 184, 0.4);
@@ -1812,6 +1825,7 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 }
 
 .sunday-league-team-form input:focus,
+.sunday-league-team-form select:focus,
 .sunday-league-team-form textarea:focus {
   outline: none;
   border-color: rgba(233, 93, 42, 0.6);
@@ -1819,9 +1833,174 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   background: #ffffff;
 }
 
+.sunday-league-team-form select {
+  appearance: none;
+  -webkit-appearance: none;
+  color-scheme: light;
+  cursor: pointer;
+  padding-right: 46px;
+  background-image: none;
+}
+
+.sunday-league-team-form select option {
+  color: #0f172a;
+  background: #ffffff;
+}
+
 .sunday-league-team-form textarea {
   resize: vertical;
   min-height: 150px;
+}
+
+.sunday-league-free-agent-form {
+  gap: 18px;
+}
+
+.sunday-league-free-agent-form .sunday-league-panel-box {
+  min-height: 0;
+  gap: 14px;
+  padding-bottom: 24px;
+}
+
+.sunday-league-free-agent-form .sunday-league-panel-box > h3 {
+  margin-bottom: 2px;
+}
+
+.sunday-league-free-agent-form .sunday-league-form-grid {
+  align-items: start;
+}
+
+.sunday-league-free-agent-form .sunday-league-select-field__control {
+  position: relative;
+}
+
+.sunday-league-free-agent-form .sunday-league-select-field__trigger {
+  position: relative;
+  display: block;
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  border-radius: 16px;
+  padding: 14px 48px 14px 16px;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: rgba(248, 250, 252, 0.92);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+  cursor: pointer;
+}
+
+.sunday-league-free-agent-form .sunday-league-select-field__trigger::after {
+  content: "";
+  position: absolute;
+  right: 18px;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid #64748b;
+  border-bottom: 2px solid #64748b;
+  transform: translateY(-60%) rotate(45deg);
+  pointer-events: none;
+}
+
+.sunday-league-free-agent-form .sunday-league-select-field__trigger.is-placeholder {
+  color: #64748b;
+}
+
+.sunday-league-free-agent-form .sunday-league-select-field__trigger:hover {
+  border-color: rgba(148, 163, 184, 0.55);
+}
+
+.sunday-league-free-agent-form .sunday-league-select-field__trigger:focus-visible,
+.sunday-league-free-agent-form .sunday-league-select-field__trigger.is-open {
+  outline: none;
+  border-color: rgba(233, 93, 42, 0.6);
+  box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.12);
+  background: #ffffff;
+}
+
+.sunday-league-free-agent-form .sunday-league-select-field__menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow:
+    0 24px 60px rgba(15, 23, 42, 0.18),
+    0 10px 24px rgba(15, 23, 42, 0.1);
+}
+
+.sunday-league-free-agent-form .sunday-league-select-field__option {
+  width: 100%;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font: inherit;
+  text-align: left;
+  color: #0f172a;
+  background: transparent;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.sunday-league-free-agent-form .sunday-league-select-field__option:hover,
+.sunday-league-free-agent-form .sunday-league-select-field__option:focus-visible,
+.sunday-league-free-agent-form .sunday-league-select-field__option.is-selected {
+  outline: none;
+  color: #0f172a;
+  background: rgba(233, 93, 42, 0.12);
+}
+
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__trigger {
+  border-color: rgba(148, 163, 184, 0.2);
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.9);
+}
+
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__trigger::after {
+  border-right-color: #cbd5e1;
+  border-bottom-color: #cbd5e1;
+}
+
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__trigger.is-placeholder {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__trigger:focus-visible,
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__trigger.is-open {
+  background: rgba(15, 23, 42, 0.98);
+}
+
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__menu {
+  border-color: rgba(148, 163, 184, 0.18);
+  background: linear-gradient(180deg, rgba(15, 25, 45, 0.98), rgba(12, 21, 38, 1));
+  box-shadow:
+    0 26px 64px rgba(2, 6, 23, 0.5),
+    0 12px 28px rgba(2, 6, 23, 0.35);
+}
+
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__option {
+  color: #e2e8f0;
+}
+
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__option:hover,
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__option:focus-visible,
+html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-field__option.is-selected {
+  color: #f8fafc;
+  background: rgba(148, 163, 184, 0.16);
 }
 
 .sunday-league-radio-row {
@@ -1844,6 +2023,24 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
 
 .sunday-league-checkbox-list--static {
   gap: 10px;
+}
+
+.sunday-league-team-form .checkbox-label {
+  color: #0f172a;
+}
+
+.sunday-league-team-form .checkbox-label input {
+  flex: 0 0 18px;
+  accent-color: #e95d2a;
+  color-scheme: light;
+}
+
+html[data-theme="dark"] .sunday-league-team-form .checkbox-label {
+  color: #e8edf7;
+}
+
+html[data-theme="dark"] .sunday-league-team-form .checkbox-label input {
+  color-scheme: dark;
 }
 
 .sunday-league-form-actions,
@@ -2263,13 +2460,33 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   transition: transform 160ms ease, box-shadow 160ms ease;
 }
 
+.sunday-league-team-board__player-card--button {
+  text-align: left;
+  cursor: pointer;
+  appearance: none;
+  font: inherit;
+  transition:
+    transform 160ms ease,
+    box-shadow 160ms ease,
+    border-color 160ms ease;
+}
+
 .sunday-league-team-board__player-card--link:hover {
   transform: translateY(-2px);
 }
 
-.sunday-league-team-board__player-card--link:focus-visible {
+.sunday-league-team-board__player-card--link:focus-visible,
+.sunday-league-team-board__player-card--button:focus-visible {
   outline: 3px solid rgba(248, 250, 252, 0.9);
   outline-offset: 3px;
+}
+
+.sunday-league-team-board__player-card--button.is-selected {
+  border-color: #facc15;
+  box-shadow:
+    0 20px 34px rgba(0, 0, 0, 0.28),
+    0 0 0 2px rgba(250, 204, 21, 0.22);
+  transform: translateY(-2px);
 }
 
 .sunday-league-team-board__player-crown {
@@ -2414,6 +2631,18 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   display: block;
 }
 
+.sunday-league-team-board__player-division-label {
+  margin: 0;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  letter-spacing: 0.16em;
+  color: #0f172a;
+  background: linear-gradient(180deg, #facc15, #f59e0b);
+  text-transform: uppercase;
+}
+
 
 .sunday-league-team-board__list {
   display: grid;
@@ -2544,6 +2773,113 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   overflow: auto;
   padding: 20px;
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.32);
+}
+
+.sunday-league-free-agent-modal {
+  width: min(1100px, calc(100vw - 48px));
+  max-height: min(86dvh, 920px);
+}
+
+.sunday-league-free-agent-modal__body {
+  display: grid;
+  gap: 18px;
+}
+
+.sunday-league-free-agent-modal__roster {
+  padding-bottom: 12px;
+}
+
+.sunday-league-free-agent-modal__detail {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  border-radius: 24px;
+  background:
+    linear-gradient(180deg, rgba(12, 21, 38, 0.08), rgba(12, 21, 38, 0.03)),
+    #ffffff;
+  border: 1px solid rgba(12, 21, 38, 0.12);
+}
+
+.sunday-league-free-agent-modal__detail-header {
+  display: grid;
+  grid-template-columns: 84px minmax(0, 1fr);
+  gap: 16px;
+  align-items: center;
+}
+
+.sunday-league-free-agent-modal__detail-avatar {
+  width: 84px;
+  height: 84px;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 4px solid rgba(15, 23, 42, 0.12);
+  background: #f8fafc;
+}
+
+.sunday-league-free-agent-modal__detail-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.sunday-league-free-agent-modal__detail-copy .eyebrow,
+.sunday-league-free-agent-modal__detail-copy h3,
+.sunday-league-free-agent-modal__detail-copy p {
+  margin: 0;
+}
+
+.sunday-league-free-agent-modal__stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.sunday-league-free-agent-modal__stat {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(12, 21, 38, 0.08);
+}
+
+.sunday-league-free-agent-modal__stat span {
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.sunday-league-free-agent-modal__stat strong {
+  font-size: 1rem;
+  color: #0f172a;
+}
+
+.sunday-league-free-agent-modal__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.sunday-league-free-agent-modal__meta-item {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border-radius: 16px;
+  background: rgba(248, 250, 252, 0.84);
+  border: 1px solid rgba(12, 21, 38, 0.08);
+}
+
+.sunday-league-free-agent-modal__meta-item .eyebrow,
+.sunday-league-free-agent-modal__meta-item p {
+  margin: 0;
+}
+
+.sunday-league-free-agent-modal__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .sunday-league-invite-modal__list {
@@ -2719,6 +3055,16 @@ html[data-theme="dark"] .sunday-league-team-board {
   .sunday-league-team-board__player-badge {
     width: 36px;
     height: 36px;
+  }
+
+  .sunday-league-free-agent-modal__detail-header {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .sunday-league-free-agent-modal__actions {
+    justify-content: center;
   }
 }
 
@@ -5241,6 +5587,11 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
   overflow: auto;
   padding: 20px;
   box-shadow: 0 28px 70px rgba(0, 0, 0, 0.32);
+}
+
+.register-modal.sunday-league-free-agent-modal {
+  width: min(1100px, calc(100vw - 48px));
+  max-height: min(86dvh, 920px);
 }
 
 .register-footer__left {

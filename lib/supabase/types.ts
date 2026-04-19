@@ -468,12 +468,12 @@ export type SundayLeagueLeaderboardUpdate = {
 
 export type SundayLeagueTeamMember = {
   id: string;
-  team_id: string;
+  team_id?: string | null;
   player_user_id?: string | null;
   invite_email?: string | null;
   invite_name?: string | null;
-  status: "pending" | "accepted" | "declined";
-  source: "player_request" | "captain_invite";
+  status: "free_agent" | "pending" | "accepted" | "declined";
+  source: "free_agent" | "player_request" | "captain_invite";
   role: "player" | "co_captain";
   created_at?: string | null;
   updated_at?: string | null;
@@ -481,12 +481,12 @@ export type SundayLeagueTeamMember = {
 
 export type SundayLeagueTeamMemberInsert = {
   id?: string;
-  team_id: string;
+  team_id?: string | null;
   player_user_id?: string | null;
   invite_email?: string | null;
   invite_name?: string | null;
-  status?: "pending" | "accepted" | "declined";
-  source: "player_request" | "captain_invite";
+  status?: "free_agent" | "pending" | "accepted" | "declined";
+  source: "free_agent" | "player_request" | "captain_invite";
   role?: "player" | "co_captain";
   created_at?: string | null;
   updated_at?: string | null;
@@ -494,12 +494,12 @@ export type SundayLeagueTeamMemberInsert = {
 
 export type SundayLeagueTeamMemberUpdate = {
   id?: string;
-  team_id?: string;
+  team_id?: string | null;
   player_user_id?: string | null;
   invite_email?: string | null;
   invite_name?: string | null;
-  status?: "pending" | "accepted" | "declined";
-  source?: "player_request" | "captain_invite";
+  status?: "free_agent" | "pending" | "accepted" | "declined";
+  source?: "free_agent" | "player_request" | "captain_invite";
   role?: "player" | "co_captain";
   created_at?: string | null;
   updated_at?: string | null;

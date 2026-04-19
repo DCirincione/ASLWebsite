@@ -342,7 +342,9 @@ function AccountInboxContent() {
     const inviteMemberships = Array.from(membershipMap.values()).filter(
       (membership) => membership.source === "captain_invite" && membership.status === "pending",
     );
-    const teamIds = Array.from(new Set(inviteMemberships.map((membership) => membership.team_id)));
+    const teamIds = Array.from(
+      new Set(inviteMemberships.map((membership) => membership.team_id).filter((teamId): teamId is string => Boolean(teamId))),
+    );
     let teamMap = new Map<string, AccountSundayLeagueTeam>();
 
     if (teamIds.length > 0) {
@@ -365,7 +367,7 @@ function AccountInboxContent() {
     setPendingInvites(
       inviteMemberships.map((membership) => ({
         ...membership,
-        team: teamMap.get(membership.team_id) ?? null,
+        team: membership.team_id ? teamMap.get(membership.team_id) ?? null : null,
       })),
     );
     setDirectMessages(nextDirectMessages);

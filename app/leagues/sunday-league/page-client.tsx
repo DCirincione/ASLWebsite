@@ -400,10 +400,11 @@ export default function SundayLeaguePageClient({
   );
 
   const membershipByTeamId = useMemo(() => {
-    const rank = { accepted: 3, pending: 2, declined: 1 } as const;
+    const rank = { accepted: 4, pending: 3, declined: 2, free_agent: 1 } as const;
     const map = new Map<string, SundayLeagueTeamMember>();
 
     for (const membership of myMemberships) {
+      if (!membership.team_id) continue;
       const existing = map.get(membership.team_id);
       if (!existing || rank[membership.status] > rank[existing.status]) {
         map.set(membership.team_id, membership);
@@ -414,7 +415,7 @@ export default function SundayLeaguePageClient({
   }, [myMemberships]);
 
   const acceptedMembership = useMemo(
-    () => myMemberships.find((membership) => membership.status === "accepted") ?? null,
+    () => myMemberships.find((membership) => membership.status === "accepted" && membership.team_id) ?? null,
     [myMemberships],
   );
 
@@ -1239,11 +1240,7 @@ export default function SundayLeaguePageClient({
                   className="button ghost"
                   type="button"
                   onClick={() => {
-                    if (!userId) {
-                      router.push("/account/create");
-                      return;
-                    }
-                    setActiveSection("inquiries");
+                    router.push("/leagues/sunday-league/free-agent");
                   }}
                 >
                   Free Agent
