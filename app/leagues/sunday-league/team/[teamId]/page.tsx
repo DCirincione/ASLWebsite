@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { AvatarImage } from "@/components/avatar-image";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
@@ -1077,12 +1078,7 @@ export default function SundayLeagueTeamPortalPage() {
                             ) : null}
                             <div className="sunday-league-team-board__player-avatar-wrap">
                               <div className="sunday-league-team-board__player-avatar">
-                                <Image
-                                  src={player.avatarUrl ?? "/avatar-placeholder.svg"}
-                                  alt={player.name}
-                                  fill
-                                  sizes="180px"
-                                />
+                                <AvatarImage src={player.avatarUrl} alt={player.name} objectPosition="center 57%" />
                               </div>
                             </div>
                             <div className="sunday-league-team-board__player-panel">
@@ -1413,7 +1409,7 @@ export default function SundayLeagueTeamPortalPage() {
                     {inviteSuggestions.map((profile) => (
                       <li key={profile.id} className="team-card sunday-league-invite-modal__item">
                         <div className="team-card__logo">
-                          <Image src={profile.avatar_url ?? "/avatar-placeholder.svg"} alt="" fill sizes="80px" />
+                          <AvatarImage src={profile.avatar_url} alt="" />
                         </div>
                         <div className="team-card__info">
                           <p className="list__title">{profile.name?.trim() || "Player"}</p>

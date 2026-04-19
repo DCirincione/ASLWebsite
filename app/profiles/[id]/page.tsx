@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { AvatarImage } from "@/components/avatar-image";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { getCountryNameFromCode } from "@/lib/countries";
@@ -248,7 +248,7 @@ export default function PublicProfilePage() {
         <header className="account-header">
           <div className="account-header__info">
             <div className="account-avatar" aria-hidden>
-              <Image src={avatarSrc} alt="" fill sizes="96px" />
+              <AvatarImage src={avatarSrc} alt="" loading="eager" />
             </div>
             <div className="account-header__text">
               <p className="eyebrow">Profile</p>

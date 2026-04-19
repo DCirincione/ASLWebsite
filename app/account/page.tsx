@@ -1,10 +1,10 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { AvatarImage } from "@/components/avatar-image";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { RegistrationModal } from "@/components/registration-modal";
 import { SubmissionReviewModal } from "@/components/submission-review-modal";
@@ -748,7 +748,7 @@ export default function AccountPage() {
           <header className="account-header">
             <div className="account-header__info">
               <div className="account-avatar" aria-hidden>
-                <Image src={avatarSrc} alt="" fill sizes="96px" />
+                <AvatarImage src={avatarSrc} alt="" loading="eager" />
               </div>
               <div className="account-header__text">
                 <p className="eyebrow">Account</p>

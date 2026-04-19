@@ -5,6 +5,7 @@ import Link from "next/link";
 import { CSSProperties, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 
 import { AccountSignupForm } from "./account-signup-form";
+import { AvatarImage } from "./avatar-image";
 import { AccountSigninForm } from "./account-signin-form";
 import { canAccessAdminDashboard, isPartnerRole } from "@/lib/event-approval";
 import { supabase } from "@/lib/supabase/client";
@@ -272,13 +273,7 @@ export function SiteHeader() {
                   onClick={() => setIsMenuOpen((prev) => !prev)}
                 >
                   <span className="header-avatar">
-                    <Image
-                      src={avatarUrl || "/avatar-placeholder.svg"}
-                      alt=""
-                      fill
-                      sizes="38px"
-                      priority
-                    />
+                    <AvatarImage src={avatarUrl} alt="" loading="eager" />
                   </span>
                   <span className="header-user__chevron" aria-hidden>
                     ˅

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
+import { AvatarImage } from "@/components/avatar-image";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { TeamLogoImage } from "@/components/team-logo-image";
@@ -513,12 +514,7 @@ export default function SundayLeaguePublicTeamPage() {
                             ) : null}
                             <div className="sunday-league-team-board__player-avatar-wrap">
                               <div className="sunday-league-team-board__player-avatar">
-                                <Image
-                                  src={player.avatarUrl ?? "/avatar-placeholder.svg"}
-                                  alt={player.name}
-                                  fill
-                                  sizes="180px"
-                                />
+                                <AvatarImage src={player.avatarUrl} alt={player.name} objectPosition="center 57%" />
                               </div>
                             </div>
                             <div className="sunday-league-team-board__player-panel">
