@@ -1,0 +1,113 @@
+.contact-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+  align-items: start;
+}
+
+.contact-card {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  background: #ffffff;
+  display: grid;
+  gap: 14px;
+  box-shadow: var(--glow);
+}
+
+.contact-card--info {
+  background: #f8fafc;
+}
+
+.contact-card h3 {
+  margin: 0;
+}
+
+.contact-form {
+  display: grid;
+  gap: 12px;
+}
+
+.contact-form input,
+.contact-form textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  font: inherit;
+  background: #f8fafc;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.contact-form input:focus,
+.contact-form textarea:focus {
+  outline: none;
+  border-color: rgba(233, 93, 42, 0.6);
+  box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.12);
+  background: #ffffff;
+}
+
+.contact-form textarea {
+  min-height: 140px;
+  resize: vertical;
+}
+
+.contact-list {
+  display: grid;
+  gap: 12px;
+}
+
+.contact-item {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.contact-icon {
+  font-size: 18px;
+}
+
+.contact-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.contact-map {
+  margin-top: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: var(--glow);
+}
+
+html[data-theme="dark"] .contact-map {
+  border-color: #1f2a40;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .contact-card {
+  background: #0f192d;
+  border-color: #1f2a40;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .contact-card--info {
+  background: #0c1526;
+}
+
+html[data-theme="dark"] .contact-form input,
+html[data-theme="dark"] .contact-form textarea {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: #1f2a40;
+  color: #e8edf7;
+}
+
+html[data-theme="dark"] .contact-form input:focus,
+html[data-theme="dark"] .contact-form textarea:focus {
+  border-color: rgba(233, 93, 42, 0.6);
+  box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+}

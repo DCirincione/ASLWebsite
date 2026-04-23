@@ -1,4 +1,5 @@
 "use client";
+import "@/app/account/account.css";
 
 import { AccountSigninForm } from "./account-signin-form";
 import { AccountSignupForm } from "./account-signup-form";

@@ -1,4 +1,5 @@
 "use client";
+import "../sunday-league.css";
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";

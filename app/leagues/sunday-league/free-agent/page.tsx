@@ -1,4 +1,5 @@
 "use client";
+import "../sunday-league.css";
 
 import Link from "next/link";
 import {

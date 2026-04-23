@@ -1,3 +1,4 @@
+import "../account.css";
 import { AccountSignupForm } from "@/components/account-signup-form";
 
 export default function AccountCreatePage() {

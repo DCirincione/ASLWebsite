@@ -1,10 +1,10 @@
 "use client";
-import "@/app/account/account.css";
 
 import Link from "next/link";
-import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-import { AccountAuthModal } from "@/components/account-auth-modal";
+import { AccountSigninForm } from "@/components/account-signin-form";
+import { AccountSignupForm } from "@/components/account-signup-form";
 import {
   ALDRICH_COMMUNICATIONS_KEY,
   ALDRICH_COMMUNICATIONS_LABEL,
@@ -278,12 +278,7 @@ export function RegistrationModal({
       : null;
   const showAuthWarning = !loadingEvent && Boolean(eventConfig) && !userId && authStep === "warning";
   const showAuthGate = !loadingEvent && Boolean(eventConfig) && !userId && authStep === "auth";
-
-  const handleAuthOverlayClick = (event: ReactMouseEvent<HTMLDivElement>) => {
-    if (event.target === event.currentTarget) {
-      onClose();
-    }
-  };
+  const showAuthFlow = showAuthWarning || showAuthGate;
 
   const validate = useMemo(() => {
     return () => {
@@ -516,35 +511,14 @@ export function RegistrationModal({
 
   if (!open) return null;
 
-  if (showAuthGate) {
-    return (
-      <div
-        className="account-create-overlay"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="event-account-title"
-        onClick={handleAuthOverlayClick}
-      >
-        <AccountAuthModal
-          authMode={authMode}
-          onAuthModeChange={setAuthMode}
-          onClose={onClose}
-          onSuccess={() => setStatus({ type: "idle" })}
-          redirectTo={null}
-          titleId="event-account-title"
-        />
-      </div>
-    );
-  }
-
   return (
     <div
-      className={`register-modal-backdrop${showAuthWarning ? " register-modal-backdrop--dialog" : ""}`}
+      className={`register-modal-backdrop${showAuthFlow ? " register-modal-backdrop--dialog" : ""}`}
       role="dialog"
       aria-modal="true"
     >
-      <div className={`register-modal${showAuthWarning ? " register-modal--dialog" : ""}`}>
-        {!showAuthWarning ? (
+      <div className={`register-modal${showAuthFlow ? " register-modal--dialog" : ""}`}>
+        {!showAuthFlow ? (
           <>
             <div className="register-modal__header">
               <div>
@@ -566,7 +540,7 @@ export function RegistrationModal({
         ) : null}
 
         {loadingEvent ? <p className="muted">Loading form…</p> : null}
-        {status.type === "error" && !showAuthWarning ? (
+        {status.type === "error" && !showAuthFlow ? (
           <p className="form-help error" role="status" aria-live="polite">
             {status.message}
           </p>
@@ -604,6 +578,39 @@ export function RegistrationModal({
           </div>
         ) : null}
 
+        {showAuthGate ? (
+          <div className="register-auth-panel">
+            <div className="register-auth-panel__header">
+              <div>
+                <p className="eyebrow">Account</p>
+                <h3>{authMode === "signup" ? "Create an Account" : "Sign In"}</h3>
+                <p className="muted">
+                  {authMode === "signup"
+                    ? "Set up your profile so you can register for events, track stats, and connect with friends."
+                    : "Sign in to finish your event signup and manage your account."}
+                </p>
+              </div>
+              <div className="account-create__actions">
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => setAuthMode(authMode === "signup" ? "signin" : "signup")}
+                >
+                  {authMode === "signup" ? "Already have an account? Sign in" : "New here? Create account"}
+                </button>
+                <button className="button ghost" type="button" onClick={onClose}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+            {authMode === "signup" ? (
+              <AccountSignupForm redirectTo={null} onSuccess={() => setStatus({ type: "idle" })} />
+            ) : (
+              <AccountSigninForm redirectTo={null} onSuccess={() => setStatus({ type: "idle" })} />
+            )}
+          </div>
+        ) : null}
+
         {!loadingEvent && eventConfig && showWaitlistSuccessState ? (
           <div className="register-modal__success" role="status" aria-live="polite">
             <div className="register-modal__success-copy">
@@ -622,7 +629,7 @@ export function RegistrationModal({
           </div>
         ) : null}
 
-        {!loadingEvent && eventConfig && !showAuthWarning && !showWaitlistSuccessState ? (
+        {!loadingEvent && eventConfig && !showAuthWarning && !showAuthGate && !showWaitlistSuccessState ? (
           <form className="register-form" onSubmit={handleSubmit}>
             {paymentAmountLabel ? (
               <p className="muted">

@@ -1,4 +1,5 @@
 "use client";
+import "../account.css";
 
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";

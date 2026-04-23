@@ -1,4 +1,5 @@
 "use client";
+import "../account.css";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";

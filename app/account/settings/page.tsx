@@ -1,4 +1,5 @@
 "use client";
+import "../account.css";
 
 import { useEffect, useState } from "react";
 

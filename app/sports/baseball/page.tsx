@@ -1,4 +1,5 @@
 "use client";
+import "../sports.css";
 
 import Image from "next/image";
 import Link from "next/link";

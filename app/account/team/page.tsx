@@ -1,4 +1,6 @@
 "use client";
+import "../account.css";
+import "../../leagues/sunday-league/sunday-league.css";
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";

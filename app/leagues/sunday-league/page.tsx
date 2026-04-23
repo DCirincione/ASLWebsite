@@ -1,3 +1,4 @@
+import "./sunday-league.css";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { readSundayLeagueSignupForm } from "@/lib/sunday-league-signup-form-store";

@@ -1,5 +1,7 @@
 "use client";
 
+import "./admin.css";
+import "../account/account.css";
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";

@@ -1,3 +1,4 @@
+import "../sunday-league.css";
 import SundayLeagueDepositPageClient from "./page-client";
 import { readSundayLeagueSettings } from "@/lib/sunday-league-settings";
 

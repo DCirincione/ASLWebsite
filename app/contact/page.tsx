@@ -1,5 +1,6 @@
 "use client";
 
+import "./contact.css";
 import Link from "next/link";
 import Script from "next/script";
 import { useState, type FormEvent } from "react";

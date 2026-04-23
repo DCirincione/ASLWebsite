@@ -1,4 +1,6 @@
+
 "use client";
+import "./sunday-league.css";
 
 import Image from "next/image";
 import Link from "next/link";
