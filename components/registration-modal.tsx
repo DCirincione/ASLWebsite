@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { type MouseEvent as ReactMouseEvent, useEffect, useMemo, useState } from "react";
 
+import { AccountAuthModal } from "@/components/account-auth-modal";
 import {
   ALDRICH_COMMUNICATIONS_KEY,
   ALDRICH_COMMUNICATIONS_LABEL,
@@ -145,7 +145,6 @@ export function RegistrationModal({
   onClose,
   onSubmitted,
 }: RegistrationModalProps) {
-  const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [eventConfig, setEventConfig] = useState<EventRegistration | null>(null);
   const [fields, setFields] = useState<Field[]>([]);
@@ -153,12 +152,17 @@ export function RegistrationModal({
   const [files, setFiles] = useState<Record<string, File[]>>({});
   const [status, setStatus] = useState<Status>({ type: "idle" });
   const [loadingEvent, setLoadingEvent] = useState(false);
+  const [authStep, setAuthStep] = useState<"warning" | "auth">("warning");
+  const [authMode, setAuthMode] = useState<"signup" | "signin">("signup");
 
   useEffect(() => {
     if (!open) return;
     const client = supabase;
     if (!client) return;
+    let cancelled = false;
+
     client.auth.getSession().then(({ data }) => {
+      if (cancelled) return;
       const session = data.session;
       const uid = session?.user.id ?? null;
       setUserId(uid);
@@ -166,23 +170,23 @@ export function RegistrationModal({
         ...prev,
         email: prev.email || session?.user.email || "",
       }));
-      if (!uid) {
-        router.push("/account/create");
-      }
     });
+
     const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
+      if (cancelled) return;
       const uid = session?.user.id ?? null;
       setUserId(uid);
       setValues((prev) => ({
         ...prev,
         email: prev.email || session?.user.email || "",
       }));
-      if (!uid) {
-        router.push("/account/create");
-      }
     });
-    return () => sub?.subscription.unsubscribe();
-  }, [open, router]);
+
+    return () => {
+      cancelled = true;
+      sub?.subscription.unsubscribe();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open || !eventId) return;
@@ -191,6 +195,8 @@ export function RegistrationModal({
     const load = async () => {
       setLoadingEvent(true);
       setStatus({ type: "idle" });
+      setAuthStep("warning");
+      setAuthMode("signup");
       setEventConfig(null);
       setFields([]);
       setValues((prev) => ({ ...DEFAULT_VALUES, email: prev.email || "" }));
@@ -269,6 +275,14 @@ export function RegistrationModal({
     paymentRequired && eventConfig?.payment_amount_cents
       ? formatEventPaymentAmount(eventConfig.payment_amount_cents)
       : null;
+  const showAuthWarning = !loadingEvent && Boolean(eventConfig) && !userId && authStep === "warning";
+  const showAuthGate = !loadingEvent && Boolean(eventConfig) && !userId && authStep === "auth";
+
+  const handleAuthOverlayClick = (event: ReactMouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      onClose();
+    }
+  };
 
   const validate = useMemo(() => {
     return () => {
@@ -308,7 +322,8 @@ export function RegistrationModal({
       return;
     }
     if (!userId) {
-      router.push("/account/create");
+      setAuthMode("signin");
+      setAuthStep("auth");
       return;
     }
     if (!eventConfig) return;
@@ -437,7 +452,9 @@ export function RegistrationModal({
       const { data: sessionData } = await client.auth.getSession();
       const accessToken = sessionData.session?.access_token ?? null;
       if (!accessToken) {
-        router.push("/account/create");
+        setUserId(null);
+        setAuthMode("signin");
+        setAuthStep("auth");
         return;
       }
 
@@ -498,31 +515,92 @@ export function RegistrationModal({
 
   if (!open) return null;
 
-  return (
-    <div className="register-modal-backdrop" role="dialog" aria-modal="true">
-      <div className="register-modal">
-        <div className="register-modal__header">
-          <div>
-            <p className="eyebrow">{getSignupModalEyebrow(eventConfig, mode)}</p>
-            <h2>{eventConfig?.title || contextTitle || getSignupModalTitle(eventConfig)}</h2>
-            {contextTitle ? <p className="muted">{contextTitle}</p> : null}
-          </div>
-          <button className="button ghost" type="button" onClick={onClose}>
-            Close
-          </button>
-        </div>
+  if (showAuthGate) {
+    return (
+      <div
+        className="account-create-overlay"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="event-account-title"
+        onClick={handleAuthOverlayClick}
+      >
+        <AccountAuthModal
+          authMode={authMode}
+          onAuthModeChange={setAuthMode}
+          onClose={onClose}
+          onSuccess={() => setStatus({ type: "idle" })}
+          redirectTo={null}
+          titleId="event-account-title"
+        />
+      </div>
+    );
+  }
 
-        <div className="register-modal__meta">
-          <span className="pill pill--muted">Secure form</span>
-          <span className="muted">All required fields are marked with *</span>
-          {paymentAmountLabel ? <span className="pill pill--muted">{paymentAmountLabel} payment required</span> : null}
-        </div>
+  return (
+    <div
+      className={`register-modal-backdrop${showAuthWarning ? " register-modal-backdrop--dialog" : ""}`}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className={`register-modal${showAuthWarning ? " register-modal--dialog" : ""}`}>
+        {!showAuthWarning ? (
+          <>
+            <div className="register-modal__header">
+              <div>
+                <p className="eyebrow">{getSignupModalEyebrow(eventConfig, mode)}</p>
+                <h2>{eventConfig?.title || contextTitle || getSignupModalTitle(eventConfig)}</h2>
+                {contextTitle ? <p className="muted">{contextTitle}</p> : null}
+              </div>
+              <button className="button ghost" type="button" onClick={onClose}>
+                Close
+              </button>
+            </div>
+
+            <div className="register-modal__meta">
+              <span className="pill pill--muted">Secure form</span>
+              <span className="muted">All required fields are marked with *</span>
+              {paymentAmountLabel ? <span className="pill pill--muted">{paymentAmountLabel} payment required</span> : null}
+            </div>
+          </>
+        ) : null}
 
         {loadingEvent ? <p className="muted">Loading form…</p> : null}
-        {status.type === "error" ? (
+        {status.type === "error" && !showAuthWarning ? (
           <p className="form-help error" role="status" aria-live="polite">
             {status.message}
           </p>
+        ) : null}
+
+        {showAuthWarning ? (
+          <div className="register-auth-warning">
+            <div className="register-auth-warning__copy">
+              <p className="eyebrow">Account Required</p>
+              <h3>Hold up! Sign in or create your account first.</h3>
+              <p className="muted">
+                You need an account before you can sign up for {eventConfig?.title || contextTitle || "this event"}.
+                Once you finish this step, this signup form will stay right here for you to complete.
+              </p>
+            </div>
+            <div className="register-auth-warning__notice">
+              Creating an account does not register you for {eventConfig?.title || contextTitle || "this event"}.
+              You still need to submit the event signup form after this step.
+            </div>
+            <div className="register-auth-warning__actions">
+              <button
+                className="button primary"
+                type="button"
+                onClick={() => {
+                  setAuthMode("signup");
+                  setAuthStep("auth");
+                }}
+              >
+                Continue
+              </button>
+              <button className="button ghost" type="button" onClick={onClose}>
+                Cancel
+              </button>
+            </div>
+          </div>
         ) : null}
 
         {!loadingEvent && eventConfig && showWaitlistSuccessState ? (
@@ -543,7 +621,7 @@ export function RegistrationModal({
           </div>
         ) : null}
 
-        {!loadingEvent && eventConfig && !showWaitlistSuccessState ? (
+        {!loadingEvent && eventConfig && !showAuthWarning && !showWaitlistSuccessState ? (
           <form className="register-form" onSubmit={handleSubmit}>
             {paymentAmountLabel ? (
               <p className="muted">

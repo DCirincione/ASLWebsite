@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { unstable_noStore as noStore } from "next/cache";
 
+import "./merch.css";
+
 import { MerchStorefront } from "@/components/merch-storefront";
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";

@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { AvatarCropField, type AvatarCropFieldHandle } from "@/components/avatar-crop-field";
 import { ALDRICH_COMMUNICATIONS_LABEL } from "@/lib/aldrich-communications";
 import { COUNTRY_OPTIONS } from "@/lib/countries";
 import { supabase } from "@/lib/supabase/client";
@@ -11,10 +12,12 @@ type Status = { type: "idle" | "loading" | "success" | "error"; message?: string
 
 type AccountSignupFormProps = {
   onSuccess?: () => void;
+  redirectTo?: string | null;
 };
 
-export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
+export function AccountSignupForm({ onSuccess, redirectTo }: AccountSignupFormProps) {
   const router = useRouter();
+  const avatarFieldRef = useRef<AvatarCropFieldHandle | null>(null);
   const [status, setStatus] = useState<Status>({ type: "idle" });
   const [form, setForm] = useState({
     name: "",
@@ -61,6 +64,12 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
     const skill_level = Number.isNaN(Number(form.skill_level)) ? null : Number(form.skill_level);
     const positions = parseArray(form.positions);
     const sports = parseArray(form.sports);
+    const croppedAvatarDataUrl = await avatarFieldRef.current?.getCroppedImage();
+
+    if (!croppedAvatarDataUrl) {
+      setStatus({ type: "error", message: "Unable to save your profile picture. Try another image." });
+      return;
+    }
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -85,6 +94,7 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
       id: userId,
       name,
       age,
+      avatar_url: croppedAvatarDataUrl,
       country_code: country_code || null,
       positions,
       skill_level,
@@ -98,9 +108,14 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
     }
 
     if (data.session) {
-      setStatus({ type: "success", message: "Account created! Redirecting to your account..." });
+      setStatus({
+        type: "success",
+        message: redirectTo === null ? "Account created! Finish your event signup below." : "Account created! Redirecting to your account...",
+      });
       onSuccess?.();
-      router.push("/account");
+      if (redirectTo !== null) {
+        router.push(redirectTo || "/account");
+      }
     } else {
       setStatus({
         type: "success",
@@ -111,6 +126,19 @@ export function AccountSignupForm({ onSuccess }: AccountSignupFormProps) {
 
   return (
     <form className="account-form" onSubmit={handleSubmit}>
+      <AvatarCropField
+        ref={avatarFieldRef}
+        inputId="profile-picture"
+        inputName="profile-picture"
+        label="Profile Picture"
+        helpText="Required for all new accounts. Upload a JPG, PNG, or WebP image under 5MB."
+        onImageSelected={() => {
+          if (status.type === "error") {
+            setStatus({ type: "idle" });
+          }
+        }}
+        required
+      />
       <div className="form-grid">
         <div className="form-control">
           <label htmlFor="name">Full Name</label>

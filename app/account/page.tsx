@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
+import { AvatarCropField, type AvatarCropFieldHandle } from "@/components/avatar-crop-field";
 import { AvatarImage } from "@/components/avatar-image";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { RegistrationModal } from "@/components/registration-modal";
@@ -147,14 +148,11 @@ export default function AccountPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [signingOut, setSigningOut] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-  const [avatarError, setAvatarError] = useState<string | null>(null);
-  const [avatarSuccess, setAvatarSuccess] = useState<string | null>(null);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState<ProfileFormState>(emptyProfileForm);
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>({ type: "idle" });
   const [activeSection, setActiveSection] = useState<AccountSection>("events");
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const avatarFieldRef = useRef<AvatarCropFieldHandle | null>(null);
 
   // Teams
   const [teams, setTeams] = useState<AccountSundayLeagueTeam[]>([]);
@@ -205,61 +203,6 @@ export default function AccountPage() {
     window.location.assign("/");
   };
 
-  const handleAvatarSelect = async (event: ChangeEvent<HTMLInputElement>) => {
-    const fileInput = event.target;
-    const file = fileInput.files?.[0];
-    if (!file) return;
-    if (!supabase) {
-      setAvatarError("Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.");
-      return;
-    }
-    if (!userId) {
-      setAvatarError("You need to be signed in to change your photo.");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      setAvatarError("Please choose an image under 5MB.");
-      return;
-    }
-
-    setUploadingAvatar(true);
-    setAvatarError(null);
-    setAvatarSuccess(null);
-
-    const readAsDataUrl = () =>
-      new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = () => reject(new Error("Could not read file"));
-        reader.readAsDataURL(file);
-      });
-
-    let dataUrl: string;
-    try {
-      dataUrl = await readAsDataUrl();
-    } catch {
-      setAvatarError("Unable to read image file.");
-      setUploadingAvatar(false);
-      return;
-    }
-
-    const { error: updateError } = await supabase
-      .from("profiles")
-      .update({ avatar_url: dataUrl })
-      .eq("id", userId);
-
-    if (updateError) {
-      setAvatarError(updateError.message);
-      setUploadingAvatar(false);
-      return;
-    }
-
-    setProfile((prev) => (prev ? { ...prev, avatar_url: dataUrl } : prev));
-    setAvatarSuccess("Profile photo updated!");
-    setUploadingAvatar(false);
-    fileInput.value = "";
-  };
-
   const updateProfileForm = (key: keyof ProfileFormState, value: string) => {
     setProfileForm((prev) => ({ ...prev, [key]: value }));
   };
@@ -304,10 +247,19 @@ export default function AccountPage() {
     };
 
     setProfileSaveStatus({ type: "loading" });
+    const nextAvatarUrl = await avatarFieldRef.current?.getCroppedImage();
+
+    if (avatarFieldRef.current?.hasSelectedImage() && !nextAvatarUrl) {
+      setProfileSaveStatus({ type: "error", message: "Unable to save your profile picture. Try another image." });
+      return;
+    }
 
     const { error: updateError } = await supabase
       .from("profiles")
-      .update(payload)
+      .update({
+        ...payload,
+        ...(nextAvatarUrl ? { avatar_url: nextAvatarUrl } : {}),
+      })
       .eq("id", userId);
 
     if (updateError) {
@@ -320,6 +272,7 @@ export default function AccountPage() {
       return {
         ...prev,
         ...payload,
+        ...(nextAvatarUrl ? { avatar_url: nextAvatarUrl } : {}),
       };
     });
     setProfileForm((prev) => ({ ...prev, name: payload.name, about: payload.about ?? "" }));
@@ -364,10 +317,6 @@ export default function AccountPage() {
 
     loadProfile();
   }, []);
-
-  useEffect(() => {
-    setProfileForm(toProfileFormState(profile));
-  }, [profile]);
 
   // Load teams
   useEffect(() => {
@@ -858,28 +807,21 @@ export default function AccountPage() {
                 </div>
               </div>
               <div className="form-control">
-                <label>Photo</label>
-                <div className="avatar-upload">
-                  <input
-                    ref={fileInputRef}
-                    id="avatar-upload"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarSelect}
-                    className="sr-only"
-                  />
-                  <button
-                    className="button ghost"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={uploadingAvatar}
-                  >
-                    {uploadingAvatar ? "Uploading..." : "Edit Photo"}
-                  </button>
-                  <p className="muted">JPG or PNG, max 5MB.</p>
-                  {avatarError ? <p className="form-help error">{avatarError}</p> : null}
-                  {avatarSuccess ? <p className="form-help success">{avatarSuccess}</p> : null}
-                </div>
+                <AvatarCropField
+                  ref={avatarFieldRef}
+                  inputId="avatar-upload"
+                  label="Photo"
+                  helpText="Upload a JPG, PNG, or WebP image under 5MB."
+                  initialPreviewSrc={data.avatar_url}
+                  onImageSelected={() => {
+                    if (profileSaveStatus.type === "error") {
+                      setProfileSaveStatus({ type: "idle" });
+                    }
+                  }}
+                  pickerVariant="button"
+                  fileButtonLabel="Upload Image"
+                  cropButtonLabel="Edit / Crop Image"
+                />
               </div>
               <div className="form-control">
                 <label htmlFor="profile-about">Bio</label>

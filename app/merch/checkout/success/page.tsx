@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import "../../merch.css";
+
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
 

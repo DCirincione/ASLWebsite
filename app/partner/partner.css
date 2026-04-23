@@ -1,0 +1,322 @@
+.partner-events-summary {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.partner-event-card__stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.partner-event-card__stat {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.partner-event-card__stat-label {
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.partner-event-card__stat-value {
+  font-size: 1.2rem;
+  line-height: 1.1;
+  color: #0f172a;
+}
+
+.partner-event-card__stat-button {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.partner-event-card__stat-button:hover {
+  border-color: rgba(233, 93, 42, 0.28);
+  box-shadow: 0 10px 24px rgba(233, 93, 42, 0.08);
+}
+
+.partner-event-card__stat-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.partner-event-card__stat-hint {
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.partner-signups-panel {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.partner-signups-panel__title {
+  margin: 0;
+}
+
+.partner-signups-list {
+  display: grid;
+  gap: 10px;
+}
+
+.partner-signup-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  background: #ffffff;
+}
+
+.partner-signup-row__name {
+  margin: 0 0 4px;
+  font-weight: 800;
+}
+
+.partner-signup-row__meta {
+  display: grid;
+  gap: 4px;
+  min-width: 220px;
+}
+
+.partner-event-card__payout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: rgba(15, 23, 42, 0.03);
+}
+
+.partner-event-card__payout-title {
+  margin: 0 0 4px;
+  font-weight: 800;
+}
+
+.partner-application-form {
+  display: grid;
+  gap: 22px;
+}
+
+.partner-application-section {
+  display: grid;
+  gap: 14px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
+}
+
+.partner-application-section:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.partner-application-section__header {
+  display: grid;
+  gap: 6px;
+}
+
+.partner-application-section__header h3,
+.partner-application-section__header h4,
+.partner-application-plan-card h4 {
+  margin: 0;
+}
+
+.partner-application-option-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.partner-application-team-list {
+  display: grid;
+  gap: 12px;
+}
+
+.partner-application-team-card {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(248, 250, 252, 0.78);
+}
+
+.partner-application-radio-row {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.partner-application-plan-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(233, 93, 42, 0.2);
+  background: linear-gradient(180deg, rgba(233, 93, 42, 0.08), rgba(15, 23, 42, 0.02));
+}
+
+.partner-application-plan-card__amount {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 800;
+  color: #c2410c;
+}
+
+.partner-square-card {
+  min-height: 56px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.partner-square-card--disabled {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+}
+
+.partner-square-card iframe {
+  width: 100%;
+}
+
+.partner-application-terms {
+  display: grid;
+  gap: 10px;
+}
+
+.partner-application-status {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+}
+
+.partner-application-status h3,
+.partner-application-status p {
+  margin: 0;
+}
+
+.partner-application-status--success {
+  background: rgba(16, 185, 129, 0.08);
+  border-color: rgba(16, 185, 129, 0.26);
+}
+
+.partner-application-status--pending {
+  background: rgba(233, 93, 42, 0.08);
+  border-color: rgba(233, 93, 42, 0.22);
+}
+
+.partner-application-link {
+  font-weight: 700;
+  color: #c2410c;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (max-width: 720px) {
+  .partner-application-option-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .partner-application-plan-card {
+    align-items: flex-start;
+  }
+}
+
+html[data-theme="dark"] .event-card-simple {
+  background: #0f192d;
+  border-color: #1f2a40;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .partner-event-card__stat {
+  background: rgba(15, 23, 42, 0.75);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-event-card__stat-label {
+  color: #94a3b8;
+}
+
+html[data-theme="dark"] .partner-event-card__stat-value {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .partner-event-card__stat-hint {
+  color: #cbd5e1;
+}
+
+html[data-theme="dark"] .partner-signups-panel {
+  background: rgba(15, 23, 42, 0.82);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-signup-row {
+  background: rgba(15, 23, 42, 0.72);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-event-card__payout {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-application-team-card,
+html[data-theme="dark"] .partner-application-status {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-application-plan-card {
+  background: linear-gradient(180deg, rgba(233, 93, 42, 0.12), rgba(15, 23, 42, 0.36));
+  border-color: rgba(233, 93, 42, 0.24);
+}
+
+html[data-theme="dark"] .partner-square-card {
+  background: rgba(15, 23, 42, 0.78);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .partner-application-plan-card__amount,
+html[data-theme="dark"] .partner-application-link {
+  color: #fdba74;
+}
+
+@media (max-width: 720px) {
+  .partner-event-card__stats {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .partner-signup-row__meta {
+    min-width: 0;
+  }
+}

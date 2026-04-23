@@ -4,6 +4,8 @@ import Link from "next/link";
 import Script from "next/script";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
+import "./partner.css";
+
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PartnerApplicationForm } from "@/components/partner-application-form";

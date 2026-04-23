@@ -99,7 +99,6 @@ export function HomeUpcomingEvents() {
   const router = useRouter();
   const [events, setEvents] = useState<HomeEvent[]>(fallbackEvents);
   const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [modalEventId, setModalEventId] = useState<string | null>(null);
   const [modalTitle, setModalTitle] = useState<string | null>(null);
@@ -118,14 +117,7 @@ export function HomeUpcomingEvents() {
       setLoading(false);
     };
 
-    const loadSession = async () => {
-      if (!supabase) return;
-      const { data } = await supabase.auth.getSession();
-      setUserId(data.session?.user.id ?? null);
-    };
-
     void loadEvents();
-    void loadSession();
   }, []);
 
   const primaryDateLabel = (event: HomeEvent) => {
@@ -208,10 +200,6 @@ export function HomeUpcomingEvents() {
                             if (isRegistered) {
                               return;
                             }
-                            if (!userId) {
-                              router.push("/account/create");
-                              return;
-                            }
                             setModalEventId(event.id);
                             setModalTitle(event.title);
                             setModalOpen(true);
@@ -248,10 +236,6 @@ export function HomeUpcomingEvents() {
             return;
           }
           if (isRegisteredEvent(event.id)) {
-            return;
-          }
-          if (!userId) {
-            router.push("/account/create");
             return;
           }
           setDetailEvent(null);

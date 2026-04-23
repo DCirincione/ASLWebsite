@@ -4,9 +4,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { CSSProperties, MouseEvent, useCallback, useEffect, useRef, useState } from "react";
 
-import { AccountSignupForm } from "./account-signup-form";
+import { AccountAuthModal } from "./account-auth-modal";
 import { AvatarImage } from "./avatar-image";
-import { AccountSigninForm } from "./account-signin-form";
 import { canAccessAdminDashboard, isPartnerRole } from "@/lib/event-approval";
 import { supabase } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/supabase/types";
@@ -320,46 +319,13 @@ export function SiteHeader() {
           aria-labelledby="create-account-title"
           onClick={handleOverlayClick}
         >
-          <div className="account-create-modal">
-            <button
-              className="account-create__close"
-              type="button"
-              aria-label="Close create account dialog"
-              onClick={closeAccountModal}
-            >
-              X
-            </button>
-            <header className="account-create__header">
-              <div>
-                <p className="eyebrow">Account</p>
-                <h1 id="create-account-title">
-                  {authMode === "signup" ? "Create an Account" : "Sign In"}
-                </h1>
-                <p className="muted">
-                  {authMode === "signup"
-                    ? "Set up your profile so you can register teams, track stats, and connect with friends."
-                    : "Sign in to access your account, manage teams, and track stats."}
-                </p>
-              </div>
-              <div className="account-create__actions">
-                <button
-                  className="button ghost"
-                  type="button"
-                  onClick={() => setAuthMode(authMode === "signup" ? "signin" : "signup")}
-                >
-                  {authMode === "signup" ? "Already have an account? Sign in" : "New here? Create account"}
-                </button>
-                <button className="button ghost" type="button" onClick={closeAccountModal}>
-                  Cancel
-                </button>
-              </div>
-            </header>
-            {authMode === "signup" ? (
-              <AccountSignupForm onSuccess={closeAccountModal} />
-            ) : (
-              <AccountSigninForm onSuccess={closeAccountModal} />
-            )}
-          </div>
+          <AccountAuthModal
+            authMode={authMode}
+            onAuthModeChange={setAuthMode}
+            onClose={closeAccountModal}
+            onSuccess={closeAccountModal}
+            titleId="create-account-title"
+          />
         </div>
       ) : null}
     </>

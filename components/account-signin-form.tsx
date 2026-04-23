@@ -10,9 +10,10 @@ const PASSWORD_RESET_REDIRECT = "https://aldrichsports.com/reset-password";
 
 type AccountSigninFormProps = {
   onSuccess?: () => void;
+  redirectTo?: string | null;
 };
 
-export function AccountSigninForm({ onSuccess }: AccountSigninFormProps) {
+export function AccountSigninForm({ onSuccess, redirectTo }: AccountSigninFormProps) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>({ type: "idle" });
   const [resetStatus, setResetStatus] = useState<Status>({ type: "idle" });
@@ -77,9 +78,14 @@ export function AccountSigninForm({ onSuccess }: AccountSigninFormProps) {
       return;
     }
 
-    setStatus({ type: "success", message: "Signed in! Redirecting to your account..." });
+    setStatus({
+      type: "success",
+      message: redirectTo === null ? "Signed in! Finish your event signup below." : "Signed in! Redirecting to your account...",
+    });
     onSuccess?.();
-    router.push("/account");
+    if (redirectTo !== null) {
+      router.push(redirectTo || "/account");
+    }
   };
 
   return (

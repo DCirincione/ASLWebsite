@@ -22,8 +22,6 @@ import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slu
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import type { JsonValue, Sport } from "@/lib/supabase/types";
 
-import styles from "./events-page.module.css";
-
 type EventItem = {
   id: string;
   title: string;
@@ -943,9 +941,9 @@ export default function EventsPage() {
     const isOpen = openFilterGroups[groupKey];
 
     return (
-      <div className={styles.eventsFiltersGroup}>
+      <div className="events-filters__group">
         <button
-          className={styles.eventsFiltersToggle}
+          className="events-filters__toggle"
           type="button"
           aria-expanded={isOpen}
           onClick={() =>
@@ -956,17 +954,14 @@ export default function EventsPage() {
           }
         >
           <h3>{title}</h3>
-          <span
-            className={`${styles.eventsFiltersToggleArrow}${isOpen ? ` ${styles.toggleArrowOpen}` : ""}`}
-            aria-hidden
-          >
+          <span className={`events-filters__toggle-arrow${isOpen ? " is-open" : ""}`} aria-hidden>
             ▾
           </span>
         </button>
         {isOpen ? (
-          <div className={styles.eventsFiltersOptions}>
+          <div className="events-filters__options">
             {options.map((option) => (
-              <label key={option.value} className={styles.eventsFilterOption}>
+              <label key={option.value} className="events-filter-option">
                 <input
                   type="checkbox"
                   checked={selectedValues.includes(option.value)}
@@ -989,14 +984,14 @@ export default function EventsPage() {
     events: DerivedEvent[],
     emptyMessage: string,
   ) => (
-    <section className={styles.eventsGroup} id={id}>
-      <div className={styles.eventsGroupHeader}>
+    <section className="events-group" id={id}>
+      <div className="events-group__header">
         <p className="eyebrow">{eyebrow}</p>
         <h2>{title}</h2>
         <p className="muted">{description}</p>
       </div>
       {events.length > 0 ? (
-        <div className={styles.eventCardGrid}>
+        <div className="event-card-grid">
           {events.map(renderEventCard)}
         </div>
       ) : (
@@ -1013,7 +1008,7 @@ export default function EventsPage() {
         title="Event Search"
         description="Browse every upcoming event, narrow the list with live filters, or switch into a calendar view to plan your month."
         headingLevel="h1"
-        className={styles.eventsSection}
+        className="events-section"
       >
         {message ? (
           <p className="muted" role="status" aria-live="polite">
@@ -1023,9 +1018,9 @@ export default function EventsPage() {
         {loading ? <p className="muted">Loading events...</p> : null}
 
         {!loading ? (
-          <div className={styles.eventsDiscovery}>
-            <aside className={styles.eventsFilters}>
-              <div className={styles.eventsFiltersHeader}>
+          <div className="events-discovery">
+            <aside className="events-filters">
+              <div className="events-filters__header">
                 <div>
                   <p className="eyebrow">Filter Events</p>
                   <h2>Refine Results</h2>
@@ -1037,10 +1032,10 @@ export default function EventsPage() {
                 ) : null}
               </div>
 
-              <div className={styles.eventsSearch}>
-                <label className={styles.eventsSearchLabel} htmlFor="events-search-input">Search events</label>
-                <div className={styles.eventsSearchField}>
-                  <span className={styles.eventsSearchIcon} aria-hidden />
+              <div className="events-search">
+                <label className="events-search__label" htmlFor="events-search-input">Search events</label>
+                <div className="events-search__field">
+                  <span className="events-search__icon" aria-hidden />
                   <input
                     id="events-search-input"
                     value={searchTerm}
@@ -1048,7 +1043,7 @@ export default function EventsPage() {
                     placeholder="Title, sport, location, keyword..."
                   />
                   {searchTerm ? (
-                    <button className={styles.eventsSearchClear} type="button" onClick={() => setSearchTerm("")}>
+                    <button className="events-search__clear" type="button" onClick={() => setSearchTerm("")}>
                       Clear
                     </button>
                   ) : null}
@@ -1063,8 +1058,8 @@ export default function EventsPage() {
               {renderFilterGroup("prices", "Price", priceOptions, selectedPrices, setSelectedPrices)}
             </aside>
 
-            <div className={styles.eventsResults}>
-              <div className={styles.eventsResultsToolbar}>
+            <div className="events-results">
+              <div className="events-results__toolbar">
                 <div>
                   <p className="eyebrow">Results</p>
                   <h2>Showing results for {filteredEvents.length} event{filteredEvents.length === 1 ? "" : "s"}</h2>
@@ -1074,7 +1069,7 @@ export default function EventsPage() {
                       : "Only filter options with live events are shown."}
                   </p>
                 </div>
-                <div className={styles.eventsResultsViewToggle}>
+                <div className="events-results__view-toggle">
                   <button
                     className={`button ${viewMode === "cards" ? "primary" : "ghost"}`}
                     type="button"
@@ -1093,12 +1088,12 @@ export default function EventsPage() {
               </div>
 
               {filteredEvents.length === 0 ? (
-                <div className={styles.eventsEmptyState}>
+                <div className="events-empty-state">
                   <h3>No events match these filters.</h3>
                   <p className="muted">Try removing a few checkboxes or clearing the search.</p>
                 </div>
               ) : viewMode === "cards" ? (
-                <div className={styles.eventsDeck}>
+                <div className="events-deck">
                   {renderResultsSection(
                     "filtered-aldrich-events",
                     "Aldrich Sports",
@@ -1125,8 +1120,8 @@ export default function EventsPage() {
                   )}
                 </div>
               ) : (
-                <div className={styles.eventsCalendar}>
-                  <div className={styles.eventsCalendarToolbar}>
+                <div className="events-calendar">
+                  <div className="events-calendar__toolbar">
                     <button
                       className="button ghost"
                       type="button"
@@ -1135,9 +1130,9 @@ export default function EventsPage() {
                     >
                       Previous
                     </button>
-                    <div className={`form-control ${styles.eventsCalendarSelect}`}>
-                      <p className="eyebrow">Month</p>
-                      <label htmlFor="events-calendar-month" className="sr-only">Month</label>
+                    <div className="form-control events-calendar__select">
+                        <p className="eyebrow">Month</p>
+                        <label htmlFor="events-calendar-month" className="sr-only">Month</label>
                       <select
                         id="events-calendar-month"
                         value={activeCalendarMonth}
@@ -1161,25 +1156,25 @@ export default function EventsPage() {
                     </button>
                   </div>
 
-                  <div className={styles.eventsCalendarDesktop}>
-                    <div className={styles.eventsCalendarWeekdays}>
+                  <div className="events-calendar__desktop">
+                    <div className="events-calendar__weekdays">
                       {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((label) => (
                         <span key={label}>{label}</span>
                       ))}
                     </div>
 
-                    <div className={styles.eventsCalendarGrid}>
+                    <div className="events-calendar__grid">
                       {calendarCells.map((cell) => (
                         <div
                           key={cell.key}
-                          className={`${styles.eventsCalendarCell}${cell.isEmpty ? ` ${styles.calendarCellEmpty}` : ""}`}
+                          className={`events-calendar__cell${cell.isEmpty ? " is-empty" : ""}`}
                         >
-                          {!cell.isEmpty ? <span className={styles.eventsCalendarDay}>{cell.label}</span> : null}
-                          <div className={styles.eventsCalendarEvents}>
+                          {!cell.isEmpty ? <span className="events-calendar__day">{cell.label}</span> : null}
+                          <div className="events-calendar__events">
                             {cell.events.slice(0, 3).map((event) => (
                               <button
                                 key={`${cell.key}-${event.id}`}
-                                className={styles.eventsCalendarEvent}
+                                className="events-calendar__event"
                                 type="button"
                                 onClick={() => openEventDetails(event)}
                               >
@@ -1188,7 +1183,7 @@ export default function EventsPage() {
                               </button>
                             ))}
                             {cell.events.length > 3 ? (
-                              <span className={styles.eventsCalendarMore}>+{cell.events.length - 3} more</span>
+                              <span className="events-calendar__more">+{cell.events.length - 3} more</span>
                             ) : null}
                           </div>
                         </div>
@@ -1196,25 +1191,25 @@ export default function EventsPage() {
                     </div>
                   </div>
 
-                  <div className={styles.eventsCalendarMobileList}>
+                  <div className="events-calendar__mobile-list">
                     {mobileCalendarDays.length > 0 ? mobileCalendarDays.map((cell) => (
-                      <section key={`mobile-${cell.key}`} className={styles.eventsCalendarMobileDay}>
-                        <div className={styles.eventsCalendarMobileDayHeader}>
+                      <section key={`mobile-${cell.key}`} className="events-calendar__mobile-day">
+                        <div className="events-calendar__mobile-day-header">
                           <div>
-                            <p className={styles.eventsCalendarMobileDayDate}>
+                            <p className="events-calendar__mobile-day-date">
                               {formatCalendarDayHeading(activeCalendarMonth, cell.label)}
                             </p>
-                            <p className={styles.eventsCalendarMobileDayCount}>
+                            <p className="events-calendar__mobile-day-count">
                               {cell.events.length} event{cell.events.length === 1 ? "" : "s"}
                             </p>
                           </div>
-                          <span className={styles.eventsCalendarMobileDayNumber}>{cell.label}</span>
+                          <span className="events-calendar__mobile-day-number">{cell.label}</span>
                         </div>
-                        <div className={styles.eventsCalendarMobileEvents}>
+                        <div className="events-calendar__mobile-events">
                           {cell.events.map((event) => (
                             <button
                               key={`mobile-${cell.key}-${event.id}`}
-                              className={styles.eventsCalendarMobileEvent}
+                              className="events-calendar__mobile-event"
                               type="button"
                               onClick={() => openEventDetails(event)}
                             >
