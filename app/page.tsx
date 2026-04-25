@@ -9,6 +9,7 @@ import { HomeHeroCarousel } from "@/components/home-hero-carousel";
 import { HomeUpcomingEvents } from "@/components/home-upcoming-events";
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
+import { readCommunitySponsors } from "@/lib/community-sponsors";
 import { resolveHomeBannerButtonHref } from "@/lib/home-banner";
 import { SITE_DESCRIPTION, SITE_TITLE } from "@/lib/site-metadata";
 import { readSiteSettings } from "@/lib/site-settings";
@@ -24,9 +25,11 @@ export default async function Home() {
   noStore();
 
   const siteSettings = await readSiteSettings();
+  const sponsors = (await readCommunitySponsors()).filter((sponsor) => sponsor.image.trim());
   const homeBannerText = siteSettings.homeBanner.text.trim();
   const homeBannerButtonHref = resolveHomeBannerButtonHref(siteSettings.homeBanner);
   const showHomeBanner = siteSettings.homeBanner.enabled && Boolean(homeBannerText);
+  const sponsorTickerItems = sponsors.length > 0 ? [...sponsors, ...sponsors] : [];
 
   return (
     <PageShell>
@@ -102,6 +105,56 @@ export default async function Home() {
           </Link>
         </div>
       </Section>
+
+      {sponsors.length > 0 ? (
+        <section className="sponsor-ticker" aria-label="Aldrich Sports sponsors">
+          <div className="sponsor-ticker__header">
+            <span>Our Sponsors</span>
+          </div>
+          <div className="sponsor-ticker__viewport">
+            <div className="sponsor-ticker__track">
+              {sponsorTickerItems.map((sponsor, index) => {
+                const href = sponsor.websiteUrl || sponsor.instagramUrl || "";
+                const logo = (
+                  <span className="sponsor-ticker__logo">
+                    <Image
+                      src={sponsor.image}
+                      alt={sponsor.name}
+                      width={180}
+                      height={80}
+                      sizes="180px"
+                    />
+                  </span>
+                );
+
+                return href ? (
+                  <a
+                    key={`${sponsor.id}-${index}`}
+                    className="sponsor-ticker__item"
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={sponsor.name}
+                    aria-hidden={index >= sponsors.length}
+                    tabIndex={index >= sponsors.length ? -1 : undefined}
+                  >
+                    {logo}
+                  </a>
+                ) : (
+                  <span
+                    key={`${sponsor.id}-${index}`}
+                    className="sponsor-ticker__item"
+                    aria-label={sponsor.name}
+                    aria-hidden={index >= sponsors.length}
+                  >
+                    {logo}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <Section
         id="programs"
