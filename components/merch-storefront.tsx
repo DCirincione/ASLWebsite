@@ -70,6 +70,25 @@ const formatCurrency = (amount: number, currencyCode: string) =>
 
 const formatCents = (amountCents: number, currencyCode: string) => formatCurrency(amountCents / 100, currencyCode);
 
+const getShippingFeeCentsForSubtotal = (
+  subtotal: number,
+  shippingRateTiers: MerchCatalog["checkout"]["shippingRateTiers"],
+  fallbackShippingFeeCents: number | null,
+) => {
+  if (subtotal <= 0) return null;
+
+  const subtotalCents = Math.round(subtotal * 100);
+  let matchedFeeCents: number | null = null;
+
+  for (const tier of shippingRateTiers) {
+    if (subtotalCents >= tier.minSubtotalCents) {
+      matchedFeeCents = tier.feeCents;
+    }
+  }
+
+  return matchedFeeCents ?? fallbackShippingFeeCents;
+};
+
 const getCheckoutReadyVariants = (product: MerchProduct) =>
   product.variants.filter((variant) => variant.checkoutReady && variant.availability !== "discontinued");
 
@@ -851,7 +870,7 @@ function CartDialog({
               ) : null}
               {checkoutEnabled && shippingFeeCents == null ? (
                 <p className="merch-cart__status">
-                  Shipping is not being added from the site yet. Configure a flat Square shipping fee before going live.
+                  Shipping is not being added from the site yet. Configure Square shipping before going live.
                 </p>
               ) : null}
 
@@ -1073,7 +1092,14 @@ export function MerchStorefront({ catalog, purchasesEnabled }: MerchStorefrontPr
 
   const cartSubtotal = cartDetails.reduce((sum, item) => sum + item.lineTotal, 0);
   const cartItemCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-  const shippingFeeCents = cartItemCount > 0 ? catalog.checkout.shippingFeeCents : null;
+  const shippingFeeCents =
+    cartItemCount > 0
+      ? getShippingFeeCentsForSubtotal(
+          cartSubtotal,
+          catalog.checkout.shippingRateTiers,
+          catalog.checkout.shippingFeeCents,
+        )
+      : null;
   const shippingFee = shippingFeeCents != null ? shippingFeeCents / 100 : 0;
   const cartTotal = cartSubtotal + shippingFee;
   const checkoutEnabled = purchasesEnabled && catalog.checkout.enabled;

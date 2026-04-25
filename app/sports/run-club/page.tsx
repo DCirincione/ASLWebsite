@@ -220,8 +220,10 @@ export default function RunClubPage() {
 
       <Section
         id="runs"
+        title="Runs"
         headingLevel="h2"
         className="soccer-section"
+        showHeader={false}
       >
         <div className="run-club-overview">
           <div className="run-club-overview__flyer">

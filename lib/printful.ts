@@ -90,8 +90,14 @@ export type MerchCheckoutConfig = {
   provider: "square";
   currencyCode: string;
   shippingFeeCents: number | null;
+  shippingRateTiers: MerchShippingRateTier[];
   shippingFeeLabel: string;
   statusMessage: string | null;
+};
+
+export type MerchShippingRateTier = {
+  minSubtotalCents: number;
+  feeCents: number;
 };
 
 export type MerchProduct = {
@@ -223,12 +229,55 @@ export const getMerchShippingFeeCents = () => {
   return parsed;
 };
 
+export const getMerchShippingRateTiers = () => {
+  const rawValue = process.env.MERCH_SHIPPING_RATE_TIERS?.trim();
+  if (!rawValue) return [];
+
+  const tiers = rawValue
+    .split(",")
+    .flatMap((entry): MerchShippingRateTier[] => {
+      const [rawMinSubtotal, rawFee, ...extraParts] = entry.split(":");
+      if (extraParts.length > 0) return [];
+
+      const minSubtotalCents = Number.parseInt(rawMinSubtotal?.trim() ?? "", 10);
+      const feeCents = Number.parseInt(rawFee?.trim() ?? "", 10);
+      if (!Number.isFinite(minSubtotalCents) || !Number.isFinite(feeCents)) return [];
+      if (minSubtotalCents < 0 || feeCents < 0) return [];
+
+      return [{ minSubtotalCents, feeCents }];
+    })
+    .sort((left, right) => left.minSubtotalCents - right.minSubtotalCents);
+
+  const deduped = new Map<number, MerchShippingRateTier>();
+  for (const tier of tiers) {
+    deduped.set(tier.minSubtotalCents, tier);
+  }
+
+  return [...deduped.values()];
+};
+
+export const getMerchShippingFeeCentsForSubtotal = (subtotalCents: number, tiers = getMerchShippingRateTiers()) => {
+  if (!Number.isFinite(subtotalCents) || subtotalCents < 0 || tiers.length === 0) {
+    return getMerchShippingFeeCents();
+  }
+
+  let matchedTier: MerchShippingRateTier | null = null;
+  for (const tier of tiers) {
+    if (subtotalCents >= tier.minSubtotalCents) {
+      matchedTier = tier;
+    }
+  }
+
+  return matchedTier?.feeCents ?? getMerchShippingFeeCents();
+};
+
 export const getMerchShippingFeeLabel = () => process.env.MERCH_SHIPPING_FEE_LABEL?.trim() || "Shipping";
 
 export const readMerchCheckoutConfig = (): MerchCheckoutConfig => {
   const hasSquareAccessToken = Boolean(process.env.SQUARE_ACCESS_TOKEN?.trim());
   const hasSquareLocationId = Boolean(process.env.SQUARE_LOCATION_ID?.trim());
   const hasAppUrl = Boolean(process.env.APP_URL?.trim());
+  const shippingRateTiers = getMerchShippingRateTiers();
   const shippingFeeCents = getMerchShippingFeeCents();
 
   return {
@@ -236,6 +285,7 @@ export const readMerchCheckoutConfig = (): MerchCheckoutConfig => {
     provider: "square",
     currencyCode: MERCH_CHECKOUT_CURRENCY,
     shippingFeeCents,
+    shippingRateTiers,
     shippingFeeLabel: getMerchShippingFeeLabel(),
     statusMessage:
       hasSquareAccessToken && hasSquareLocationId && hasAppUrl

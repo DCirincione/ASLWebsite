@@ -17,7 +17,8 @@ Next.js App Router starter with a components-first structure.
 - `PRINTFUL_STORE_ID` is optional if your token already has store context; set it when using an account-level token.
 - `PRINTFUL_PRODUCT_SOURCE` is optional and can be `store` or `sync` depending on how your Printful products are managed.
 - `PRINTFUL_STOREFRONT_URL` is optional and lets merch buttons open your public storefront while checkout is still handled by Printful.
-- `MERCH_SHIPPING_FEE_CENTS` is optional but recommended for the Square merch checkout if you want the hosted checkout to add a flat shipping fee.
+- `MERCH_SHIPPING_RATE_TIERS` is optional but recommended for Square merch checkout if you want hosted checkout shipping to change by cart subtotal. Use comma-separated `minimumSubtotalCents:shippingFeeCents` pairs, for example `0:475,1300:575,2600:725,5000:975,7500:1075,10000:1225,15000:1575,25000:2075`.
+- `MERCH_SHIPPING_FEE_CENTS` is optional and still supported as a flat fallback when no tier matches or no tier table is configured.
 - `MERCH_SHIPPING_FEE_LABEL` is optional and defaults to `Shipping`.
 
 ## Next steps

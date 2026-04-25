@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createId } from "@/lib/create-id";
-import { readMerchCatalog } from "@/lib/printful";
+import { getMerchShippingFeeCentsForSubtotal, readMerchCatalog } from "@/lib/printful";
 import { readSiteSettings } from "@/lib/site-settings";
 import { createSquarePaymentLink, getAppUrl, getSquareLocationId } from "@/lib/square";
 
@@ -106,6 +106,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const subtotalCents = validatedItems.reduce((sum, item) => {
+      const unitPriceCents = item.variant.price != null ? Math.round(item.variant.price * 100) : 0;
+      return sum + unitPriceCents * item.quantity;
+    }, 0);
+    const shippingFeeCents = getMerchShippingFeeCentsForSubtotal(subtotalCents, catalog.checkout.shippingRateTiers);
+
     const orderReferenceId = buildMerchOrderReferenceId();
     const squareResponse = await createSquarePaymentLink({
       idempotency_key: createId(),
@@ -122,7 +128,7 @@ export async function POST(req: NextRequest) {
       checkout_options: {
         ask_for_shipping_address: true,
         redirect_url: `${appUrl}/merch/checkout/success`,
-        ...(catalog.checkout.shippingFeeCents != null
+        ...(shippingFeeCents != null
           ? {
               shipping_fee: {
                 name: truncateSquareText(
@@ -130,8 +136,8 @@ export async function POST(req: NextRequest) {
                   SQUARE_SHIPPING_FEE_NAME_MAX_LENGTH,
                 ),
                 charge: {
-                  amount: String(catalog.checkout.shippingFeeCents),
-                  currency_code: catalog.checkout.currencyCode,
+                  amount: shippingFeeCents,
+                  currency: catalog.checkout.currencyCode,
                 },
               },
             }
