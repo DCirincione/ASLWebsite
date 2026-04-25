@@ -1,8 +1,10 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
+import { isRegularAslSundayLeagueEvent } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
 
 type EventDetail = {
@@ -66,10 +68,19 @@ const formatSingleDate = (value?: string | null) => {
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 };
 
+type WhoIsPlayingPlayer = {
+  id: string;
+  user_id: string;
+  name: string;
+};
+
 export function EventDetailModal({ open, event, dateLabel, isRegistered = false, onClose, onRegister }: EventDetailModalProps) {
   const [flyerImageUrl, setFlyerImageUrl] = useState<string | null>(null);
   const [flyerDetails, setFlyerDetails] = useState<string | null>(null);
   const [hasFlyerMatch, setHasFlyerMatch] = useState(false);
+  const [whoIsPlayingOpen, setWhoIsPlayingOpen] = useState(false);
+  const [whoIsPlayingLoading, setWhoIsPlayingLoading] = useState(false);
+  const [whoIsPlayingPlayers, setWhoIsPlayingPlayers] = useState<WhoIsPlayingPlayer[] | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -82,6 +93,9 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
 
   useEffect(() => {
     if (!open || !event) return;
+    setFlyerImageUrl(null);
+    setFlyerDetails(null);
+    setHasFlyerMatch(false);
     const client = supabase;
     if (!client) return;
     let cancelled = false;
@@ -157,6 +171,47 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
     };
   }, [open, event]);
 
+  useEffect(() => {
+    setWhoIsPlayingOpen(false);
+    setWhoIsPlayingLoading(false);
+    setWhoIsPlayingPlayers(null);
+  }, [event?.id]);
+
+  useEffect(() => {
+    if (!whoIsPlayingOpen) return;
+    const handleKey = (evt: KeyboardEvent) => {
+      if (evt.key === "Escape") setWhoIsPlayingOpen(false);
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [whoIsPlayingOpen]);
+
+  const isSundayLeague = isRegularAslSundayLeagueEvent({
+    title: event?.title ?? "",
+    description: event?.description ?? "",
+    registration_program_slug: event?.registration_program_slug ?? "",
+    sport_slug: "",
+  });
+
+  const openWhoIsPlaying = async () => {
+    setWhoIsPlayingOpen(true);
+    if (whoIsPlayingPlayers !== null) return;
+    if (!supabase || !event) return;
+    setWhoIsPlayingLoading(true);
+    const { data } = await supabase
+      .from("event_submissions")
+      .select("id,user_id,name")
+      .eq("event_id", event.id);
+    const seen = new Set<string>();
+    const unique = ((data ?? []) as WhoIsPlayingPlayer[]).filter((row) => {
+      if (seen.has(row.user_id)) return false;
+      seen.add(row.user_id);
+      return true;
+    });
+    setWhoIsPlayingPlayers(unique);
+    setWhoIsPlayingLoading(false);
+  };
+
   if (!open || !event) return null;
 
   const dateRange = formatDateRange(event.start_date, event.end_date) || dateLabel || "Date TBD";
@@ -168,6 +223,7 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
   const moreInfo = flyerDetails || event.description || null;
 
   return (
+    <>
     <div
       className="event-detail-backdrop"
       role="dialog"
@@ -215,6 +271,19 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
           <span className="pill pill--muted">{event.location || "Location TBD"}</span>
         </div>
 
+        {!isSundayLeague ? (
+          <div className="event-detail__who">
+            <button
+              className="event-detail__who-btn"
+              type="button"
+              onClick={() => void openWhoIsPlaying()}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              See Who&apos;s Playing
+            </button>
+          </div>
+        ) : null}
+
         <div className="event-detail__layout">
           <div className="event-detail__info">
             <h3>More information</h3>
@@ -258,5 +327,36 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
         </div>
       </div>
     </div>
+
+    {whoIsPlayingOpen ? (
+      <div
+        className="who-popup-backdrop"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Who's Playing"
+        onClick={() => setWhoIsPlayingOpen(false)}
+      >
+        <div className="who-popup" onClick={(e) => e.stopPropagation()}>
+          <div className="who-popup__header">
+            <h3>Who&apos;s Playing</h3>
+            <button className="who-popup__close" type="button" onClick={() => setWhoIsPlayingOpen(false)}>✕</button>
+          </div>
+          {whoIsPlayingLoading ? (
+            <p className="muted">Loading...</p>
+          ) : whoIsPlayingPlayers && whoIsPlayingPlayers.length > 0 ? (
+            <div className="who-popup__grid">
+              {whoIsPlayingPlayers.map((player) => (
+                <Link key={player.id} className="who-popup__card" href={`/profiles/${player.user_id}`}>
+                  {player.name}
+                </Link>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">No one has signed up yet.</p>
+          )}
+        </div>
+      </div>
+    ) : null}
+    </>
   );
 }

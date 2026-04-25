@@ -487,7 +487,17 @@ export default function EventsPage() {
   useEffect(() => {
     const syncEventIdFromUrl = () => {
       const nextParams = new URLSearchParams(window.location.search);
-      setEventIdFromQuery(nextParams.get("eventId")?.trim() || "");
+      const id = nextParams.get("eventId")?.trim() || "";
+      setEventIdFromQuery(id);
+      if (id) {
+        try {
+          const raw = sessionStorage.getItem("events:lastOpenedEvent");
+          if (raw) {
+            const stored = JSON.parse(raw) as EventItem;
+            if (stored?.id === id) setDetailEvent(stored);
+          }
+        } catch {}
+      }
     };
 
     syncEventIdFromUrl();
@@ -796,6 +806,7 @@ export default function EventsPage() {
   );
 
   const clearDirectEventQuery = () => {
+    try { sessionStorage.removeItem("events:lastOpenedEvent"); } catch {}
     if (!eventIdFromQuery) return;
     const nextParams = new URLSearchParams(window.location.search);
     nextParams.delete("eventId");
@@ -820,6 +831,11 @@ export default function EventsPage() {
       return;
     }
     setDetailEvent(event);
+    setEventIdFromQuery(event.id);
+    const params = new URLSearchParams(window.location.search);
+    params.set("eventId", event.id);
+    router.replace(`/events?${params.toString()}`, { scroll: false });
+    try { sessionStorage.setItem("events:lastOpenedEvent", JSON.stringify(event)); } catch {}
   };
 
   const openRegistration = (event: EventItem) => {
