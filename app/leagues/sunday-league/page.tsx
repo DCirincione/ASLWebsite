@@ -40,6 +40,8 @@ export default async function SundayLeaguePage({
       initialSection={normalizeSection(params.section)}
       signupForm={signupForm}
       depositAmountCents={sundayLeagueSettings.depositAmountCents}
+      overviewParagraphs={sundayLeagueSettings.overviewParagraphs}
+      rules={sundayLeagueSettings.rules}
     />
   );
 }

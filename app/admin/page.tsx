@@ -28,7 +28,13 @@ import {
   type SundayLeagueSignupFieldEditor,
   type SundayLeagueSignupFieldType,
 } from "@/lib/sunday-league-signup-form";
-import { DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS, formatSundayLeagueDepositAmount } from "@/lib/sunday-league-settings-shared";
+import {
+  DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS,
+  DEFAULT_OVERVIEW_PARAGRAPHS,
+  DEFAULT_RULES,
+  formatSundayLeagueDepositAmount,
+  type SundayLeagueRuleSection,
+} from "@/lib/sunday-league-settings-shared";
 import { getEventProgramSlugOptions, parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type {
@@ -537,6 +543,12 @@ export default function AdminPage() {
   const [sundayLeagueSettingsForm, setSundayLeagueSettingsForm] = useState({
     depositAmount: (DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS / 100).toFixed(2),
   });
+  const [overviewParagraphs, setOverviewParagraphs] = useState<string[]>(DEFAULT_OVERVIEW_PARAGRAPHS);
+  const [overviewStatus, setOverviewStatus] = useState<FormStatus>({ type: "idle" });
+  const [overviewOpen, setOverviewOpen] = useState(false);
+  const [rulesForm, setRulesForm] = useState<SundayLeagueRuleSection[]>(DEFAULT_RULES);
+  const [rulesStatus, setRulesStatus] = useState<FormStatus>({ type: "idle" });
+  const [rulesOpen, setRulesOpen] = useState(false);
   const [showCreateScheduleWeekForm, setShowCreateScheduleWeekForm] = useState(false);
   const [scheduleWeekForm, setScheduleWeekForm] = useState<SundayLeagueScheduleFormState>(createEmptySundayLeagueScheduleForm());
   const [editingScheduleWeekId, setEditingScheduleWeekId] = useState<string | null>(null);
@@ -887,6 +899,13 @@ export default function AdminPage() {
       setSundayLeagueSettingsForm({
         depositAmount: (depositAmountCents / 100).toFixed(2),
       });
+
+      if (Array.isArray(json?.settings?.overviewParagraphs)) {
+        setOverviewParagraphs(json.settings.overviewParagraphs);
+      }
+      if (Array.isArray(json?.settings?.rules)) {
+        setRulesForm(json.settings.rules as SundayLeagueRuleSection[]);
+      }
     } catch {
       setSundayLeagueSettingsStatus({ type: "error", message: "Could not load Sunday League deposit settings." });
     } finally {
@@ -3633,7 +3652,7 @@ export default function AdminPage() {
           "content-type": "application/json",
           authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ depositAmountCents }),
+        body: JSON.stringify({ depositAmountCents, overviewParagraphs, rules: rulesForm }),
       });
       const json = await response.json();
 
@@ -3656,6 +3675,54 @@ export default function AdminPage() {
       });
     } catch {
       setSundayLeagueSettingsStatus({ type: "error", message: "Could not update Sunday League deposit settings." });
+    }
+  };
+
+  const handleSaveOverview = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    const accessToken = await getAccessToken();
+    if (!accessToken) { setOverviewStatus({ type: "error", message: "Sign in again to continue." }); return; }
+    const paragraphs = overviewParagraphs.map((p) => p.trim()).filter(Boolean);
+    if (paragraphs.length === 0) { setOverviewStatus({ type: "error", message: "At least one paragraph is required." }); return; }
+    setOverviewStatus({ type: "loading" });
+    try {
+      const depositAmountCents = Math.round(Number(sundayLeagueSettingsForm.depositAmount) * 100);
+      const response = await fetch("/api/admin/sunday-league-settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ depositAmountCents, overviewParagraphs: paragraphs, rules: rulesForm }),
+      });
+      const json = await response.json();
+      if (!response.ok) { setOverviewStatus({ type: "error", message: json?.error ?? "Could not save overview." }); return; }
+      if (Array.isArray(json?.settings?.overviewParagraphs)) setOverviewParagraphs(json.settings.overviewParagraphs);
+      setOverviewStatus({ type: "success", message: "Overview saved." });
+    } catch {
+      setOverviewStatus({ type: "error", message: "Could not save overview." });
+    }
+  };
+
+  const handleSaveRules = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+    const accessToken = await getAccessToken();
+    if (!accessToken) { setRulesStatus({ type: "error", message: "Sign in again to continue." }); return; }
+    const sections = rulesForm.filter((s) => s.heading.trim());
+    if (sections.length === 0) { setRulesStatus({ type: "error", message: "At least one rule section is required." }); return; }
+    setRulesStatus({ type: "loading" });
+    try {
+      const depositAmountCents = Math.round(Number(sundayLeagueSettingsForm.depositAmount) * 100);
+      const response = await fetch("/api/admin/sunday-league-settings", {
+        method: "PUT",
+        headers: { "content-type": "application/json", authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ depositAmountCents, overviewParagraphs, rules: sections }),
+      });
+      const json = await response.json();
+      if (!response.ok) { setRulesStatus({ type: "error", message: json?.error ?? "Could not save rules." }); return; }
+      if (Array.isArray(json?.settings?.rules)) setRulesForm(json.settings.rules as SundayLeagueRuleSection[]);
+      setRulesStatus({ type: "success", message: "Rules saved." });
+    } catch {
+      setRulesStatus({ type: "error", message: "Could not save rules." });
     }
   };
 
@@ -4213,15 +4280,7 @@ export default function AdminPage() {
             <section className="account-card account-card__summary">
               <h1>Admin Dashboard</h1>
               <p className="muted">Choose an area to manage.</p>
-              <div
-                style={{
-                  marginTop: 8,
-                  display: "grid",
-                  gap: 12,
-                  gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))",
-                  maxWidth: 980,
-                }}
-              >
+              <div className="admin-module-grid" style={{ marginTop: 8 }}>
                 {adminModules.map((module) => (
                   <button
                     key={module.id}
@@ -4575,6 +4634,130 @@ export default function AdminPage() {
                     </p>
                   ) : null}
                 </section>
+
+                <section className="account-card">
+                  <button
+                    className="account-card__collapse-toggle"
+                    type="button"
+                    onClick={() => setOverviewOpen((prev) => !prev)}
+                    aria-expanded={overviewOpen}
+                  >
+                    <div>
+                      <h2>Overview Text</h2>
+                      <p className="muted">Edit the paragraphs shown in the Overview tab of the Sunday League page.</p>
+                    </div>
+                    <span className="account-card__collapse-arrow" aria-hidden>{overviewOpen ? "▲" : "▼"}</span>
+                  </button>
+                  {overviewOpen ? (
+                    <form className="register-form" onSubmit={handleSaveOverview} style={{ marginTop: 20 }}>
+                      {overviewParagraphs.map((paragraph, idx) => (
+                        <div className="form-control" key={idx}>
+                          <label>Paragraph {idx + 1}</label>
+                          <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                            <textarea
+                              rows={4}
+                              value={paragraph}
+                              onChange={(e) => setOverviewParagraphs((prev) => prev.map((p, i) => i === idx ? e.target.value : p))}
+                            />
+                            <button
+                              className="button ghost"
+                              type="button"
+                              onClick={() => setOverviewParagraphs((prev) => prev.filter((_, i) => i !== idx))}
+                              disabled={overviewParagraphs.length <= 1}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <div className="cta-row">
+                        <button
+                          className="button ghost"
+                          type="button"
+                          onClick={() => setOverviewParagraphs((prev) => [...prev, ""])}
+                        >
+                          + Add Paragraph
+                        </button>
+                        <button className="button primary" type="submit" disabled={overviewStatus.type === "loading"}>
+                          {overviewStatus.type === "loading" ? "Saving..." : "Save Overview"}
+                        </button>
+                      </div>
+                      {overviewStatus.message ? (
+                        <p className={`form-help ${overviewStatus.type === "error" ? "error" : "muted"}`}>
+                          {overviewStatus.message}
+                        </p>
+                      ) : null}
+                    </form>
+                  ) : null}
+                </section>
+
+                <section className="account-card">
+                  <button
+                    className="account-card__collapse-toggle"
+                    type="button"
+                    onClick={() => setRulesOpen((prev) => !prev)}
+                    aria-expanded={rulesOpen}
+                  >
+                    <div>
+                      <h2>Rules</h2>
+                      <p className="muted">Edit the rule sections shown in the Rules tab of the Sunday League page.</p>
+                    </div>
+                    <span className="account-card__collapse-arrow" aria-hidden>{rulesOpen ? "▲" : "▼"}</span>
+                  </button>
+                  {rulesOpen ? (
+                    <form className="register-form" onSubmit={handleSaveRules} style={{ marginTop: 20 }}>
+                      {rulesForm.map((section, sIdx) => (
+                        <div key={sIdx} className="admin-rule-section">
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
+                            <div className="form-control" style={{ flex: 1, margin: 0 }}>
+                              <label>Section Heading</label>
+                              <input
+                                type="text"
+                                value={section.heading}
+                                onChange={(e) => setRulesForm((prev) => prev.map((s, i) => i === sIdx ? { ...s, heading: e.target.value } : s))}
+                              />
+                            </div>
+                            <button
+                              className="button ghost"
+                              type="button"
+                              style={{ marginTop: 22 }}
+                              onClick={() => setRulesForm((prev) => prev.filter((_, i) => i !== sIdx))}
+                              disabled={rulesForm.length <= 1}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                          <div className="form-control">
+                            <label>Items (one per line)</label>
+                            <textarea
+                              rows={section.items.length + 2}
+                              value={section.items.join("\n")}
+                              onChange={(e) => setRulesForm((prev) => prev.map((s, i) => i === sIdx ? { ...s, items: e.target.value.split("\n") } : s))}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                      <div className="cta-row">
+                        <button
+                          className="button ghost"
+                          type="button"
+                          onClick={() => setRulesForm((prev) => [...prev, { heading: "", items: [] }])}
+                        >
+                          + Add Section
+                        </button>
+                        <button className="button primary" type="submit" disabled={rulesStatus.type === "loading"}>
+                          {rulesStatus.type === "loading" ? "Saving..." : "Save Rules"}
+                        </button>
+                      </div>
+                      {rulesStatus.message ? (
+                        <p className={`form-help ${rulesStatus.type === "error" ? "error" : "muted"}`}>
+                          {rulesStatus.message}
+                        </p>
+                      ) : null}
+                    </form>
+                  ) : null}
+                </section>
+
                 <section className="account-card">
                   <form className="register-form" onSubmit={handleSaveSundayLeagueSignupForm}>
                     {renderSundayLeagueSignupBuilder()}

@@ -1,7 +1,13 @@
 import "server-only";
 
 import { getSupabaseServiceRole } from "@/lib/admin-route-auth";
-import { DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS, type SundayLeagueSettings } from "@/lib/sunday-league-settings-shared";
+import {
+  DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS,
+  DEFAULT_OVERVIEW_PARAGRAPHS,
+  DEFAULT_RULES,
+  type SundayLeagueRuleSection,
+  type SundayLeagueSettings,
+} from "@/lib/sunday-league-settings-shared";
 
 const SUNDAY_LEAGUE_SETTINGS_KEY = "sunday_league";
 
@@ -19,8 +25,28 @@ const normalizeDepositAmountCents = (value: unknown) => {
   return nextValue > 0 ? nextValue : DEFAULT_SUNDAY_LEAGUE_DEPOSIT_AMOUNT_CENTS;
 };
 
+const normalizeOverviewParagraphs = (value: unknown): string[] => {
+  if (!Array.isArray(value)) return DEFAULT_OVERVIEW_PARAGRAPHS;
+  const items = value.map((p) => String(p).trim()).filter(Boolean);
+  return items.length > 0 ? items : DEFAULT_OVERVIEW_PARAGRAPHS;
+};
+
+const normalizeRules = (value: unknown): SundayLeagueRuleSection[] => {
+  if (!Array.isArray(value)) return DEFAULT_RULES;
+  const sections = value
+    .filter((s) => s && typeof s === "object" && typeof s.heading === "string")
+    .map((s) => ({
+      heading: String(s.heading).trim(),
+      items: Array.isArray(s.items) ? s.items.map((i: unknown) => String(i).trim()).filter(Boolean) : [],
+    }))
+    .filter((s) => s.heading);
+  return sections.length > 0 ? sections : DEFAULT_RULES;
+};
+
 const normalizeSundayLeagueSettings = (value?: Partial<SundayLeagueSettings> | null): SundayLeagueSettings => ({
   depositAmountCents: normalizeDepositAmountCents(value?.depositAmountCents),
+  overviewParagraphs: normalizeOverviewParagraphs(value?.overviewParagraphs),
+  rules: normalizeRules(value?.rules),
 });
 
 export const readSundayLeagueSettings = async (): Promise<SundayLeagueSettings> => {

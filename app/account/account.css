@@ -269,6 +269,8 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   flex-direction: column;
   gap: 16px;
   padding: 24px 0 64px;
+  overflow-x: hidden;
+  width: 100%;
 }
 
 .account-nav {

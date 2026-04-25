@@ -21,6 +21,8 @@ export async function PUT(req: NextRequest) {
 
     const body = (await req.json()) as {
       depositAmountCents?: number;
+      overviewParagraphs?: string[];
+      rules?: Array<{ heading: string; items: string[] }>;
     };
 
     const depositAmountCents = Math.round(Number(body.depositAmountCents));
@@ -28,7 +30,11 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "Deposit amount must be greater than zero." }, { status: 400 });
     }
 
-    const settings = await writeSundayLeagueSettings({ depositAmountCents });
+    const settings = await writeSundayLeagueSettings({
+      depositAmountCents,
+      overviewParagraphs: Array.isArray(body.overviewParagraphs) ? body.overviewParagraphs : [],
+      rules: Array.isArray(body.rules) ? body.rules : [],
+    });
     return NextResponse.json({ ok: true, settings });
   } catch {
     return NextResponse.json({ error: "Could not update Sunday League settings." }, { status: 500 });
