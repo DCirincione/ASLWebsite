@@ -4,6 +4,12 @@
   padding: 48px 0 64px;
 }
 
+@media (min-width: 1200px) {
+  .eventsSection {
+    width: calc(100% + 100px);
+  }
+}
+
 .eventsDiscovery {
   display: grid;
   grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
