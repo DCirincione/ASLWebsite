@@ -77,6 +77,148 @@ html[data-theme="dark"] .site-footer__social a:hover {
   color: #ffffff;
 }
 
+.money-spread {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+}
+
+.money-spread__bills {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.money-bill {
+  position: absolute;
+  width: 144px;
+  height: 62px;
+  border: 2px solid #27653b;
+  border-radius: 5px;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.44) 0 17px, transparent 18px),
+    linear-gradient(90deg, rgba(39, 101, 59, 0.16) 0 12px, transparent 12px calc(100% - 12px), rgba(39, 101, 59, 0.16) calc(100% - 12px)),
+    repeating-linear-gradient(135deg, rgba(25, 87, 49, 0.09) 0 2px, transparent 2px 7px),
+    #dff0d0;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.18);
+  color: #174629;
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 900;
+  opacity: 0;
+  animation: money-bill-drop 180ms ease-out forwards;
+}
+
+.money-bill::before {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(23, 70, 41, 0.55);
+  border-radius: 3px;
+}
+
+.money-bill::after {
+  content: "ASL";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 48px;
+  height: 28px;
+  border: 1px solid rgba(23, 70, 41, 0.48);
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  font-size: 15px;
+  letter-spacing: 0.06em;
+}
+
+.money-bill__corner {
+  position: absolute;
+  left: 10px;
+  top: 7px;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.money-bill__corner--right {
+  left: auto;
+  right: 10px;
+  top: auto;
+  bottom: 7px;
+  transform: rotate(180deg);
+}
+
+.money-bill__seal {
+  position: absolute;
+  left: 23px;
+  bottom: 10px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid rgba(23, 70, 41, 0.68);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+}
+
+.money-bill__portrait {
+  position: absolute;
+  right: 22px;
+  top: 12px;
+  font-size: 24px;
+  line-height: 1;
+  opacity: 0.7;
+}
+
+.money-spread__controls {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+.money-spread__control {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(15, 25, 45, 0.18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: #0f192d;
+  font-size: 18px;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(10px);
+}
+
+.money-spread__control:hover {
+  transform: translateY(-1px);
+}
+
+@keyframes money-bill-drop {
+  from {
+    opacity: 0;
+    margin-top: -10px;
+  }
+
+  to {
+    opacity: 1;
+    margin-top: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .money-bill {
+    animation: none;
+    opacity: 1;
+  }
+}
+
 
 
 

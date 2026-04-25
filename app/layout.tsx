@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Anton } from "next/font/google";
 import Script from "next/script";
 
+import { MoneySpread } from "@/components/money-spread";
 import { SITE_ALTERNATE_NAMES, SITE_DESCRIPTION, SITE_NAME, SITE_SOCIALS, SITE_TITLE, SITE_URL } from "@/lib/site-metadata";
 
 import "./globals.css";
@@ -170,6 +171,7 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         {children}
+        <MoneySpread />
       </body>
     </html>
   );
