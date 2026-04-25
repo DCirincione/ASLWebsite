@@ -220,13 +220,9 @@ export default function RunClubPage() {
 
       <Section
         id="runs"
-        eyebrow="Runs"
-        title="Runs"
-        description="Scheduled run club sessions."
         headingLevel="h2"
         className="soccer-section"
       >
-        {loadingEvents ? <p className="muted">Loading runs...</p> : renderCards()}
         <div className="run-club-overview">
           <div className="run-club-overview__flyer">
             <Image
@@ -247,6 +243,11 @@ export default function RunClubPage() {
             </p>
           </div>
         </div>
+        <div style={{ marginTop: 8 }}>
+          <h2 className="eyebrow" style={{ color: "inherit" }}>Runs</h2>
+          <p className="muted">Scheduled run club sessions.</p>
+        </div>
+        {loadingEvents ? <p className="muted">Loading runs...</p> : renderCards()}
       </Section>
 
       <RegistrationModal
