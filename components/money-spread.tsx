@@ -1,6 +1,6 @@
 "use client";
 
-import { PointerEvent, useEffect, useRef, useState } from "react";
+import { PointerEvent, useCallback, useEffect, useRef, useState } from "react";
 
 type Bill = {
   id: number;
@@ -11,8 +11,10 @@ type Bill = {
   tilt: number;
 };
 
-const SECRET_WORD = "moneyspread";
+const SECRET_PHRASES = ["moneyspread", "money spread"];
+const MAX_SECRET_PHRASE_LENGTH = Math.max(...SECRET_PHRASES.map((phrase) => phrase.length));
 const MAX_BILLS = 180;
+const MONEY_SONG_SRC = "/money-spread/01%20Dirty%20Cash%20%28Money%20Talks%29.mp3";
 
 function isTypingTarget(target: EventTarget | null) {
   if (!(target instanceof HTMLElement)) return false;
@@ -40,14 +42,49 @@ export function MoneySpread() {
   const lastDropRef = useRef(0);
   const logoClicksRef = useRef<number[]>([]);
   const typedRef = useRef("");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const getAudio = useCallback(() => {
+    if (!audioRef.current) {
+      const audio = new Audio(MONEY_SONG_SRC);
+      audio.loop = true;
+      audio.volume = 0.42;
+      audioRef.current = audio;
+    }
+
+    return audioRef.current;
+  }, []);
+
+  const playMoneySong = useCallback(() => {
+    const audio = getAudio();
+    void audio.play().catch(() => {
+      // The song is optional and may be blocked or absent in some environments.
+    });
+  }, [getAudio]);
+
+  const stopMoneySong = useCallback(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    audio.pause();
+    audio.currentTime = 0;
+  }, []);
+
+  const activate = useCallback(() => {
+    setIsActive(true);
+    playMoneySong();
+  }, [playMoneySong]);
+
+  const deactivate = useCallback(() => {
+    setIsActive(false);
+    setIsDragging(false);
+    stopMoneySong();
+  }, [stopMoneySong]);
 
   useEffect(() => {
-    const activate = () => setIsActive(true);
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setIsActive(false);
-        setIsDragging(false);
+        deactivate();
         return;
       }
 
@@ -59,8 +96,8 @@ export function MoneySpread() {
         return;
       }
 
-      typedRef.current = `${typedRef.current}${event.key.toLowerCase()}`.slice(-SECRET_WORD.length);
-      if (typedRef.current === SECRET_WORD) {
+      typedRef.current = `${typedRef.current}${event.key.toLowerCase()}`.slice(-MAX_SECRET_PHRASE_LENGTH);
+      if (SECRET_PHRASES.some((phrase) => typedRef.current.endsWith(phrase))) {
         activate();
         typedRef.current = "";
       }
@@ -80,14 +117,20 @@ export function MoneySpread() {
       }
     };
 
-    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown, { capture: true });
     document.addEventListener("click", handleClick);
 
     return () => {
-      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("keydown", handleKeyDown, { capture: true });
       document.removeEventListener("click", handleClick);
     };
-  }, []);
+  }, [activate, deactivate]);
+
+  useEffect(() => {
+    return () => {
+      stopMoneySong();
+    };
+  }, [stopMoneySong]);
 
   const addBill = (x: number, y: number, force = false) => {
     const now = performance.now();
@@ -168,8 +211,7 @@ export function MoneySpread() {
           title="Close"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={() => {
-            setIsActive(false);
-            setIsDragging(false);
+            deactivate();
           }}
         >
           ×
