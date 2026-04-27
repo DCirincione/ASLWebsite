@@ -844,6 +844,22 @@ html[data-theme="dark"] .sunday-league-team-form .checkbox-label input {
   gap: 10px;
 }
 
+.register-modal-backdrop:has(.sunday-league-create-modal) {
+  place-items: center;
+  padding: 24px;
+}
+
+.register-modal.sunday-league-create-modal {
+  width: min(1040px, calc(100vw - 48px));
+  height: auto;
+  max-height: min(88dvh, 920px);
+  margin: auto;
+  border-radius: 24px;
+  overflow: auto;
+  padding: 28px;
+  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.32);
+}
+
 .sunday-league-flow-summary,
 .sunday-league-portal-grid {
   display: grid;
@@ -1842,6 +1858,22 @@ html[data-theme="dark"] .sunday-league-schedule-grid > .form-control > label {
 }
 
 @media (max-width: 720px) {
+  .register-modal.sunday-league-create-modal {
+    width: 100%;
+    min-height: 100dvh;
+    padding: 18px 14px max(96px, calc(env(safe-area-inset-bottom) + 72px));
+    border-radius: 0;
+  }
+
+  .sunday-league-create-modal .register-modal__header {
+    align-items: center;
+  }
+
+  .sunday-league-create-modal .sunday-league-panel-box {
+    padding: 18px;
+    border-radius: 18px;
+  }
+
   .sunday-league-sidebar {
     grid-template-columns: 1fr;
   }
