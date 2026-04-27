@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import { isRegularAslSundayLeagueEvent } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
+import type { JsonValue } from "@/lib/supabase/types";
 
 type EventDetail = {
   id: string;
@@ -72,6 +73,59 @@ type WhoIsPlayingPlayer = {
   id: string;
   user_id: string;
   name: string;
+  teammates: string[];
+};
+
+type WhoIsPlayingSubmission = {
+  id: string;
+  user_id: string;
+  name: string;
+  answers?: Record<string, JsonValue> | null;
+};
+
+const teammateAnswerKeyPattern =
+  /(^|_)(teammates?|team_?mates?|team_?members?|additional_?players?|player_?\d+|player_?names?|guest_?name)(_|$)/i;
+
+const ignoredTeammateAnswerKeyPattern =
+  /(email|phone|number|jersey|color|division|skill|age|waiver|agreement|captain|team_?name|communications)/i;
+
+const looksLikePersonName = (value: string) => {
+  const normalized = value.trim();
+  if (normalized.length < 2 || normalized.length > 80) return false;
+  if (!/[a-z]/i.test(normalized)) return false;
+  if (/^(yes|no|true|false|none|n\/a|na)$/i.test(normalized)) return false;
+  if (/^@/.test(normalized)) return false;
+  if (/[/\\]/.test(normalized)) return false;
+  if (/\.(?:png|jpe?g|webp|gif|pdf|heic)$/i.test(normalized)) return false;
+  if (/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i.test(normalized)) return false;
+  return true;
+};
+
+const splitPotentialNames = (value: string) =>
+  value
+    .split(/\r?\n|,/)
+    .map((entry) => entry.trim())
+    .filter(looksLikePersonName);
+
+const extractTeammateNames = (answers?: Record<string, JsonValue> | null) => {
+  if (!answers) return [];
+
+  const names: string[] = [];
+  for (const [key, value] of Object.entries(answers)) {
+    if (!teammateAnswerKeyPattern.test(key) || ignoredTeammateAnswerKeyPattern.test(key)) continue;
+
+    if (typeof value === "string") {
+      names.push(...splitPotentialNames(value));
+    } else if (Array.isArray(value)) {
+      for (const entry of value) {
+        if (typeof entry === "string") {
+          names.push(...splitPotentialNames(entry));
+        }
+      }
+    }
+  }
+
+  return [...new Set(names)];
 };
 
 export function EventDetailModal({ open, event, dateLabel, isRegistered = false, onClose, onRegister }: EventDetailModalProps) {
@@ -200,13 +254,26 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
     setWhoIsPlayingLoading(true);
     const { data } = await supabase
       .from("event_submissions")
-      .select("id,user_id,name")
+      .select("id,user_id,name,answers")
       .eq("event_id", event.id);
     const seen = new Set<string>();
-    const unique = ((data ?? []) as WhoIsPlayingPlayer[]).filter((row) => {
-      if (seen.has(row.user_id)) return false;
+    const unique = ((data ?? []) as WhoIsPlayingSubmission[]).flatMap((row) => {
+      if (seen.has(row.user_id)) return [];
+
       seen.add(row.user_id);
-      return true;
+      const teammateNames = extractTeammateNames(row.answers).filter((name) => {
+        const teammateKey = `${row.id}:teammate:${name.toLowerCase()}`;
+        if (seen.has(teammateKey)) return false;
+        seen.add(teammateKey);
+        return true;
+      });
+
+      return [{
+        id: row.id,
+        user_id: row.user_id,
+        name: row.name,
+        teammates: teammateNames,
+      }];
     });
     setWhoIsPlayingPlayers(unique);
     setWhoIsPlayingLoading(false);
@@ -221,6 +288,29 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
   const flyerImage = hasFlyerMatch ? (flyerImageUrl || undefined) : (event.image || event.image_url || undefined);
   const eventPhoto = event.image || event.image_url || flyerImage || undefined;
   const moreInfo = flyerDetails || event.description || null;
+  const teamPlayers = whoIsPlayingPlayers?.filter((player) => player.teammates.length > 0) ?? [];
+  const soloPlayers = whoIsPlayingPlayers?.filter((player) => player.teammates.length === 0) ?? [];
+
+  const renderWhoIsPlayingGroup = (player: WhoIsPlayingPlayer) => (
+    <div
+      key={player.id}
+      className={`who-popup__group${player.teammates.length > 0 ? " who-popup__group--with-teammates" : ""}`}
+    >
+      <Link className="who-popup__card who-popup__card--primary" href={`/profiles/${player.user_id}`}>
+        {player.name}
+      </Link>
+      {player.teammates.length > 0 ? (
+        <div className="who-popup__teammates">
+          {player.teammates.map((teammate) => (
+            <div key={`${player.id}-${teammate}`} className="who-popup__teammate">
+              <small>Teammate</small>
+              <span>{teammate}</span>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
 
   return (
     <>
@@ -344,12 +434,23 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
           {whoIsPlayingLoading ? (
             <p className="muted">Loading...</p>
           ) : whoIsPlayingPlayers && whoIsPlayingPlayers.length > 0 ? (
-            <div className="who-popup__grid">
-              {whoIsPlayingPlayers.map((player) => (
-                <Link key={player.id} className="who-popup__card" href={`/profiles/${player.user_id}`}>
-                  {player.name}
-                </Link>
-              ))}
+            <div className="who-popup__sections">
+              {teamPlayers.length > 0 ? (
+                <section className="who-popup__section">
+                  <h4>Team</h4>
+                  <div className="who-popup__grid">
+                    {teamPlayers.map(renderWhoIsPlayingGroup)}
+                  </div>
+                </section>
+              ) : null}
+              {soloPlayers.length > 0 ? (
+                <section className="who-popup__section">
+                  <h4>Solo</h4>
+                  <div className="who-popup__grid">
+                    {soloPlayers.map(renderWhoIsPlayingGroup)}
+                  </div>
+                </section>
+              ) : null}
             </div>
           ) : (
             <p className="muted">No one has signed up yet.</p>
