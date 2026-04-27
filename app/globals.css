@@ -257,6 +257,11 @@ html[data-theme="dark"] .event-card__meta {
   color: #cbd5e1;
 }
 
+html[data-theme="dark"] .event-card-simple {
+  background: #0f192d;
+  border-color: #1f2a40;
+  color: #e8edf7;
+}
 
 .highlight-links a {
   outline: 2px dashed currentColor;
