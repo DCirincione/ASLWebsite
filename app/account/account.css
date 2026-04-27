@@ -645,6 +645,34 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   .account-header--compact {
     grid-template-columns: 1fr;
   }
+
+  .account-form .form-control {
+    min-width: 0;
+  }
+
+  .account-form input[type="date"] {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .account-chat-panel__person p {
+    display: none;
+  }
+
+  .account-chat-panel__person {
+    display: grid;
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .account-chat-panel__person > div:last-child {
+    min-width: 0;
+  }
+
+  .account-suggestion-card__actions {
+    grid-column: 1 / -1;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
 }
 
 @media (max-width: 900px) {
@@ -666,6 +694,12 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
 .account-profile-card__actions {
   align-items: flex-start;
   margin-top: 10px;
+}
+
+.account-suggestion-card__actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .account-tabs {

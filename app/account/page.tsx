@@ -1104,7 +1104,7 @@ export default function AccountPage() {
                       <div className="team-card__info">
                         <p className="list__title">{person.name}</p>
                       </div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                      <div className="account-suggestion-card__actions">
                         <Link className="button ghost" href={`/profiles/${person.id}`}>
                           View
                         </Link>
