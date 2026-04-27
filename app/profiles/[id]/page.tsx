@@ -78,6 +78,7 @@ export default function PublicProfilePage() {
   const profileId = params?.id;
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [sessionChecked, setSessionChecked] = useState(false);
   const [profile, setProfile] = useState<ProfileWithAvatar | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [teams, setTeams] = useState<PublicSundayLeagueTeam[]>([]);
@@ -95,10 +96,14 @@ export default function PublicProfilePage() {
 
   useEffect(() => {
     const loadSession = async () => {
-      if (!supabase) return;
+      if (!supabase) {
+        setSessionChecked(true);
+        return;
+      }
 
       const { data: sessionData } = await supabase.auth.getSession();
       setSessionUserId(sessionData.session?.user.id ?? null);
+      setSessionChecked(true);
     };
 
     void loadSession();
@@ -246,13 +251,14 @@ export default function PublicProfilePage() {
 
   useEffect(() => {
     const client = supabase;
-    if (!profileId || !sessionUserId || profileId === sessionUserId || !client) {
-      setFriendRequest(null);
-      setFriendshipStatus(null);
-      return;
-    }
 
     const loadFriendship = async () => {
+      if (!profileId || !sessionUserId || profileId === sessionUserId || !client) {
+        setFriendRequest(null);
+        setFriendshipStatus(null);
+        return;
+      }
+
       setFriendshipStatus("loading");
       const { data: reqs, error } = await client
         .from("friend_requests")
@@ -271,7 +277,7 @@ export default function PublicProfilePage() {
           const samePair =
             (r.sender_id === sessionUserId && r.receiver_id === profileId) ||
             (r.sender_id === profileId && r.receiver_id === sessionUserId);
-          return samePair && (r.status === "accepted" || r.status === "pending");
+          return samePair;
         }) ?? null;
 
       setFriendRequest(request);
@@ -281,8 +287,10 @@ export default function PublicProfilePage() {
         setFriendshipStatus("friends");
       } else if (request.sender_id === sessionUserId) {
         setFriendshipStatus("pending_sent");
-      } else {
+      } else if (request.status === "pending") {
         setFriendshipStatus("pending_received");
+      } else {
+        setFriendshipStatus("idle");
       }
     };
 
@@ -294,9 +302,11 @@ export default function PublicProfilePage() {
 
     setFriendActionLoading(true);
     setFriendActionError(null);
-    const { error } = await supabase
-      .from("friend_requests")
-      .insert({ sender_id: sessionUserId, receiver_id: profileId, status: "pending" });
+    const payload = { sender_id: sessionUserId, receiver_id: profileId, status: "pending" as const };
+    const existingRequestId = friendRequest?.status === "declined" ? friendRequest.id : null;
+    const { error } = existingRequestId
+      ? await supabase.from("friend_requests").update(payload).eq("id", existingRequestId)
+      : await supabase.from("friend_requests").insert(payload);
 
     if (error) {
       setFriendActionError(error.message);
@@ -305,10 +315,8 @@ export default function PublicProfilePage() {
     }
 
     setFriendRequest({
-      id: "pending",
-      sender_id: sessionUserId,
-      receiver_id: profileId,
-      status: "pending",
+      id: existingRequestId ?? "pending",
+      ...payload,
     });
     setFriendshipStatus("pending_sent");
     setFriendActionLoading(false);
@@ -349,7 +357,9 @@ export default function PublicProfilePage() {
   const data = profile ?? fallbackProfile;
   const avatarSrc = data.avatar_url ?? "/avatar-placeholder.svg";
   const friendsCount = useMemo(() => friends.length, [friends]);
-  const canManageFriendship = Boolean(sessionUserId && profileId && sessionUserId !== profileId);
+  const isOwnProfile = Boolean(sessionUserId && profileId && sessionUserId === profileId);
+  const canManageFriendship = Boolean(sessionUserId && profileId && !isOwnProfile);
+  const canPromptFriendSignIn = Boolean(sessionChecked && !sessionUserId && profileId);
   const friendButtonLabel =
     friendshipStatus === "friends"
       ? "Friends"
@@ -384,7 +394,7 @@ export default function PublicProfilePage() {
             </div>
           </div>
           <div className="cta-row">
-            {sessionUserId && profileId && sessionUserId !== profileId ? (
+            {canManageFriendship ? (
               <>
                 <button
                   className="button primary"
@@ -398,6 +408,11 @@ export default function PublicProfilePage() {
                   Message
                 </Link>
               </>
+            ) : null}
+            {canPromptFriendSignIn ? (
+              <Link className="button primary" href="/account">
+                Sign In to Add Friend
+              </Link>
             ) : null}
             <HistoryBackButton label="← Back" fallbackHref="/account" />
           </div>
