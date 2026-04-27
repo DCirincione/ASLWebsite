@@ -48,6 +48,7 @@ type MerchCheckoutStatus =
   | { type: "error"; message: string };
 
 const MERCH_CART_STORAGE_KEY = "asl-merch-cart-v2";
+const MAX_VISIBLE_GALLERY_DOTS = 10;
 
 const toOptionId = (value: string) =>
   value
@@ -99,6 +100,18 @@ const getProductGalleryImages = (product: MerchProduct | null | undefined) => {
   const gallery = Array.isArray(product?.imageUrls) ? product.imageUrls : [];
   if (gallery.length > 0) return gallery;
   return product?.imageUrl ? [product.imageUrl] : [];
+};
+
+const getVisibleGalleryDotIndexes = (imageCount: number, activeIndex: number) => {
+  if (imageCount <= MAX_VISIBLE_GALLERY_DOTS) {
+    return Array.from({ length: imageCount }, (_, index) => index);
+  }
+
+  const middleOffset = Math.floor(MAX_VISIBLE_GALLERY_DOTS / 2);
+  const maxStart = imageCount - MAX_VISIBLE_GALLERY_DOTS;
+  const start = Math.min(Math.max(activeIndex - middleOffset, 0), maxStart);
+
+  return Array.from({ length: MAX_VISIBLE_GALLERY_DOTS }, (_, index) => start + index);
 };
 
 const matchesSelectedFilters = (product: MerchProduct, selectedValues: string[], values: string[]) => {
@@ -295,6 +308,7 @@ function ProductCard({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const activeImageUrl = productImageUrls[activeImageIndex] ?? productImageUrls[0] ?? null;
   const hasMultipleImages = productImageUrls.length > 1;
+  const visibleDotIndexes = getVisibleGalleryDotIndexes(productImageUrls.length, activeImageIndex);
 
   const showPreviousImage = () => {
     if (!hasMultipleImages) return;
@@ -341,9 +355,9 @@ function ProductCard({
               </button>
             </div>
             <div className="merch-card__gallery-dots" aria-label={`${product.name} mockups`}>
-              {productImageUrls.map((imageUrl, index) => (
+              {visibleDotIndexes.map((index) => (
                 <button
-                  key={imageUrl}
+                  key={`${productImageUrls[index]}-${index}`}
                   type="button"
                   className={`merch-card__gallery-dot${activeImageIndex === index ? " is-active" : ""}`}
                   onClick={() => setActiveImageIndex(index)}
@@ -459,7 +473,11 @@ function ProductOptionsDialog({
 
   if (!purchasesEnabled || !product) return null;
 
-  const activeImageUrl = productImageUrls.includes(selectedImageUrl) ? selectedImageUrl : (firstProductImageUrl || null);
+  const variantImageUrls = checkoutVariants.flatMap((variant) => (variant.imageUrl ? [variant.imageUrl] : []));
+  const knownImageUrls = new Set([...productImageUrls, ...variantImageUrls]);
+  const activeImageUrl = selectedImageUrl && knownImageUrls.has(selectedImageUrl)
+    ? selectedImageUrl
+    : (firstProductImageUrl || null);
 
   const normalizedSelectedColor = colorOptions.includes(selectedColor) ? selectedColor : "";
   const provisionalSizeAvailability = sizeOptions.map((size) => ({
@@ -523,6 +541,32 @@ function ProductOptionsDialog({
     selectedVariant?.price != null
       ? formatCurrency(selectedVariant.price, currencyCode)
       : product.priceLabel;
+
+  const findVariantImageUrl = (color: string, size: string) =>
+    checkoutVariants.find(
+      (variant) =>
+        Boolean(variant.imageUrl) &&
+        (!color || variant.color === color) &&
+        (!size || variant.size === size),
+    )?.imageUrl ?? null;
+
+  const handleSizeChange = (size: string) => {
+    setSelectedSize(size);
+
+    const imageUrl = findVariantImageUrl(effectiveSelectedColor, size);
+    if (imageUrl) {
+      setSelectedImageUrl(imageUrl);
+    }
+  };
+
+  const handleColorChange = (color: string) => {
+    setSelectedColor(color);
+
+    const imageUrl = findVariantImageUrl(color, effectiveSelectedSize);
+    if (imageUrl) {
+      setSelectedImageUrl(imageUrl);
+    }
+  };
 
   const handleAddToCart = () => {
     if (!selectedVariant) return;
@@ -598,13 +642,6 @@ function ProductOptionsDialog({
 
             <p className="merch-product-dialog__description">{product.description}</p>
 
-            {product.collections.length > 0 ? (
-              <p className="merch-product-dialog__meta">
-                <span>Collections</span>
-                <strong>{product.collections.join(" • ")}</strong>
-              </p>
-            ) : null}
-
             {(sizeOptions.length > 0 || colorOptions.length > 0) ? (
               <div className="merch-product-dialog__options">
                 {sizeOptions.length > 0 ? (
@@ -613,7 +650,7 @@ function ProductOptionsDialog({
                     <select
                       className="merch-card__option-select"
                       value={effectiveSelectedSize}
-                      onChange={(event) => setSelectedSize(event.target.value)}
+                      onChange={(event) => handleSizeChange(event.target.value)}
                       disabled={!checkoutEnabled || sizeOptions.length === 1}
                     >
                       {needsSizeChoice ? <option value="">Select size</option> : null}
@@ -632,7 +669,7 @@ function ProductOptionsDialog({
                     <select
                       className="merch-card__option-select"
                       value={effectiveSelectedColor}
-                      onChange={(event) => setSelectedColor(event.target.value)}
+                      onChange={(event) => handleColorChange(event.target.value)}
                       disabled={!checkoutEnabled || colorOptions.length === 1}
                     >
                       {needsColorChoice ? <option value="">Select color</option> : null}

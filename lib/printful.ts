@@ -26,6 +26,7 @@ type PrintfulSyncProductSummary = {
   id?: number | string;
   external_id?: string | null;
   name?: string;
+  description?: string | null;
   variants?: number;
   synced?: number;
   thumbnail_url?: string | null;
@@ -48,6 +49,7 @@ type PrintfulSyncVariant = {
   product?: {
     image?: string | null;
     name?: string | null;
+    description?: string | null;
     variant_id?: number | null;
     product_id?: number | null;
   };
@@ -63,6 +65,15 @@ type PrintfulSyncVariant = {
 type PrintfulSyncProductDetails = {
   sync_product?: PrintfulSyncProductSummary;
   sync_variants?: PrintfulSyncVariant[];
+  product?: {
+    description?: string | null;
+  };
+};
+
+type PrintfulCatalogProductDetails = {
+  product?: {
+    description?: string | null;
+  };
 };
 
 type PrintfulProductPathMode = "store" | "sync";
@@ -81,6 +92,7 @@ export type MerchVariant = {
   color: string | null;
   price: number | null;
   priceLabel: string;
+  imageUrl: string | null;
   availability: string;
   checkoutReady: boolean;
 };
@@ -481,6 +493,11 @@ async function fetchPrintfulProductDetails(id: string, pathMode: PrintfulProduct
   return response.result;
 }
 
+async function fetchPrintfulCatalogProductDescription(productId: number) {
+  const response = await fetchPrintfulJson<PrintfulCatalogProductDetails>(`/products/${productId}`);
+  return normalizePrintfulDescription(response.result.product?.description);
+}
+
 const inferCategory = (name: string) => {
   const normalized = name.toLowerCase();
 
@@ -569,6 +586,48 @@ const buildDescription = (sizes: string[], colors: string[], category: string) =
   return `${category} option with ${sizeText} and ${colorText}.`;
 };
 
+const decodeBasicHtmlEntities = (value: string) =>
+  value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, "\"")
+    .replace(/&#39;/gi, "'")
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">");
+
+const normalizePrintfulDescription = (value: string | null | undefined) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+
+  const withoutHtml = trimmed
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6])>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "- ")
+    .replace(/<[^>]+>/g, " ");
+
+  const normalized = decodeBasicHtmlEntities(withoutHtml)
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n");
+
+  return normalized || null;
+};
+
+const resolvePrintfulDescription = (details: PrintfulSyncProductDetails, variants: PrintfulSyncVariant[]) =>
+  normalizePrintfulDescription(details.sync_product?.description) ??
+  normalizePrintfulDescription(details.product?.description) ??
+  variants
+    .map((variant) => normalizePrintfulDescription(variant.product?.description))
+    .find((description): description is string => Boolean(description)) ??
+  null;
+
+const getPrintfulCatalogProductId = (variants: PrintfulSyncVariant[]) =>
+  variants
+    .map((variant) => variant.product?.product_id)
+    .find((productId): productId is number => typeof productId === "number" && Number.isFinite(productId)) ?? null;
+
 const mapPrintfulVariant = (variant: PrintfulSyncVariant): MerchVariant | null => {
   const variantId = variant.id != null ? String(variant.id) : "";
   if (!variantId) return null;
@@ -576,6 +635,12 @@ const mapPrintfulVariant = (variant: PrintfulSyncVariant): MerchVariant | null =
   const price = parsePrice(variant.retail_price);
   const availability = (variant.availability_status || "").toLowerCase() || "active";
   const externalId = variant.external_id?.trim() || null;
+  const mockupImageUrls = dedupeHttpUrls(
+    (variant.files ?? [])
+      .filter((file) => ["mockup", "preview"].includes(file.type?.trim().toLowerCase() || ""))
+      .map((file) => resolveVariantFileImageUrl(file)),
+  );
+  const imageUrl = mockupImageUrls[0] ?? (isHttpUrl(variant.product?.image) ? variant.product?.image?.trim() || null : null);
 
   return {
     id: variantId,
@@ -585,6 +650,7 @@ const mapPrintfulVariant = (variant: PrintfulSyncVariant): MerchVariant | null =
     color: variant.color?.trim() || null,
     price,
     priceLabel: price != null ? currencyFormatter.format(price) : "Price varies",
+    imageUrl,
     availability,
     checkoutReady: Boolean(externalId) && availability !== "discontinued",
   };
@@ -596,6 +662,7 @@ const mapPrintfulProduct = (
   storefrontUrl: string | null,
   squareCollections: string[],
   squareImageUrls: string[],
+  printfulCatalogDescription: string | null,
   index: number,
 ): MerchProduct | null => {
   const syncProduct = details.sync_product;
@@ -625,11 +692,12 @@ const mapPrintfulProduct = (
   const externalId = syncProduct?.external_id?.trim() || null;
   const ctaUrl = resolveProductLink(externalId, storefrontUrl);
   const imageUrls = squareImageUrls.length > 0 ? squareImageUrls : resolveProductImages(syncProduct, variants);
+  const printfulDescription = resolvePrintfulDescription(details, variants) ?? printfulCatalogDescription;
 
   return {
     id: syncProduct?.id != null ? String(syncProduct.id) : fallbackId,
     name,
-    description: buildDescription(sizes, colors, category),
+    description: printfulDescription ?? buildDescription(sizes, colors, category),
     category,
     categoryKey: slugifyValue(category),
     collections: squareCollections,
@@ -771,13 +839,26 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
     const squareItemDetailsByItemId = await readSquareCatalogItemMerchDetails(
       dedupeStrings(summaries.map((summary) => summary.external_id)),
     ).catch(() => new Map());
+    const printfulCatalogDescriptionByProductId = new Map<number, Promise<string | null>>();
 
     const detailResults = await Promise.allSettled(
       summaries
         .filter((summary) => summary.id != null && !summary.is_ignored)
         .map((summary, index) =>
-          fetchPrintfulProductDetails(String(summary.id), activeMode, storeId || undefined).then((details) =>
-            {
+          fetchPrintfulProductDetails(String(summary.id), activeMode, storeId || undefined).then(
+            async (details) => {
+              const catalogProductId = getPrintfulCatalogProductId(details.sync_variants ?? []);
+              const printfulCatalogDescription =
+                catalogProductId == null
+                  ? null
+                  : await (() => {
+                      const cached = printfulCatalogDescriptionByProductId.get(catalogProductId);
+                      if (cached) return cached;
+
+                      const request = fetchPrintfulCatalogProductDescription(catalogProductId).catch(() => null);
+                      printfulCatalogDescriptionByProductId.set(catalogProductId, request);
+                      return request;
+                    })();
               const squareItemDetails = squareItemDetailsByItemId.get(details.sync_product?.external_id?.trim() || "");
               return mapPrintfulProduct(
                 details,
@@ -785,9 +866,10 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
                 storefrontUrl,
                 squareItemDetails?.collections ?? [],
                 squareItemDetails?.imageUrls ?? [],
+                printfulCatalogDescription,
                 index,
               );
-            }
+            },
           ),
         ),
     );

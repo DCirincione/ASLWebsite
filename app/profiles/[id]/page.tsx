@@ -83,9 +83,15 @@ export default function PublicProfilePage() {
   const [teams, setTeams] = useState<PublicSundayLeagueTeam[]>([]);
   const [registeredEvents, setRegisteredEvents] = useState<PublicRegisteredEvent[]>([]);
   const [friends, setFriends] = useState<FriendSummary[]>([]);
+  const [friendRequest, setFriendRequest] = useState<FriendRequest | null>(null);
+  const [friendshipStatus, setFriendshipStatus] = useState<
+    "idle" | "pending_sent" | "pending_received" | "friends" | "loading" | null
+  >(null);
   const [loadingTeams, setLoadingTeams] = useState(false);
   const [loadingEvents, setLoadingEvents] = useState(false);
   const [loadingFriends, setLoadingFriends] = useState(false);
+  const [friendActionLoading, setFriendActionLoading] = useState(false);
+  const [friendActionError, setFriendActionError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadSession = async () => {
@@ -238,9 +244,127 @@ export default function PublicProfilePage() {
     loadFriends();
   }, [profileId]);
 
+  useEffect(() => {
+    const client = supabase;
+    if (!profileId || !sessionUserId || profileId === sessionUserId || !client) {
+      setFriendRequest(null);
+      setFriendshipStatus(null);
+      return;
+    }
+
+    const loadFriendship = async () => {
+      setFriendshipStatus("loading");
+      const { data: reqs, error } = await client
+        .from("friend_requests")
+        .select("*")
+        .or(`sender_id.eq.${sessionUserId},receiver_id.eq.${sessionUserId}`)
+        .order("created_at", { ascending: false });
+
+      if (error || !reqs) {
+        setFriendRequest(null);
+        setFriendshipStatus("idle");
+        return;
+      }
+
+      const request =
+        (reqs as FriendRequest[]).find((r) => {
+          const samePair =
+            (r.sender_id === sessionUserId && r.receiver_id === profileId) ||
+            (r.sender_id === profileId && r.receiver_id === sessionUserId);
+          return samePair && (r.status === "accepted" || r.status === "pending");
+        }) ?? null;
+
+      setFriendRequest(request);
+      if (!request) {
+        setFriendshipStatus("idle");
+      } else if (request.status === "accepted") {
+        setFriendshipStatus("friends");
+      } else if (request.sender_id === sessionUserId) {
+        setFriendshipStatus("pending_sent");
+      } else {
+        setFriendshipStatus("pending_received");
+      }
+    };
+
+    loadFriendship();
+  }, [profileId, sessionUserId]);
+
+  const sendFriendRequest = async () => {
+    if (!supabase || !profileId || !sessionUserId || profileId === sessionUserId) return;
+
+    setFriendActionLoading(true);
+    setFriendActionError(null);
+    const { error } = await supabase
+      .from("friend_requests")
+      .insert({ sender_id: sessionUserId, receiver_id: profileId, status: "pending" });
+
+    if (error) {
+      setFriendActionError(error.message);
+      setFriendActionLoading(false);
+      return;
+    }
+
+    setFriendRequest({
+      id: "pending",
+      sender_id: sessionUserId,
+      receiver_id: profileId,
+      status: "pending",
+    });
+    setFriendshipStatus("pending_sent");
+    setFriendActionLoading(false);
+  };
+
+  const acceptFriendRequest = async () => {
+    if (!supabase || !friendRequest) return;
+
+    setFriendActionLoading(true);
+    setFriendActionError(null);
+    const { error } = await supabase
+      .from("friend_requests")
+      .update({ status: "accepted" })
+      .eq("id", friendRequest.id);
+
+    if (error) {
+      setFriendActionError(error.message);
+      setFriendActionLoading(false);
+      return;
+    }
+
+    setFriendRequest({ ...friendRequest, status: "accepted" });
+    setFriendshipStatus("friends");
+    setFriends((prev) => {
+      if (!profile || prev.some((friend) => friend.id === profile.id)) return prev;
+      return [
+        ...prev,
+        {
+          id: profile.id,
+          name: profile.name,
+          avatar_url: profile.avatar_url ?? null,
+        },
+      ];
+    });
+    setFriendActionLoading(false);
+  };
+
   const data = profile ?? fallbackProfile;
   const avatarSrc = data.avatar_url ?? "/avatar-placeholder.svg";
   const friendsCount = useMemo(() => friends.length, [friends]);
+  const canManageFriendship = Boolean(sessionUserId && profileId && sessionUserId !== profileId);
+  const friendButtonLabel =
+    friendshipStatus === "friends"
+      ? "Friends"
+      : friendshipStatus === "pending_sent"
+        ? "Request Sent"
+        : friendshipStatus === "pending_received"
+          ? "Accept Request"
+          : friendshipStatus === "loading"
+            ? "Checking..."
+            : "Add Friend";
+  const friendButtonDisabled =
+    friendActionLoading ||
+    friendshipStatus === "loading" ||
+    friendshipStatus === "pending_sent" ||
+    friendshipStatus === "friends";
 
   return (
     <div className="account-page">
@@ -261,13 +385,26 @@ export default function PublicProfilePage() {
           </div>
           <div className="cta-row">
             {sessionUserId && profileId && sessionUserId !== profileId ? (
-              <Link className="button ghost" href={`/account/inbox?tab=chats&chat=${profileId}`}>
-                Message
-              </Link>
+              <>
+                <button
+                  className="button primary"
+                  type="button"
+                  onClick={friendshipStatus === "pending_received" ? acceptFriendRequest : sendFriendRequest}
+                  disabled={friendButtonDisabled}
+                >
+                  {friendActionLoading ? "Saving..." : friendButtonLabel}
+                </button>
+                <Link className="button ghost" href={`/account/inbox?tab=chats&chat=${profileId}`}>
+                  Message
+                </Link>
+              </>
             ) : null}
             <HistoryBackButton label="← Back" fallbackHref="/account" />
           </div>
         </header>
+        {canManageFriendship && friendActionError ? (
+          <p className="form-help error">{friendActionError}</p>
+        ) : null}
 
         {status === "error" ? (
           <section className="account-card">
