@@ -693,13 +693,30 @@ html[data-theme="dark"] .sunday-league-free-agent-form .sunday-league-select-fie
 }
 
 .sunday-league-team-form .checkbox-label {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
   color: #0f172a;
+  gap: 12px;
+  max-width: 100%;
 }
 
 .sunday-league-team-form .checkbox-label input {
-  flex: 0 0 18px;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  margin: 0.15em 0 0;
+  padding: 0;
+  border-radius: 5px;
+  flex: 0 0 auto;
   accent-color: #e95d2a;
   color-scheme: light;
+}
+
+.sunday-league-team-form .checkbox-label span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
 }
 
 html[data-theme="dark"] .sunday-league-team-form .checkbox-label {
