@@ -198,7 +198,7 @@ export default function SundayLeagueTeamPortalPage() {
       if (profileIds.size > 0) {
         const { data: profileData } = await supabase
           .from("profiles")
-          .select("id,name,avatar_url,positions")
+          .select("id,name,avatar_url,positions,country_code")
           .in("id", Array.from(profileIds));
 
         for (const profile of (profileData ?? []) as TeamMemberProfile[]) {
@@ -527,10 +527,10 @@ export default function SundayLeagueTeamPortalPage() {
 
     const profileMap = new Map<string, TeamMemberProfile>();
     if (profileIds.size > 0) {
-        const { data: profileData } = await supabase
-          .from("profiles")
-          .select("id,name,avatar_url,positions")
-          .in("id", Array.from(profileIds));
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id,name,avatar_url,positions,country_code")
+        .in("id", Array.from(profileIds));
 
       for (const profile of (profileData ?? []) as TeamMemberProfile[]) {
         profileMap.set(profile.id, profile);

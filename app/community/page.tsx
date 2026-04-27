@@ -5,8 +5,8 @@ import { unstable_noStore as noStore } from "next/cache";
 
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
-import featuredArticles from "@/data/community-articles.json";
 import communityContent from "@/data/community-content.json";
+import { readCommunityArticles } from "@/lib/community-articles";
 import { readCommunitySponsors } from "@/lib/community-sponsors";
 
 function SponsorMediaLinks({
@@ -43,7 +43,10 @@ function SponsorMediaLinks({
 export default async function CommunityPage() {
   noStore();
 
-  const sponsors = await readCommunitySponsors();
+  const [sponsors, featuredArticles] = await Promise.all([
+    readCommunitySponsors(),
+    readCommunityArticles(),
+  ]);
   const featuredSponsors = sponsors.filter((sponsor) => sponsor.placement === "top").slice(0, 2);
   const featuredSponsorIds = new Set(featuredSponsors.map((sponsor) => sponsor.id));
   const standardSponsors = sponsors.filter((sponsor) => !featuredSponsorIds.has(sponsor.id));

@@ -168,7 +168,7 @@ export default function SundayLeaguePublicTeamPage() {
       if (profileIds.size > 0) {
         const { data: profileData } = await supabase
           .from("profiles")
-          .select("id,name,avatar_url,positions")
+          .select("id,name,avatar_url,positions,country_code")
           .in("id", Array.from(profileIds));
 
         for (const profile of (profileData ?? []) as TeamMemberProfile[]) {

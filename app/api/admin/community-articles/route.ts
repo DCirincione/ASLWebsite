@@ -1,39 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import path from "path";
 
 import { isAdminOrOwner } from "@/lib/admin-route-auth";
-
-type CommunityArticle = {
-  id: string;
-  title: string;
-  blurb: string;
-  href: string;
-  date?: string;
-  image?: string;
-};
-
-const articlesFilePath = path.join(process.cwd(), "data", "community-articles.json");
-
-const readArticles = async (): Promise<CommunityArticle[]> => {
-  const content = await fs.readFile(articlesFilePath, "utf8");
-  const parsed = JSON.parse(content);
-  if (!Array.isArray(parsed)) return [];
-  return (parsed as Array<Partial<CommunityArticle>>)
-    .filter((item) => item && typeof item.title === "string" && typeof item.blurb === "string" && typeof item.href === "string")
-    .map((item) => ({
-      id: item.id?.trim() || crypto.randomUUID(),
-      title: item.title!.trim(),
-      blurb: item.blurb!.trim(),
-      href: item.href!.trim(),
-      ...(item.date?.trim() ? { date: item.date.trim() } : {}),
-      ...(item.image?.trim() ? { image: item.image.trim() } : {}),
-    }));
-};
+import { type CommunityArticle, readCommunityArticles, writeCommunityArticles } from "@/lib/community-articles";
 
 export async function GET() {
   try {
-    const articles = await readArticles();
+    const articles = await readCommunityArticles();
     return NextResponse.json({ articles });
   } catch {
     return NextResponse.json({ error: "Could not read community articles." }, { status: 500 });
@@ -67,11 +39,11 @@ export async function POST(req: NextRequest) {
       ...(image ? { image } : {}),
     };
 
-    const current = await readArticles();
+    const current = await readCommunityArticles();
     const next = [article, ...current];
-    await fs.writeFile(articlesFilePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+    const articles = await writeCommunityArticles(next);
 
-    return NextResponse.json({ ok: true, article, articles: next });
+    return NextResponse.json({ ok: true, article, articles });
   } catch {
     return NextResponse.json({ error: "Could not save article." }, { status: 500 });
   }
@@ -96,7 +68,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: "ID, title, blurb, and link are required." }, { status: 400 });
     }
 
-    const current = await readArticles();
+    const current = await readCommunityArticles();
     const next = current.map((article) =>
       article.id === id
         ? {
@@ -110,8 +82,8 @@ export async function PUT(req: NextRequest) {
         : article
     );
 
-    await fs.writeFile(articlesFilePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
-    return NextResponse.json({ ok: true, articles: next });
+    const articles = await writeCommunityArticles(next);
+    return NextResponse.json({ ok: true, articles });
   } catch {
     return NextResponse.json({ error: "Could not update article." }, { status: 500 });
   }
@@ -130,10 +102,10 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Article ID is required." }, { status: 400 });
     }
 
-    const current = await readArticles();
+    const current = await readCommunityArticles();
     const next = current.filter((article) => article.id !== id);
-    await fs.writeFile(articlesFilePath, `${JSON.stringify(next, null, 2)}\n`, "utf8");
-    return NextResponse.json({ ok: true, articles: next });
+    const articles = await writeCommunityArticles(next);
+    return NextResponse.json({ ok: true, articles });
   } catch {
     return NextResponse.json({ error: "Could not delete article." }, { status: 500 });
   }
