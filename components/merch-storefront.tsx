@@ -174,6 +174,7 @@ const productMatchesFilterState = (
 const sportCollectionIds = new Set([
   "all-sports",
   "baseball",
+  "baseball-softball",
   "basketball",
   "flag-football",
   "football",
@@ -182,6 +183,7 @@ const sportCollectionIds = new Set([
   "pickleball",
   "run-club",
   "soccer",
+  "softball",
   "youth-soccer",
 ]);
 
