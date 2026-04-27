@@ -1041,7 +1041,9 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   gap: 8px;
   padding: 12px 16px;
   border-radius: 12px;
+  font: inherit;
   font-weight: 700;
+  line-height: 1;
   border: 1px solid var(--border);
   transition:
     transform 0.15s ease,
@@ -1411,8 +1413,14 @@ html[data-theme="dark"] .hero__actions .button.ghost:hover:not(:disabled) {
   height: 100%;
 }
 
+.team-card__info {
+  min-width: 0;
+  overflow: hidden;
+}
+
 .team-card__info p {
   margin: 0;
+  overflow-wrap: break-word;
 }
 
 .team-card .button {
@@ -2525,7 +2533,7 @@ html[data-theme="dark"] .pill--muted {
   }
 
   .form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

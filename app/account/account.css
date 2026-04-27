@@ -202,6 +202,7 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
 .account-form select,
 .account-form textarea {
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 12px;
@@ -670,8 +671,16 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
 
   .account-suggestion-card__actions {
     grid-column: 1 / -1;
-    justify-self: start;
+    justify-self: stretch;
+    flex-direction: row;
     flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .account-suggestion-card__actions .button {
+    flex: 1;
+    justify-content: center;
+    padding: 8px 12px;
   }
 }
 
@@ -698,8 +707,14 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
 
 .account-suggestion-card__actions {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  flex-direction: column;
+  gap: 6px;
+  align-items: stretch;
+}
+
+.account-suggestion-card__actions .button {
+  padding: 7px 12px;
+  justify-content: center;
 }
 
 .account-tabs {

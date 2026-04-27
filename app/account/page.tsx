@@ -1102,7 +1102,11 @@ export default function AccountPage() {
                         <img src={person.avatar_url ?? "/avatar-placeholder.svg"} alt="" />
                       </div>
                       <div className="team-card__info">
-                        <p className="list__title">{person.name}</p>
+                        <p className="list__title" style={{ lineHeight: 1.3 }}>
+                          {person.name.trim().split(" ")[0]}
+                          <br />
+                          {person.name.trim().split(" ").slice(1).join(" ")}
+                        </p>
                       </div>
                       <div className="account-suggestion-card__actions">
                         <Link className="button ghost" href={`/profiles/${person.id}`}>
