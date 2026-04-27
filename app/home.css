@@ -360,6 +360,20 @@ html[data-theme="dark"] .sponsor-ticker__item {
   }
 }
 
+@media (max-width: 900px) {
+  .home-hero__stage {
+    position: static;
+  }
+
+  .home-hero .hero__arrow {
+    position: absolute;
+    left: 50%;
+    right: auto;
+    bottom: 60px;
+    z-index: 1;
+  }
+}
+
 .program-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

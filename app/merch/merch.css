@@ -1660,16 +1660,16 @@ html[data-theme="dark"] .merch-status {
     border-radius: 22px;
   }
 
+  .merch-hero__actions {
+    justify-content: center;
+  }
+
   .merch-category-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .merch-filters {
     gap: 10px;
-  }
-
-  .merch-hero__cart-button {
-    width: 100%;
   }
 
   .merch-filter-group {
