@@ -654,6 +654,9 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   .account-form input[type="date"] {
     min-width: 0;
     max-width: 100%;
+    width: 100%;
+    -webkit-appearance: none;
+    appearance: none;
   }
 
   .account-chat-panel__person p {
