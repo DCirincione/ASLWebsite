@@ -717,12 +717,13 @@ export default function EventsPage() {
 
   const filteredCollections = useMemo(() => {
     const pickupEvents = filteredEvents.filter((event) => event.eventTypeKey === "pickup");
+    const nonPickupEvents = filteredEvents.filter((event) => event.eventTypeKey !== "pickup");
 
-    const aldrichEvents = filteredEvents.filter(
+    const aldrichEvents = nonPickupEvents.filter(
       (event) => event.host_type === "aldrich" || (!event.host_type && heuristicAldrich(event)),
     );
 
-    const featuredEvents = filteredEvents.filter(
+    const featuredEvents = nonPickupEvents.filter(
       (event) =>
         event.host_type === "featured" ||
         event.host_type === "partner" ||
@@ -732,7 +733,7 @@ export default function EventsPage() {
     return {
       aldrichEvents,
       featuredEvents,
-      allEvents: filteredEvents,
+      allEvents: nonPickupEvents,
       pickupEvents,
     };
   }, [filteredEvents]);

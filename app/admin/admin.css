@@ -314,6 +314,20 @@
   box-shadow: 0 0 0 4px rgba(233, 93, 42, 0.12);
 }
 
+.admin-event-flyer-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.admin-event-flyer-panel h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 1rem;
+}
+
 .admin-registration-summary .list__title {
   font-size: 1.02rem;
 }

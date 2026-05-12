@@ -58,7 +58,6 @@ type AdminModule =
   | "sports"
   | "registrations"
   | "users"
-  | "flyers"
   | "settings";
 type HostType = NonNullable<Event["host_type"]>;
 const EVENT_IMAGE_BUCKET = "event-creation-uploads";
@@ -561,6 +560,8 @@ export default function AdminPage() {
   const [deletingFlyerEventId, setDeletingFlyerEventId] = useState<string | null>(null);
   const [flyerDetailsDrafts, setFlyerDetailsDrafts] = useState<Record<string, string>>({});
   const [expandedFlyerPreviews, setExpandedFlyerPreviews] = useState<Record<string, boolean>>({});
+  const [createFlyerFile, setCreateFlyerFile] = useState<File | null>(null);
+  const [createFlyerDetails, setCreateFlyerDetails] = useState("");
   const [communityArticles, setCommunityArticles] = useState<CommunityArticle[]>([]);
   const [loadingCommunity, setLoadingCommunity] = useState(false);
   const [communitySponsors, setCommunitySponsors] = useState<CommunitySponsor[]>([]);
@@ -730,12 +731,6 @@ export default function AdminPage() {
       id: "users",
       title: "Users",
       description: "View all users from the profiles table.",
-      enabled: true,
-    },
-    {
-      id: "flyers",
-      title: "Flyers",
-      description: "Upload and manage event flyers.",
       enabled: true,
     },
     {
@@ -1470,6 +1465,8 @@ export default function AdminPage() {
       require_waiver: false,
       registration_fields: [],
     });
+    setCreateFlyerFile(null);
+    setCreateFlyerDetails("");
   };
 
   const resetSportForm = () => {
@@ -2186,13 +2183,34 @@ export default function AdminPage() {
       approved_by_user_id: currentUserId,
     };
 
-    const { error } = await supabase.from("events").insert(payload);
+    const { data: createdEvent, error } = await supabase
+      .from("events")
+      .insert(payload)
+      .select("id,title,registration_program_slug")
+      .single();
     if (error) {
       setFormStatus({ type: "error", message: error.message });
       return;
     }
 
-    setFormStatus({ type: "success", message: "Event created." });
+    if (createdEvent && (createFlyerFile || createFlyerDetails.trim())) {
+      try {
+        const flyerImageUrl = createFlyerFile ? await uploadFlyerImage(createdEvent, createFlyerFile) : null;
+        await upsertFlyerRecord(createdEvent, {
+          flyer_image_url: flyerImageUrl,
+          details: createFlyerDetails.trim() || null,
+        });
+      } catch (flyerError) {
+        const message = flyerError instanceof Error ? flyerError.message : "Could not save flyer.";
+        setFormStatus({ type: "error", message: `Event created, but flyer could not be saved: ${message}` });
+        resetForm();
+        setShowCreateEventForm(false);
+        await loadEvents();
+        return;
+      }
+    }
+
+    setFormStatus({ type: "success", message: createFlyerFile || createFlyerDetails.trim() ? "Event and flyer created." : "Event created." });
     resetForm();
     setShowCreateEventForm(false);
     await loadEvents();
@@ -2603,11 +2621,11 @@ export default function AdminPage() {
     await loadScheduleWeeks();
   };
 
-  const getFlyerName = (event: Event) => {
+  const getFlyerName = (event: Pick<Event, "title" | "registration_program_slug">) => {
     return event.registration_program_slug?.trim() || event.title.trim();
   };
 
-  const uploadFlyerImage = async (event: Event, file: File) => {
+  const uploadFlyerImage = async (event: Pick<Event, "id">, file: File) => {
     if (!supabase) {
       throw new Error("Supabase is not configured.");
     }
@@ -2625,7 +2643,7 @@ export default function AdminPage() {
     return publicUrlData.publicUrl;
   };
 
-  const upsertFlyerRecord = async (event: Event, patch: Partial<Flyer>) => {
+  const upsertFlyerRecord = async (event: Pick<Event, "id" | "title" | "registration_program_slug">, patch: Partial<Flyer>) => {
     if (!supabase) {
       throw new Error("Supabase is not configured.");
     }
@@ -2670,6 +2688,21 @@ export default function AdminPage() {
       setUploadingFlyerEventId(null);
       e.target.value = "";
     }
+  };
+
+  const handleCreateFlyerFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    if (!file) {
+      setCreateFlyerFile(null);
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      setFormStatus({ type: "error", message: "Please select a valid flyer image file." });
+      e.target.value = "";
+      return;
+    }
+    setCreateFlyerFile(file);
+    setFormStatus({ type: "idle" });
   };
 
   const handleSaveFlyerDetails = async (event: Event) => {
@@ -2722,6 +2755,7 @@ export default function AdminPage() {
     if (module === "events") {
       void loadEvents();
       void loadSports();
+      void loadFlyers();
     }
     if (module === "sundayLeague") {
       void loadSundayLeagueSettings();
@@ -2739,10 +2773,6 @@ export default function AdminPage() {
       void loadCommunityArticles();
       void loadCommunityContent();
       void loadCommunitySponsors();
-    }
-    if (module === "flyers") {
-      void loadEvents();
-      void loadFlyers();
     }
     if (module === "contact") {
       void loadContactMessages();
@@ -3869,6 +3899,153 @@ export default function AdminPage() {
   const partnerRequestEvents = events.filter((event) => event.host_type === "partner" && event.approval_status !== "approved");
   const existingManageableEvents = events.filter((event) => event.host_type !== "partner" || event.approval_status === "approved");
   const pendingPartnerRequestCount = partnerRequestEvents.filter((event) => event.approval_status === "pending_approval").length;
+  const renderCreateFlyerControls = () => (
+    <div className="admin-event-flyer-panel">
+      <div>
+        <h4>Event Flyer</h4>
+        <p className="muted">
+          {createFlyerFile ? `Selected: ${createFlyerFile.name}` : "Add the flyer image and details for this event."}
+        </p>
+      </div>
+
+      <div className="form-control admin-flyer-details-field">
+        <label htmlFor="create-event-flyer-details">Flyer details</label>
+        <textarea
+          id="create-event-flyer-details"
+          value={createFlyerDetails}
+          onChange={(e) => setCreateFlyerDetails(e.target.value)}
+          rows={4}
+          placeholder="Optional extra event details for the flyer modal."
+        />
+      </div>
+
+      <div className="cta-row">
+        <label
+          className="button ghost"
+          htmlFor="create-event-flyer-upload"
+          style={{ padding: "0.45rem 0.75rem" }}
+        >
+          {createFlyerFile ? "Replace Flyer" : "Upload Flyer"}
+        </label>
+        <input
+          id="create-event-flyer-upload"
+          type="file"
+          accept="image/*"
+          onChange={handleCreateFlyerFileChange}
+          style={{ display: "none" }}
+        />
+        {createFlyerFile ? (
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => setCreateFlyerFile(null)}
+          >
+            Remove Flyer
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+  const renderEventFlyerControls = (event: Event) => {
+    const flyer = flyerByEventId.get(event.id);
+    const detailsValue = flyerDetailsDrafts[event.id] ?? flyer?.details ?? "";
+    const isFlyerExpanded = Boolean(expandedFlyerPreviews[event.id]);
+
+    return (
+      <div className="admin-event-flyer-panel">
+        <div className="event-card__header">
+          <div>
+            <h4>Event Flyer</h4>
+            <p className="muted">Flyer key: {getFlyerName(event)}</p>
+          </div>
+          {flyer?.flyer_image_url ? (
+            <button
+              className="button ghost"
+              type="button"
+              onClick={() =>
+                setExpandedFlyerPreviews((prev) => ({
+                  ...prev,
+                  [event.id]: !prev[event.id],
+                }))
+              }
+            >
+              {isFlyerExpanded ? "Collapse Flyer" : "Preview Flyer"}
+            </button>
+          ) : null}
+        </div>
+
+        {flyer?.flyer_image_url ? (
+          isFlyerExpanded ? (
+            <Image
+              src={flyer.flyer_image_url}
+              alt={`${event.title} flyer`}
+              width={840}
+              height={1188}
+              sizes="(max-width: 720px) 100vw, 420px"
+              style={{ width: "100%", maxWidth: 420, height: "auto", borderRadius: 12, border: "1px solid var(--border)" }}
+            />
+          ) : (
+            <p className="muted">Flyer uploaded.</p>
+          )
+        ) : (
+          <p className="muted">No flyer uploaded yet.</p>
+        )}
+
+        <div className="form-control admin-flyer-details-field">
+          <label htmlFor={`event-card-flyer-details-${event.id}`}>Flyer details</label>
+          <textarea
+            id={`event-card-flyer-details-${event.id}`}
+            value={detailsValue}
+            onChange={(e) =>
+              setFlyerDetailsDrafts((prev) => ({ ...prev, [event.id]: e.target.value }))
+            }
+            rows={4}
+            placeholder="Optional extra event details for the flyer modal."
+          />
+        </div>
+
+        <div className="cta-row">
+          <label
+            className="button ghost"
+            htmlFor={`event-card-flyer-upload-${event.id}`}
+            style={{ padding: "0.45rem 0.75rem" }}
+          >
+            {uploadingFlyerEventId === event.id
+              ? "Uploading..."
+              : flyer?.flyer_image_url
+                ? "Replace Flyer"
+                : "Upload Flyer"}
+          </label>
+          <input
+            id={`event-card-flyer-upload-${event.id}`}
+            type="file"
+            accept="image/*"
+            onChange={(e) => void handleFlyerUpload(event, e)}
+            disabled={uploadingFlyerEventId === event.id}
+            style={{ display: "none" }}
+          />
+          <button
+            className="button ghost"
+            type="button"
+            onClick={() => void handleSaveFlyerDetails(event)}
+            disabled={savingFlyerEventId === event.id}
+          >
+            {savingFlyerEventId === event.id ? "Saving..." : "Save Details"}
+          </button>
+          {flyer ? (
+            <button
+              className="button ghost"
+              type="button"
+              onClick={() => void handleDeleteFlyer(event)}
+              disabled={deletingFlyerEventId === event.id}
+            >
+              {deletingFlyerEventId === event.id ? "Deleting..." : "Delete Flyer"}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
   const renderAdminEventCards = (items: Event[], showPartnerApprovalControls: boolean) => (
     <div className="event-list admin-existing-events-list">
       {items.map((event) => (
@@ -4146,6 +4323,7 @@ export default function AdminPage() {
                 <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
               ) : null}
               {renderRegistrationBuilder("edit", editForm)}
+              {renderEventFlyerControls(event)}
               <div className="cta-row">
                 <button
                   className="button primary"
@@ -4531,6 +4709,7 @@ export default function AdminPage() {
                     <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
                   ) : null}
                   {renderRegistrationBuilder("create", form)}
+                  {renderCreateFlyerControls()}
                   <div className="cta-row">
                     <button className="button primary" type="submit" disabled={formStatus.type === "loading"}>
                       {formStatus.type === "loading" ? "Saving..." : "Create Event"}
@@ -4554,8 +4733,16 @@ export default function AdminPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   {showExistingEvents ? (
-                    <button className="button ghost" type="button" onClick={() => void loadEvents()} disabled={loadingEvents}>
-                      {loadingEvents ? "Refreshing..." : "Refresh"}
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => {
+                        void loadEvents();
+                        void loadFlyers();
+                      }}
+                      disabled={loadingEvents || loadingFlyers}
+                    >
+                      {loadingEvents || loadingFlyers ? "Refreshing..." : "Refresh"}
                     </button>
                   ) : null}
                   <button className="button primary" type="button" onClick={() => setShowExistingEvents((prev) => !prev)}>
@@ -4566,7 +4753,12 @@ export default function AdminPage() {
               {showExistingEvents ? (
                 <>
                   {loadingEvents ? <p className="muted">Loading events...</p> : null}
+                  {loadingFlyers ? <p className="muted">Loading event flyers...</p> : null}
                   {eventsError ? <p className="form-help error">{eventsError}</p> : null}
+                  {flyersError ? <p className="form-help error">{flyersError}</p> : null}
+                  {flyersStatus.message ? (
+                    <p className={`form-help ${flyersStatus.type === "error" ? "error" : "muted"}`}>{flyersStatus.message}</p>
+                  ) : null}
                   {!loadingEvents && existingManageableEvents.length === 0 ? <p className="muted">No events found.</p> : null}
                   {!loadingEvents && existingManageableEvents.length > 0 ? renderAdminEventCards(existingManageableEvents, false) : null}
                 </>
@@ -4581,8 +4773,16 @@ export default function AdminPage() {
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   {showPartnerRequests ? (
-                    <button className="button ghost" type="button" onClick={() => void loadEvents()} disabled={loadingEvents}>
-                      {loadingEvents ? "Refreshing..." : "Refresh"}
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => {
+                        void loadEvents();
+                        void loadFlyers();
+                      }}
+                      disabled={loadingEvents || loadingFlyers}
+                    >
+                      {loadingEvents || loadingFlyers ? "Refreshing..." : "Refresh"}
                     </button>
                   ) : null}
                   <button
@@ -4603,7 +4803,9 @@ export default function AdminPage() {
               {showPartnerRequests ? (
                 <>
                   {loadingEvents ? <p className="muted">Loading partner requests...</p> : null}
+                  {loadingFlyers ? <p className="muted">Loading event flyers...</p> : null}
                   {eventsError ? <p className="form-help error">{eventsError}</p> : null}
+                  {flyersError ? <p className="form-help error">{flyersError}</p> : null}
                   {!loadingEvents && partnerRequestEvents.length === 0 ? <p className="muted">No partner requests right now.</p> : null}
                   {!loadingEvents && partnerRequestEvents.length > 0 ? renderAdminEventCards(partnerRequestEvents, true) : null}
                 </>
@@ -6442,141 +6644,6 @@ export default function AdminPage() {
                           <p className="muted contact-message-card__preview">{message.message}</p>
                         </article>
                       ))}
-                    </div>
-                  ) : null}
-                </section>
-              </>
-            ) : null}
-            {activeModule === "flyers" ? (
-              <>
-                <section className="account-card account-card__summary">
-                  <h2>Flyers</h2>
-                  <p className="muted">Upload flyer images that appear in each event detail card.</p>
-                </section>
-                <section className="account-card">
-                  <div className="account-card__header">
-                    <div>
-                      <h2>Event Flyers</h2>
-                      <p className="muted">Each event can have one flyer image plus optional details text.</p>
-                    </div>
-                    <button
-                      className="button ghost"
-                      type="button"
-                      onClick={() => {
-                        void loadEvents();
-                        void loadFlyers();
-                      }}
-                      disabled={loadingFlyers || loadingEvents}
-                    >
-                      {loadingFlyers || loadingEvents ? "Refreshing..." : "Refresh"}
-                    </button>
-                  </div>
-                  {flyersError ? <p className="form-help error">{flyersError}</p> : null}
-                  {flyersStatus.message ? (
-                    <p className={`form-help ${flyersStatus.type === "error" ? "error" : "muted"}`}>{flyersStatus.message}</p>
-                  ) : null}
-                  {loadingFlyers || loadingEvents ? <p className="muted">Loading flyers...</p> : null}
-                  {!loadingFlyers && !loadingEvents && events.length === 0 ? <p className="muted">No events found.</p> : null}
-                  {!loadingFlyers && !loadingEvents && events.length > 0 ? (
-                    <div className="event-list admin-scroll-panel">
-                      {events.map((event) => {
-                        const flyer = flyerByEventId.get(event.id);
-                        const detailsValue = flyerDetailsDrafts[event.id] ?? flyer?.details ?? "";
-                        const isFlyerExpanded = Boolean(expandedFlyerPreviews[event.id]);
-                        return (
-                          <article key={event.id} className="event-card-simple">
-                            <div className="event-card__header">
-                              <h3>{event.title}</h3>
-                            </div>
-                            <div className="event-card__meta">
-                              <p className="muted">Date: {dateLabel(event.start_date, event.end_date)}</p>
-                              <p className="muted">Key: {getFlyerName(event)}</p>
-                            </div>
-                            {flyer?.flyer_image_url ? (
-                              <div style={{ display: "grid", gap: 10 }}>
-                                <button
-                                  className="button ghost"
-                                  type="button"
-                                  onClick={() =>
-                                    setExpandedFlyerPreviews((prev) => ({
-                                      ...prev,
-                                      [event.id]: !prev[event.id],
-                                    }))
-                                  }
-                                  style={{ justifySelf: "start" }}
-                                >
-                                  {isFlyerExpanded ? "Collapse Flyer" : "Expand Flyer"}
-                                </button>
-                                {isFlyerExpanded ? (
-                                  <Image
-                                    src={flyer.flyer_image_url}
-                                    alt={`${event.title} flyer`}
-                                    width={840}
-                                    height={1188}
-                                    sizes="(max-width: 720px) 100vw, 420px"
-                                    style={{ width: "100%", maxWidth: 420, height: "auto", borderRadius: 12, border: "1px solid var(--border)" }}
-                                  />
-                                ) : (
-                                  <p className="muted">Flyer uploaded. Expand to preview it.</p>
-                                )}
-                              </div>
-                            ) : (
-                              <p className="muted">No flyer uploaded yet.</p>
-                            )}
-                            <div className="form-control admin-flyer-details-field">
-                              <label htmlFor={`flyer-details-${event.id}`}>Details</label>
-                              <textarea
-                                id={`flyer-details-${event.id}`}
-                                value={detailsValue}
-                                onChange={(e) =>
-                                  setFlyerDetailsDrafts((prev) => ({ ...prev, [event.id]: e.target.value }))
-                                }
-                                rows={4}
-                                placeholder="Optional extra event details for the flyer modal."
-                              />
-                            </div>
-                            <div className="cta-row">
-                              <label
-                                className="button ghost"
-                                htmlFor={`flyer-upload-${event.id}`}
-                                style={{ padding: "0.45rem 0.75rem" }}
-                              >
-                                {uploadingFlyerEventId === event.id
-                                  ? "Uploading..."
-                                  : flyer?.flyer_image_url
-                                    ? "Replace Flyer"
-                                    : "Upload Flyer"}
-                              </label>
-                              <input
-                                id={`flyer-upload-${event.id}`}
-                                type="file"
-                                accept="image/*"
-                                onChange={(e) => void handleFlyerUpload(event, e)}
-                                disabled={uploadingFlyerEventId === event.id}
-                                style={{ display: "none" }}
-                              />
-                              <button
-                                className="button ghost"
-                                type="button"
-                                onClick={() => void handleSaveFlyerDetails(event)}
-                                disabled={savingFlyerEventId === event.id}
-                              >
-                                {savingFlyerEventId === event.id ? "Saving..." : "Save Details"}
-                              </button>
-                              {flyer ? (
-                                <button
-                                  className="button ghost"
-                                  type="button"
-                                  onClick={() => void handleDeleteFlyer(event)}
-                                  disabled={deletingFlyerEventId === event.id}
-                                >
-                                  {deletingFlyerEventId === event.id ? "Deleting..." : "Delete Flyer"}
-                                </button>
-                              ) : null}
-                            </div>
-                          </article>
-                        );
-                      })}
                     </div>
                   ) : null}
                 </section>
