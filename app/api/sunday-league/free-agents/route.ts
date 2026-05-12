@@ -30,7 +30,7 @@ type FreeAgentApiEntry = {
   sunday_availability: SundayLeagueAvailability | null;
   known_conflicts: string | null;
   avatar_url: string | null;
-  country_code: null;
+  country_code: string | null;
   positions: string[] | null;
   skill_level: number | null;
   sports: string[] | null;
@@ -41,7 +41,7 @@ type FreeAgentApiEntry = {
 
 type FreeAgentProfile = Pick<
   Profile,
-  "id" | "name" | "about" | "avatar_url" | "positions" | "skill_level" | "sports"
+  "id" | "name" | "about" | "avatar_url" | "country_code" | "positions" | "skill_level" | "sports"
 >;
 
 const parseOptionalNumber = (value?: string | null) => {
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest) {
     const token = getBearerToken(req);
     const teamId = req.nextUrl.searchParams.get("teamId")?.trim() || "";
 
-    if (!token || !teamId) {
+    if (!token) {
       return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
     }
 
@@ -79,20 +79,20 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Server Supabase service role is not configured." }, { status: 500 });
     }
 
-    const { data: teamData, error: teamError } = await serviceClient
-      .from("sunday_league_teams")
-      .select("id,user_id")
-      .eq("id", teamId)
-      .maybeSingle();
+    if (teamId) {
+      const { data: teamData, error: teamError } = await serviceClient
+        .from("sunday_league_teams")
+        .select("id,user_id")
+        .eq("id", teamId)
+        .maybeSingle();
 
-    if (teamError) {
-      return NextResponse.json({ error: teamError.message }, { status: 500 });
-    }
-    if (!teamData) {
-      return NextResponse.json({ error: "Team not found." }, { status: 404 });
-    }
+      if (teamError) {
+        return NextResponse.json({ error: teamError.message }, { status: 500 });
+      }
+      if (!teamData) {
+        return NextResponse.json({ error: "Team not found." }, { status: 404 });
+      }
 
-    if (teamData.user_id !== userId) {
       const { data: roleData, error: roleError } = await serviceClient
         .from("sunday_league_team_members")
         .select("id")
@@ -105,7 +105,7 @@ export async function GET(req: NextRequest) {
       if (roleError) {
         return NextResponse.json({ error: roleError.message }, { status: 500 });
       }
-      if (!roleData) {
+      if (teamData.user_id !== userId && !roleData) {
         return NextResponse.json({ error: "Only the captain or an accepted co-captain can view free agents." }, { status: 403 });
       }
     }
@@ -121,11 +121,13 @@ export async function GET(req: NextRequest) {
         .from("sunday_league_team_members")
         .select("player_user_id")
         .eq("status", "accepted"),
-      serviceClient
-        .from("sunday_league_team_members")
-        .select("player_user_id")
-        .eq("team_id", teamId)
-        .in("status", ["pending", "accepted"]),
+      teamId
+        ? serviceClient
+            .from("sunday_league_team_members")
+            .select("player_user_id")
+            .eq("team_id", teamId)
+            .in("status", ["pending", "accepted"])
+        : Promise.resolve({ data: [], error: null }),
       serviceClient.from("sunday_league_teams").select("user_id"),
     ]);
 
@@ -177,7 +179,7 @@ export async function GET(req: NextRequest) {
 
     const { data: profileData, error: profileError } = await serviceClient
       .from("profiles")
-      .select("id,name,about,avatar_url,positions,skill_level,sports")
+      .select("id,name,about,avatar_url,country_code,positions,skill_level,sports")
       .in("id", freeAgentIds);
 
     if (profileError) {
@@ -229,7 +231,7 @@ export async function GET(req: NextRequest) {
           sunday_availability: metadata.sunday_availability ?? null,
           known_conflicts: metadata.known_conflicts ?? null,
           avatar_url: profile?.avatar_url ?? null,
-          country_code: null,
+          country_code: profile?.country_code?.trim()?.toUpperCase() ?? null,
           positions: profile?.positions ?? null,
           skill_level: profile?.skill_level ?? null,
           sports: profile?.sports ?? null,
@@ -244,5 +246,45 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ freeAgents });
   } catch {
     return NextResponse.json({ error: "Could not load the free agent portal." }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const token = getBearerToken(req);
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const userClient = getSupabaseWithToken(token);
+    if (!userClient) {
+      return NextResponse.json({ error: "Supabase is not configured." }, { status: 500 });
+    }
+
+    const { data: userData, error: userError } = await userClient.auth.getUser(token);
+    const userId = userData.user?.id ?? null;
+    if (userError || !userId) {
+      return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
+    }
+
+    const serviceClient = getSupabaseServiceRole();
+    if (!serviceClient) {
+      return NextResponse.json({ error: "Server Supabase service role is not configured." }, { status: 500 });
+    }
+
+    const { error } = await serviceClient
+      .from("sunday_league_team_members")
+      .delete()
+      .eq("player_user_id", userId)
+      .eq("source", "free_agent")
+      .eq("status", "free_agent");
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true });
+  } catch {
+    return NextResponse.json({ error: "Could not leave the free agent portal." }, { status: 500 });
   }
 }

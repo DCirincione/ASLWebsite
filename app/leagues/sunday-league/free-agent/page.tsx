@@ -1,6 +1,7 @@
 "use client";
 import "../sunday-league.css";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
   useEffect,
@@ -12,12 +13,15 @@ import {
   type ReactNode,
 } from "react";
 
+import { AvatarImage } from "@/components/avatar-image";
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
+import { TeamLogoImage } from "@/components/team-logo-image";
 import {
   ALDRICH_COMMUNICATIONS_LABEL,
   getAldrichCommunicationsPreferenceFromMetadata,
 } from "@/lib/aldrich-communications";
+import { countryCodeToFlag, getCountryFlagAsset, getCountryNameFromCode } from "@/lib/countries";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import {
   SUNDAY_LEAGUE_AVAILABILITY_OPTIONS,
@@ -50,6 +54,26 @@ type FreeAgentRow = Pick<
   SundayLeagueTeamMember,
   "id" | "player_user_id" | "team_id" | "status" | "source" | "invite_name" | "invite_email"
 >;
+type FreeAgentListing = {
+  id: string;
+  name: string;
+  email: string | null;
+  phone_number: string | null;
+  age: string | null;
+  preferred_positions: string | null;
+  position_groups: SundayLeaguePositionGroup[];
+  secondary_position: string | null;
+  dominant_foot: SundayLeagueDominantFoot | null;
+  skill_level_label: SundayLeagueSkillLevelLabel | null;
+  experience_level: SundayLeagueExperienceLevel | null;
+  strengths: string | null;
+  play_style: string | null;
+  sunday_availability: SundayLeagueAvailability | null;
+  avatar_url: string | null;
+  country_code: string | null;
+  positions: string[] | null;
+  skill_level: number | null;
+};
 
 type FreeAgentFormState = {
   name: string;
@@ -252,6 +276,18 @@ const getSkillLevelLabelFromRating = (value?: number | null): SundayLeagueSkillL
   return "Beginner";
 };
 
+const formatFreeAgentCardName = (value: string) => {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  if (parts.length <= 1) {
+    return { topLine: parts[0] ?? "Free", bottomLine: parts[0] ? "Agent" : "Agent" };
+  }
+
+  return {
+    topLine: parts[0],
+    bottomLine: parts.slice(1).join(" "),
+  };
+};
+
 const getPositionGroupsFromPositions = (value?: string[] | null): SundayLeaguePositionGroup[] => {
   const normalizedPositions = (value ?? []).map((entry) => entry.trim().toLowerCase()).filter(Boolean);
   return SUNDAY_LEAGUE_POSITION_GROUP_OPTIONS.filter((option) => normalizedPositions.includes(option.toLowerCase()));
@@ -376,7 +412,41 @@ export default function SundayLeagueFreeAgentPage() {
   const [isCaptain, setIsCaptain] = useState(false);
   const [loadingState, setLoadingState] = useState<"loading" | "ready">("loading");
   const [status, setStatus] = useState<Status>({ type: "idle" });
+  const [portalStatus, setPortalStatus] = useState<Status>({ type: "idle" });
+  const [freeAgents, setFreeAgents] = useState<FreeAgentListing[]>([]);
+  const [loadingFreeAgents, setLoadingFreeAgents] = useState(false);
+  const [showFreeAgentForm, setShowFreeAgentForm] = useState(false);
   const [form, setForm] = useState<FreeAgentFormState>(defaultFormState);
+
+  const loadFreeAgents = async () => {
+    if (!supabase) return;
+    setLoadingFreeAgents(true);
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? null;
+
+    if (!accessToken) {
+      setFreeAgents([]);
+      setLoadingFreeAgents(false);
+      return;
+    }
+
+    const response = await fetch("/api/sunday-league/free-agents", {
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const json = (await response.json().catch(() => null)) as { error?: string; freeAgents?: FreeAgentListing[] } | null;
+
+    if (!response.ok || !json?.freeAgents) {
+      setPortalStatus({ type: "error", message: json?.error ?? "Could not load free agents." });
+      setFreeAgents([]);
+      setLoadingFreeAgents(false);
+      return;
+    }
+
+    setFreeAgents(json.freeAgents);
+    setLoadingFreeAgents(false);
+  };
 
   useEffect(() => {
     const loadPageState = async () => {
@@ -485,6 +555,7 @@ export default function SundayLeagueFreeAgentPage() {
         communications_opt_in: getAldrichCommunicationsPreferenceFromMetadata(nextSessionUser.user_metadata, true),
       }));
       setLoadingState("ready");
+      void loadFreeAgents();
     };
 
     void loadPageState();
@@ -548,6 +619,46 @@ export default function SundayLeagueFreeAgentPage() {
       error: response.error,
       row: (response.data ?? null) as FreeAgentRow | null,
     };
+  };
+
+  const handleLeaveFreeAgentPortal = async () => {
+    if (!supabase || !freeAgentRow) return;
+
+    const confirmed = window.confirm("Remove your free agent card from the portal?");
+    if (!confirmed) return;
+
+    setPortalStatus({ type: "loading", message: "Removing your free agent card..." });
+    const { data: sessionData } = await supabase.auth.getSession();
+    const accessToken = sessionData.session?.access_token ?? null;
+
+    if (!accessToken) {
+      setPortalStatus({ type: "error", message: "Sign in again to leave the portal." });
+      return;
+    }
+
+    const response = await fetch("/api/sunday-league/free-agents", {
+      method: "DELETE",
+      headers: {
+        authorization: `Bearer ${accessToken}`,
+      },
+    });
+    const json = (await response.json().catch(() => null)) as { error?: string } | null;
+
+    if (!response.ok) {
+      setPortalStatus({ type: "error", message: json?.error ?? "Could not leave the free agent portal." });
+      return;
+    }
+
+    setFreeAgentRow(null);
+    setPortalStatus({ type: "success", message: "You left the free agent portal. You can now be invited or join a team normally." });
+    await loadFreeAgents();
+  };
+
+  const openFreeAgentForm = () => {
+    setShowFreeAgentForm(true);
+    window.requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
   };
 
   const handleSubmit = async (event: FormEvent) => {
@@ -733,6 +844,7 @@ export default function SundayLeagueFreeAgentPage() {
         ? "Your free agent card was updated. Captains will see the latest version in the portal."
         : "Your free agent card is live. Captains can now view it in the portal and invite you to a team.",
     });
+    await loadFreeAgents();
   };
 
   return (
@@ -745,27 +857,148 @@ export default function SundayLeagueFreeAgentPage() {
         <div className="sunday-league-stack" style={{ gap: 20 }}>
           <div className="sunday-league-team-portal__heading">
             <p className="eyebrow">Sunday League</p>
-            <h1>Free Agent Signup</h1>
+            <h1>{showFreeAgentForm ? "Free Agent Signup" : "Free Agent Portal"}</h1>
             <p className="muted">
-              Fill out your player card so captains can browse your details in the Sunday League free agent portal and invite you to a roster.
+              {showFreeAgentForm
+                ? "Fill out your player card so other players and captains can find you."
+                : "Browse available players, connect with new teammates, or manage your own free agent card."}
             </p>
           </div>
 
           <article className="sunday-league-flow-summary__card">
             <div className="sunday-league-stack" style={{ gap: 14 }}>
-              <div className="sunday-league-panel-box sunday-league-panel-box--compact">
+              {!showFreeAgentForm ? (
+              <div className="sunday-league-panel-box sunday-league-panel-box--compact sunday-league-free-agent-intro">
                 <h3>How This Works</h3>
                 <p>
                   Free agents stay unattached to any team until a captain invites them and they accept. Captains can view your player card, open your full details, and invite you directly from their team portal.
                 </p>
                 <p className="muted" style={{ marginBottom: 0 }}>
                   {freeAgentRow
-                    ? "You already have a live free agent card. Submit again any time to refresh it."
-                    : "Submit this once and you will appear in the captain free agent portal."}
+                    ? "You already have a live free agent card. Use the portal controls to update it or remove yourself."
+                    : "Register once and you will appear in the free agent portal."}
                 </p>
               </div>
+              ) : null}
 
               {loadingState === "loading" ? <p className="muted">Loading free agent form...</p> : null}
+
+              {loadingState === "ready" && sessionUser && !showFreeAgentForm ? (
+                <div className="sunday-league-panel-box sunday-league-panel-box--compact sunday-league-free-agent-intro">
+                  <div className="sunday-league-team-portal__heading">
+                    <h3>Available Free Agents</h3>
+                    <p className="muted">Browse available free agents whether you are on a roster or still looking for a team.</p>
+                  </div>
+                  {portalStatus.message ? (
+                    <p className={`form-help ${portalStatus.type === "error" ? "error" : portalStatus.type === "success" ? "success" : ""}`}>
+                      {portalStatus.message}
+                    </p>
+                  ) : null}
+
+                  <div className="sunday-league-inline-actions" style={{ marginBottom: 14 }}>
+                    {!isBlocked ? (
+                      <button
+                        className="button primary"
+                        type="button"
+                        onClick={openFreeAgentForm}
+                      >
+                        {freeAgentRow ? "View / Update Free Agent" : "Register as Free Agent"}
+                      </button>
+                    ) : (
+                      <Link className="button primary" href="/account/team">
+                        Team Portal
+                      </Link>
+                    )}
+                    {freeAgentRow ? (
+                      <button
+                        className="button ghost"
+                        type="button"
+                        onClick={() => void handleLeaveFreeAgentPortal()}
+                        disabled={portalStatus.type === "loading"}
+                      >
+                        {portalStatus.type === "loading" ? "Leaving..." : "Leave Free Agent Portal"}
+                      </button>
+                    ) : null}
+                  </div>
+
+                  {loadingFreeAgents ? <p className="muted">Loading free agents...</p> : null}
+                  {!loadingFreeAgents && freeAgents.length === 0 ? (
+                    <p className="muted">No free agents are available right now.</p>
+                  ) : null}
+                  {!loadingFreeAgents && freeAgents.length > 0 ? (
+                    <div className="sunday-league-team-board__roster sunday-league-free-agent-portal__grid">
+                      {freeAgents.map((agent) => {
+                        const customFlagAsset = getCountryFlagAsset(agent.country_code);
+                        const cardName = formatFreeAgentCardName(agent.name?.trim() || "Free Agent");
+                        const skillBadge = agent.skill_level ?? "FA";
+                        const positionLabel =
+                          agent.preferred_positions?.trim()
+                          || agent.positions?.[0]
+                          || agent.position_groups[0]
+                          || "Free Agent";
+
+                        return (
+                          <Link
+                            key={agent.id}
+                            id={agent.id === sessionUser.id ? "my-free-agent-card" : undefined}
+                            className="sunday-league-team-board__player-card sunday-league-team-board__player-card--button sunday-league-free-agent-portal__card"
+                            href={`/profiles/${agent.id}`}
+                          >
+                            <div className="sunday-league-team-board__player-avatar-wrap">
+                              <div className="sunday-league-team-board__player-avatar">
+                                <AvatarImage src={agent.avatar_url} alt={agent.name?.trim() || "Free Agent"} objectPosition="center 57%" />
+                              </div>
+                            </div>
+                            <div className="sunday-league-team-board__player-panel">
+                              <div className="sunday-league-team-board__player-identity">
+                                <p className="sunday-league-team-board__player-name">
+                                  <span className="sunday-league-team-board__player-name-line">{cardName.topLine}</span>
+                                  <span className="sunday-league-team-board__player-name-line">{cardName.bottomLine}</span>
+                                </p>
+                                <p className="sunday-league-team-board__player-position">{positionLabel}</p>
+                              </div>
+                              <div className="sunday-league-team-board__player-row">
+                                {customFlagAsset ? (
+                                  <span className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(agent.country_code) ?? undefined}>
+                                    <Image
+                                      src={customFlagAsset.src}
+                                      alt=""
+                                      width={customFlagAsset.width}
+                                      height={customFlagAsset.height}
+                                      className="sunday-league-team-board__player-flag-image"
+                                      style={{ width: "34px", height: "auto" }}
+                                    />
+                                  </span>
+                                ) : countryCodeToFlag(agent.country_code) ? (
+                                  <p className="sunday-league-team-board__player-flag" aria-label={getCountryNameFromCode(agent.country_code) ?? undefined}>
+                                    {countryCodeToFlag(agent.country_code)}
+                                  </p>
+                                ) : (
+                                  <span className="sunday-league-team-board__player-flag sunday-league-team-board__player-flag--empty" aria-hidden />
+                                )}
+                                <p className="sunday-league-team-board__player-number">{skillBadge}</p>
+                                <div className="sunday-league-team-board__player-badge">
+                                  <TeamLogoImage src="/free-agent-placeholder.svg" alt="" fill sizes="42px" />
+                                </div>
+                              </div>
+                              <div className="sunday-league-team-board__player-division">
+                                <p className="sunday-league-team-board__player-division-label">FREE AGENT</p>
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {loadingState === "ready" && !sessionUser && !showFreeAgentForm ? (
+                <div className="sunday-league-panel-box sunday-league-panel-box--compact">
+                  <h3>Free Agent Portal</h3>
+                  <p>Sign in or create an account below to browse the current free agent list.</p>
+                </div>
+              ) : null}
 
               {loadingState === "ready" && isBlocked ? (
                 <div className="sunday-league-panel-box sunday-league-panel-box--compact">
@@ -786,8 +1019,8 @@ export default function SundayLeagueFreeAgentPage() {
                 </div>
               ) : null}
 
-              {loadingState === "ready" && !isBlocked ? (
-                <form className="sunday-league-team-form sunday-league-free-agent-form" onSubmit={handleSubmit}>
+              {loadingState === "ready" && !isBlocked && showFreeAgentForm ? (
+                <form id="free-agent-signup-form" className="sunday-league-team-form sunday-league-free-agent-form" onSubmit={handleSubmit}>
                   <div className="sunday-league-panel-box">
                     <h3>Basic Information</h3>
                     <div className="sunday-league-form-grid">
@@ -1039,6 +1272,13 @@ export default function SundayLeagueFreeAgentPage() {
                     ) : null}
                     <button className="button primary" type="submit" disabled={status.type === "loading"}>
                       {submitLabel}
+                    </button>
+                    <button
+                      className="button ghost"
+                      type="button"
+                      onClick={() => setShowFreeAgentForm(false)}
+                    >
+                      Back to Free Agents
                     </button>
                   </div>
                 </form>
