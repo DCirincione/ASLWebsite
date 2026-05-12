@@ -716,6 +716,8 @@ export default function EventsPage() {
   );
 
   const filteredCollections = useMemo(() => {
+    const pickupEvents = filteredEvents.filter((event) => event.eventTypeKey === "pickup");
+
     const aldrichEvents = filteredEvents.filter(
       (event) => event.host_type === "aldrich" || (!event.host_type && heuristicAldrich(event)),
     );
@@ -731,6 +733,7 @@ export default function EventsPage() {
       aldrichEvents,
       featuredEvents,
       allEvents: filteredEvents,
+      pickupEvents,
     };
   }, [filteredEvents]);
 
@@ -1138,6 +1141,14 @@ export default function EventsPage() {
                     "The full filtered calendar, sorted by date.",
                     filteredCollections.allEvents,
                     "No events match the filters right now.",
+                  )}
+                  {renderResultsSection(
+                    "filtered-pickup-events",
+                    "Open Play",
+                    "Pick Up Events",
+                    "Pickup sessions and open runs that match your filters.",
+                    filteredCollections.pickupEvents,
+                    "No pickup events match the filters right now.",
                   )}
                 </div>
               ) : (

@@ -1491,6 +1491,26 @@ export default function AdminPage() {
     setShowCreateEventForm(true);
   };
 
+  const openCreatePickupSessionForm = () => {
+    const soccerSport = sports.find((sport) => slugifySportValue(sport.title ?? "") === "soccer") ?? null;
+    const pickupSlug = getEventProgramSlugOptions(soccerSport).find((option) => option.value.includes("pickup"))?.value ?? "";
+
+    resetForm();
+    setForm((prev) => ({
+      ...prev,
+      host_type: "aldrich",
+      sport_id: soccerSport?.id ?? "",
+      registration_program_slug: pickupSlug,
+      registration_enabled: true,
+    }));
+    setCreateRegistrationFieldsVisible(false);
+    setFormStatus({
+      type: "idle",
+      message: soccerSport && pickupSlug ? undefined : "Choose Soccer and Pickup before saving this session.",
+    });
+    setShowCreateEventForm(true);
+  };
+
   const openCreateSportForm = () => {
     resetSportForm();
     setSportsStatus({ type: "idle" });
@@ -4320,9 +4340,14 @@ export default function AdminPage() {
                   <p className="muted">Open the event builder when you want to add a new event.</p>
                 </div>
                 {!showCreateEventForm ? (
-                  <button className="button primary" type="button" onClick={openCreateEventForm}>
-                    Create Event
-                  </button>
+                  <div className="cta-row">
+                    <button className="button primary" type="button" onClick={openCreateEventForm}>
+                      Create Event
+                    </button>
+                    <button className="button ghost" type="button" onClick={openCreatePickupSessionForm}>
+                      Create Pickup Session
+                    </button>
+                  </div>
                 ) : null}
               </div>
               {showCreateEventForm ? (
