@@ -4061,37 +4061,6 @@ export default function AdminPage() {
           <div className="event-card__header">
             <h3>{event.title}</h3>
           </div>
-          <div className="event-card__meta">
-            <p className="muted">Host: {event.host_type ?? "Unspecified"}</p>
-            {event.host_type === "partner" ? (
-              <p className="muted">
-                Approval: {formatApprovalStatusLabel(event.approval_status)}
-              </p>
-            ) : null}
-            <p className="muted">Date: {dateLabel(event.start_date, event.end_date)}</p>
-            {event.location ? <p className="muted">Location: {event.location}</p> : null}
-            {event.registration_program_slug ? (
-              <p className="muted">Event type: {event.registration_program_slug}</p>
-            ) : null}
-            {event.sport_id ? (
-              <p className="muted">Sport: {sports.find((sport) => sport.id === event.sport_id)?.title ?? event.sport_id}</p>
-            ) : null}
-            {event.host_type === "partner" && event.created_by_user_id ? (
-              <p className="muted">
-                Partner: {eventOwnerNames[event.created_by_user_id] ?? event.created_by_user_id}
-              </p>
-            ) : null}
-            <p className="muted">
-              Signup mode: {event.signup_mode === "waitlist" ? "Waitlist / interest" : "Registration"}
-            </p>
-            <p className="muted">
-              Signup status: {event.registration_enabled ? "Open" : "Closed"}
-            </p>
-            <p className="muted">
-              Payment: {event.payment_required && event.payment_amount_cents ? `${formatEventPaymentAmount(event.payment_amount_cents)} required` : "No payment"}
-            </p>
-          </div>
-          {event.description ? <p className="muted">{event.description}</p> : null}
           {showPartnerApprovalControls && event.host_type === "partner" ? (
             <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
               <div className="form-control">
