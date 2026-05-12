@@ -484,6 +484,12 @@ const createEmptyAnnouncementForm = (): AnnouncementFormState => ({
   recipientIds: [],
 });
 
+const isPickupEvent = (event: Pick<Event, "registration_program_slug" | "title" | "description">) => {
+  const registrationSlug = event.registration_program_slug?.trim().toLowerCase() ?? "";
+  const combinedText = `${event.title ?? ""} ${event.description ?? ""}`.toLowerCase();
+  return registrationSlug.includes("pickup") || combinedText.includes("pickup");
+};
+
 export default function AdminPage() {
   const [status, setStatus] = useState<AccessStatus>("loading");
   const [activeModule, setActiveModule] = useState<AdminModule>("none");
@@ -3896,9 +3902,11 @@ export default function AdminPage() {
   const flyerByEventId = new Map(
     flyers.filter((flyer) => flyer.event_id).map((flyer) => [flyer.event_id as string, flyer])
   );
-  const partnerRequestEvents = events.filter((event) => event.host_type === "partner" && event.approval_status !== "approved");
-  const existingManageableEvents = events.filter((event) => event.host_type !== "partner" || event.approval_status === "approved");
-  const pendingPartnerRequestCount = partnerRequestEvents.filter((event) => event.approval_status === "pending_approval").length;
+  const partnerEvents = events.filter((event) => event.host_type === "partner");
+  const existingManageableEvents = events.filter((event) => event.host_type !== "partner");
+  const existingRegularEvents = existingManageableEvents.filter((event) => !isPickupEvent(event));
+  const existingPickupEvents = existingManageableEvents.filter(isPickupEvent);
+  const pendingPartnerRequestCount = partnerEvents.filter((event) => event.approval_status === "pending_approval").length;
   const renderCreateFlyerControls = () => (
     <div className="admin-event-flyer-panel">
       <div>
@@ -4760,7 +4768,33 @@ export default function AdminPage() {
                     <p className={`form-help ${flyersStatus.type === "error" ? "error" : "muted"}`}>{flyersStatus.message}</p>
                   ) : null}
                   {!loadingEvents && existingManageableEvents.length === 0 ? <p className="muted">No events found.</p> : null}
-                  {!loadingEvents && existingManageableEvents.length > 0 ? renderAdminEventCards(existingManageableEvents, false) : null}
+                  {!loadingEvents && existingManageableEvents.length > 0 ? (
+                    <div className="admin-events-split-list">
+                      <section>
+                        <div className="account-card__header">
+                          <div>
+                            <h3>Regular Events</h3>
+                            <p className="muted">{existingRegularEvents.length} event{existingRegularEvents.length === 1 ? "" : "s"}</p>
+                          </div>
+                        </div>
+                        {existingRegularEvents.length > 0 ? renderAdminEventCards(existingRegularEvents, false) : (
+                          <p className="muted">No regular events found.</p>
+                        )}
+                      </section>
+
+                      <section>
+                        <div className="account-card__header">
+                          <div>
+                            <h3>Pick Up Sessions</h3>
+                            <p className="muted">{existingPickupEvents.length} session{existingPickupEvents.length === 1 ? "" : "s"}</p>
+                          </div>
+                        </div>
+                        {existingPickupEvents.length > 0 ? renderAdminEventCards(existingPickupEvents, false) : (
+                          <p className="muted">No pickup sessions found.</p>
+                        )}
+                      </section>
+                    </div>
+                  ) : null}
                 </>
               ) : null}
             </section>
@@ -4768,8 +4802,8 @@ export default function AdminPage() {
             <section className="account-card">
               <div className="account-card__header">
                 <div>
-                  <h2>Partner Requests</h2>
-                  <p className="muted">Review new partner submissions separately before they are published.</p>
+                  <h2>Partner Events</h2>
+                  <p className="muted">Review partner event submissions and manage approved partner events separately.</p>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                   {showPartnerRequests ? (
@@ -4790,7 +4824,7 @@ export default function AdminPage() {
                     type="button"
                     onClick={() => setShowPartnerRequests((prev) => !prev)}
                   >
-                    {showPartnerRequests ? "Close Requests" : "Partner Requests"}
+                    {showPartnerRequests ? "Close Partner Events" : "Partner Events"}
                     <span
                       className={`account-card__action-badge${pendingPartnerRequestCount > 0 ? " account-card__action-badge--unread" : ""}`}
                       aria-label={`${pendingPartnerRequestCount} pending partner request${pendingPartnerRequestCount === 1 ? "" : "s"}`}
@@ -4802,12 +4836,12 @@ export default function AdminPage() {
               </div>
               {showPartnerRequests ? (
                 <>
-                  {loadingEvents ? <p className="muted">Loading partner requests...</p> : null}
+                  {loadingEvents ? <p className="muted">Loading partner events...</p> : null}
                   {loadingFlyers ? <p className="muted">Loading event flyers...</p> : null}
                   {eventsError ? <p className="form-help error">{eventsError}</p> : null}
                   {flyersError ? <p className="form-help error">{flyersError}</p> : null}
-                  {!loadingEvents && partnerRequestEvents.length === 0 ? <p className="muted">No partner requests right now.</p> : null}
-                  {!loadingEvents && partnerRequestEvents.length > 0 ? renderAdminEventCards(partnerRequestEvents, true) : null}
+                  {!loadingEvents && partnerEvents.length === 0 ? <p className="muted">No partner events right now.</p> : null}
+                  {!loadingEvents && partnerEvents.length > 0 ? renderAdminEventCards(partnerEvents, true) : null}
                 </>
               ) : null}
             </section>

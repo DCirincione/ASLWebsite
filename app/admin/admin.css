@@ -328,6 +328,21 @@
   font-size: 1rem;
 }
 
+.admin-events-split-list {
+  display: grid;
+  gap: 26px;
+}
+
+.admin-events-split-list > section {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-events-split-list h3 {
+  margin: 0;
+  color: var(--text);
+}
+
 .admin-registration-summary .list__title {
   font-size: 1.02rem;
 }
