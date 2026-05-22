@@ -61,6 +61,7 @@ type FacetOption = {
 };
 
 type DerivedEvent = EventItem & {
+  occurrenceKey: string;
   image?: string;
   sportKey: string;
   sportLabel: string;
@@ -77,6 +78,7 @@ type DerivedEvent = EventItem & {
   startDate: Date | null;
   endDate: Date | null;
   calendarEndDate: Date | null;
+  recurringDates: string[];
   recurringWeekdays: number[];
   searchText: string;
 };
@@ -165,15 +167,37 @@ const deriveRecurringWeekdaysFromText = (event: Pick<EventItem, "title" | "descr
 
 const getCalendarMetadata = (event: Pick<EventItem, "title" | "description" | "time_info" | "end_date" | "registration_schema">) => {
   const recurrence = readEventRecurrence(event.registration_schema);
-  const recurringWeekdays = recurrence?.weekdays.length
+  const recurringDates = recurrence?.mode === "dates" ? recurrence.dates : [];
+  const recurringWeekdays = recurrence?.mode === "weekly" && recurrence.weekdays.length
     ? recurrence.weekdays
     : deriveRecurringWeekdaysFromText(event);
-  const calendarEndDate = parseDateUTC(recurrence?.until ?? event.end_date);
+  const lastRecurringDate = recurringDates.length > 0 ? recurringDates[recurringDates.length - 1] : null;
+  const calendarEndDate = parseDateUTC(recurrence?.mode === "weekly" ? recurrence.until : lastRecurringDate ?? event.end_date);
 
   return {
+    recurringDates,
     recurringWeekdays,
     calendarEndDate,
   };
+};
+
+const getOccurrenceEndDate = (event: Pick<EventItem, "start_date" | "end_date">, occurrenceDate: string) => {
+  const originalStart = parseDateUTC(event.start_date);
+  const originalEnd = parseDateUTC(event.end_date);
+  const nextStart = parseDateUTC(occurrenceDate);
+
+  if (!originalStart || !originalEnd || !nextStart || originalEnd.getTime() < originalStart.getTime()) {
+    return event.end_date && event.end_date !== event.start_date ? occurrenceDate : event.end_date ?? null;
+  }
+
+  const durationDays = Math.max(0, Math.round((originalEnd.getTime() - originalStart.getTime()) / DAY_IN_MS));
+  if (durationDays === 0) {
+    return event.end_date ? occurrenceDate : null;
+  }
+
+  const nextEnd = new Date(nextStart.getTime());
+  nextEnd.setUTCDate(nextEnd.getUTCDate() + durationDays);
+  return nextEnd.toISOString().slice(0, 10);
 };
 
 const formatDateRange = (start?: string | null, end?: string | null) => {
@@ -419,6 +443,10 @@ const eventOccursOnDay = (event: DerivedEvent, day: Date) => {
   const startTime = startDate.getTime();
   const endTime = endDate.getTime();
 
+  if (event.recurringDates.length > 0) {
+    return event.recurringDates.includes(day.toISOString().slice(0, 10));
+  }
+
   if (event.recurringWeekdays.length > 0) {
     return (
       dayTime >= startTime &&
@@ -519,7 +547,7 @@ export default function EventsPage() {
 
   const derivedEvents = useMemo<DerivedEvent[]>(() => {
     return events
-      .map((event) => {
+      .flatMap((event) => {
         const sportLabel = resolveSportLabel(event, sportsById);
         const sportKey = slugifyFilterValue(sportLabel);
         const eventType = resolveEventType(event);
@@ -529,40 +557,52 @@ export default function EventsPage() {
         const skillLabels = resolveSkillLabels(event);
         const price = resolvePrice(event);
         const calendarMetadata = getCalendarMetadata(event);
+        const occurrenceDates = calendarMetadata.recurringDates.length > 0
+          ? calendarMetadata.recurringDates
+          : [event.start_date ?? ""];
 
-        return {
-          ...event,
-          image: event.image_url || undefined,
-          sportKey,
-          sportLabel,
-          eventTypeKey: eventType.key,
-          eventTypeLabel: eventType.label,
-          locationKey,
-          locationLabel,
-          ageLabels,
-          ageKeys: ageLabels.map(slugifyFilterValue),
-          skillLabels,
-          skillKeys: skillLabels.map(slugifyFilterValue),
-          priceKey: price.key,
-          priceLabel: price.label,
-          startDate: parseDateUTC(event.start_date),
-          endDate: parseDateUTC(event.end_date),
-          calendarEndDate: calendarMetadata.calendarEndDate,
-          recurringWeekdays: calendarMetadata.recurringWeekdays,
-          searchText: [
-            event.title,
-            event.description,
-            event.location,
+        return occurrenceDates.map((occurrenceDate, index) => {
+          const startDateValue = occurrenceDate || event.start_date || null;
+          const endDateValue = occurrenceDate ? getOccurrenceEndDate(event, occurrenceDate) : event.end_date ?? null;
+
+          return {
+            ...event,
+            start_date: startDateValue,
+            end_date: endDateValue,
+            occurrenceKey: occurrenceDate ? `${event.id}-${occurrenceDate}` : `${event.id}-${index}`,
+            image: event.image_url || undefined,
+            sportKey,
             sportLabel,
-            eventType.label,
-            ...ageLabels,
-            ...skillLabels,
-            price.label,
-          ]
-            .filter(Boolean)
-            .join(" ")
-            .toLowerCase(),
-        };
+            eventTypeKey: eventType.key,
+            eventTypeLabel: eventType.label,
+            locationKey,
+            locationLabel,
+            ageLabels,
+            ageKeys: ageLabels.map(slugifyFilterValue),
+            skillLabels,
+            skillKeys: skillLabels.map(slugifyFilterValue),
+            priceKey: price.key,
+            priceLabel: price.label,
+            startDate: parseDateUTC(startDateValue),
+            endDate: parseDateUTC(endDateValue),
+            calendarEndDate: calendarMetadata.recurringDates.length > 0 ? parseDateUTC(endDateValue ?? startDateValue) : calendarMetadata.calendarEndDate,
+            recurringDates: calendarMetadata.recurringDates.length > 0 ? [] : calendarMetadata.recurringDates,
+            recurringWeekdays: calendarMetadata.recurringDates.length > 0 ? [] : calendarMetadata.recurringWeekdays,
+            searchText: [
+              event.title,
+              event.description,
+              event.location,
+              sportLabel,
+              eventType.label,
+              ...ageLabels,
+              ...skillLabels,
+              price.label,
+            ]
+              .filter(Boolean)
+              .join(" ")
+              .toLowerCase(),
+          };
+        });
       })
       .sort(sortByStartDate);
   }, [events, sportsById]);
@@ -866,7 +906,7 @@ export default function EventsPage() {
     const isSundayLeague = isRegularAslSundayLeagueEvent(event);
 
     return (
-      <article key={event.id} className="event-card event-card--full">
+      <article key={event.occurrenceKey} className="event-card event-card--full">
         <div
           className="event-card__image event-card__image--interactive"
           style={{
@@ -1213,7 +1253,7 @@ export default function EventsPage() {
                           <div className={styles.eventsCalendarEvents}>
                             {cell.events.slice(0, 3).map((event) => (
                               <button
-                                key={`${cell.key}-${event.id}`}
+                                key={`${cell.key}-${event.occurrenceKey}`}
                                 className={styles.eventsCalendarEvent}
                                 type="button"
                                 onClick={() => openEventDetails(event)}
@@ -1248,7 +1288,7 @@ export default function EventsPage() {
                         <div className={styles.eventsCalendarMobileEvents}>
                           {cell.events.map((event) => (
                             <button
-                              key={`mobile-${cell.key}-${event.id}`}
+                              key={`mobile-${cell.key}-${event.occurrenceKey}`}
                               className={styles.eventsCalendarMobileEvent}
                               type="button"
                               onClick={() => openEventDetails(event)}

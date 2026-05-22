@@ -17,6 +17,11 @@ import {
 } from "@/lib/aldrich-communications";
 import { canAccessAdminDashboard, formatApprovalStatusLabel } from "@/lib/event-approval";
 import { createId } from "@/lib/create-id";
+import {
+  parseEventRecurrenceInput,
+  readEventRecurrence,
+  type EventRecurrenceMode,
+} from "@/lib/event-recurrence";
 import { formatEventPaymentAmount } from "@/lib/event-payments";
 import type { SignupMode } from "@/lib/event-signups";
 import { DEFAULT_HOME_BANNER_TEXT, HOME_BANNER_PAGE_OPTIONS, type HomeBannerButtonTarget } from "@/lib/home-banner";
@@ -91,6 +96,9 @@ type EventFormState = {
   show_public_signups: boolean;
   require_waiver: boolean;
   registration_fields: RegistrationFieldEditor[];
+  recurrence_mode: EventRecurrenceMode;
+  recurrence_dates: string[];
+  recurrence_date_input: string;
 };
 type SportGender = NonNullable<Sport["gender"]>;
 type SportFormState = {
@@ -392,8 +400,9 @@ const createEmptyRegistrationField = (): RegistrationFieldEditor => ({
   expanded: false,
 });
 
-const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick<EventFormState, "show_public_signups" | "require_waiver" | "registration_fields"> => {
+const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick<EventFormState, "show_public_signups" | "require_waiver" | "registration_fields" | "recurrence_mode" | "recurrence_dates" | "recurrence_date_input"> => {
   const schema = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+  const recurrence = readEventRecurrence(value);
   const rawFields = Array.isArray(schema?.fields) ? schema.fields : Array.isArray(value) ? value : [];
   const registrationFields = rawFields.flatMap((entry) => {
     if (!entry || typeof entry !== "object") return [];
@@ -414,6 +423,9 @@ const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick
     show_public_signups: schema?.show_public_signups !== false,
     require_waiver: Boolean(schema?.require_waiver),
     registration_fields: registrationFields,
+    recurrence_mode: recurrence?.mode === "dates" ? "dates" : "none",
+    recurrence_dates: recurrence?.mode === "dates" ? recurrence.dates : [],
+    recurrence_date_input: "",
   };
 };
 
@@ -437,13 +449,20 @@ const buildRegistrationSchema = (formState: EventFormState) => {
     })
     .filter(Boolean);
 
-  if (formState.show_public_signups && !formState.require_waiver && fields.length === 0) {
+  const recurrenceInput = parseEventRecurrenceInput({
+    mode: formState.recurrence_mode,
+    dates: formState.recurrence_dates,
+  });
+  const recurrence = "recurrence" in recurrenceInput ? recurrenceInput.recurrence : null;
+
+  if (formState.show_public_signups && !formState.require_waiver && fields.length === 0 && !recurrence) {
     return null;
   }
 
   return {
     show_public_signups: formState.show_public_signups,
     require_waiver: formState.require_waiver,
+    recurrence,
     fields,
   };
 };
@@ -672,6 +691,9 @@ export default function AdminPage() {
     show_public_signups: true,
     require_waiver: false,
     registration_fields: [],
+    recurrence_mode: "none",
+    recurrence_dates: [],
+    recurrence_date_input: "",
   });
   const [editForm, setEditForm] = useState<EventFormState>({
     title: "",
@@ -693,6 +715,9 @@ export default function AdminPage() {
     show_public_signups: true,
     require_waiver: false,
     registration_fields: [],
+    recurrence_mode: "none",
+    recurrence_dates: [],
+    recurrence_date_input: "",
   });
   const [sportForm, setSportForm] = useState<SportFormState>(createEmptySportForm());
   const [editSportForm, setEditSportForm] = useState<SportFormState>(createEmptySportForm());
@@ -1476,6 +1501,9 @@ export default function AdminPage() {
       show_public_signups: true,
       require_waiver: false,
       registration_fields: [],
+      recurrence_mode: "none",
+      recurrence_dates: [],
+      recurrence_date_input: "",
     });
     setCreateFlyerFile(null);
     setCreateFlyerDetails("");
@@ -1575,8 +1603,47 @@ export default function AdminPage() {
       show_public_signups: registrationState.show_public_signups,
       require_waiver: registrationState.require_waiver,
       registration_fields: registrationState.registration_fields,
+      recurrence_mode: registrationState.recurrence_mode,
+      recurrence_dates: registrationState.recurrence_dates,
+      recurrence_date_input: "",
     });
     setFormStatus({ type: "idle" });
+  };
+
+  const copyEventToCreateForm = (event: Event) => {
+    const registrationState = parseRegistrationSchemaState(event.registration_schema);
+    setEditingId(null);
+    setCreateRegistrationFieldsVisible(false);
+    setForm({
+      title: event.title ?? "",
+      start_date: event.start_date ?? "",
+      end_date: event.end_date ?? "",
+      time_info: event.time_info ?? "",
+      location: event.location ?? "",
+      description: event.description ?? "",
+      host_type: event.host_type ?? "aldrich",
+      image_url: event.image_url ?? "",
+      signup_mode: event.signup_mode === "waitlist" ? "waitlist" : "registration",
+      registration_program_slug: event.registration_program_slug ?? "",
+      sport_id: event.sport_id ?? "",
+      registration_enabled: Boolean(event.registration_enabled),
+      waiver_url: event.waiver_url ?? "",
+      registration_limit: event.registration_limit?.toString() ?? "",
+      payment_required: Boolean(event.payment_required),
+      payment_amount: event.payment_amount_cents ? (event.payment_amount_cents / 100).toFixed(2) : "",
+      show_public_signups: registrationState.show_public_signups,
+      require_waiver: registrationState.require_waiver,
+      registration_fields: registrationState.registration_fields.map((field) => ({
+        ...field,
+        id: createId(),
+        expanded: false,
+      })),
+      recurrence_mode: "none",
+      recurrence_dates: [],
+      recurrence_date_input: "",
+    });
+    setFormStatus({ type: "idle", message: "Copied event info. Change the date and save it as a new event." });
+    setShowCreateEventForm(true);
   };
 
   const startEditingSport = (sport: Sport) => {
@@ -1615,6 +1682,38 @@ export default function AdminPage() {
 
   const updateEdit = <K extends keyof EventFormState>(key: K, value: EventFormState[K]) => {
     setEditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const addRecurrenceDate = (target: "create" | "edit") => {
+    const apply = (prev: EventFormState) => {
+      const nextDate = prev.recurrence_date_input.trim();
+      if (!nextDate) return prev;
+      return {
+        ...prev,
+        recurrence_mode: "dates" as const,
+        recurrence_dates: Array.from(new Set([...prev.recurrence_dates, nextDate])).sort(),
+        recurrence_date_input: "",
+      };
+    };
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+    setEditForm(apply);
+  };
+
+  const removeRecurrenceDate = (target: "create" | "edit", date: string) => {
+    const apply = (prev: EventFormState) => ({
+      ...prev,
+      recurrence_dates: prev.recurrence_dates.filter((entry) => entry !== date),
+    });
+
+    if (target === "create") {
+      setForm(apply);
+      return;
+    }
+    setEditForm(apply);
   };
 
   const updateEditSportId = (sportId: string) => {
@@ -1912,6 +2011,65 @@ export default function AdminPage() {
     );
   };
 
+  const renderRecurrenceControls = (target: "create" | "edit", state: EventFormState) => {
+    const updateTarget = target === "create" ? update : updateEdit;
+
+    return (
+      <div className="account-card" style={{ display: "grid", gap: 12 }}>
+        <div>
+          <h3 style={{ margin: 0 }}>Recurring Dates</h3>
+          <p className="muted" style={{ margin: "4px 0 0" }}>
+            Add every date this pickup session should appear on. The time, location, signup settings, and form fields stay the same.
+          </p>
+        </div>
+        <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+          <label className="checkbox-label">
+            <input
+              type="checkbox"
+              checked={state.recurrence_mode === "dates"}
+              onChange={(e) => updateTarget("recurrence_mode", e.target.checked ? "dates" : "none")}
+            />
+            <span>Use exact repeat dates</span>
+          </label>
+        </div>
+        {state.recurrence_mode === "dates" ? (
+          <>
+            <div className="form-control">
+              <label htmlFor={`${target}-recurrence-date`}>Add date</label>
+              <input
+                id={`${target}-recurrence-date`}
+                type="date"
+                value={state.recurrence_date_input}
+                onChange={(e) => updateTarget("recurrence_date_input", e.target.value)}
+              />
+            </div>
+            <div className="cta-row">
+              <button className="button ghost" type="button" onClick={() => addRecurrenceDate(target)}>
+                Add Date
+              </button>
+            </div>
+            {state.recurrence_dates.length > 0 ? (
+              <div className="list">
+                {state.recurrence_dates.map((date) => (
+                  <div key={date} className="team-card">
+                    <div className="team-card__info">
+                      <p className="list__title">{date}</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => removeRecurrenceDate(target, date)}>
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="muted">No repeat dates added yet.</p>
+            )}
+          </>
+        ) : null}
+      </div>
+    );
+  };
+
   const updateSundayLeagueSignupField = (
     fieldId: string,
     key: keyof SundayLeagueSignupFieldEditor,
@@ -2166,6 +2324,14 @@ export default function AdminPage() {
       setFormStatus({ type: "error", message: "Enter a payment amount greater than $0.00 when payment is required." });
       return;
     }
+    const recurrenceInput = parseEventRecurrenceInput({
+      mode: form.recurrence_mode,
+      dates: form.recurrence_dates,
+    });
+    if ("error" in recurrenceInput) {
+      setFormStatus({ type: "error", message: recurrenceInput.error });
+      return;
+    }
 
     setFormStatus({ type: "loading" });
     const registrationSchema = buildRegistrationSchema({
@@ -2300,6 +2466,14 @@ export default function AdminPage() {
     const paymentAmountCents = Math.round(paymentAmountValue * 100);
     if (!isWaitlist && editForm.payment_required && (!Number.isFinite(paymentAmountValue) || paymentAmountCents <= 0)) {
       setFormStatus({ type: "error", message: "Enter a payment amount greater than $0.00 when payment is required." });
+      return;
+    }
+    const recurrenceInput = parseEventRecurrenceInput({
+      mode: editForm.recurrence_mode,
+      dates: editForm.recurrence_dates,
+    });
+    if ("error" in recurrenceInput) {
+      setFormStatus({ type: "error", message: recurrenceInput.error });
       return;
     }
 
@@ -4117,6 +4291,13 @@ export default function AdminPage() {
             <button
               className="button ghost"
               type="button"
+              onClick={() => copyEventToCreateForm(event)}
+            >
+              {isPickupEvent(event) ? "Copy Session" : "Copy Event"}
+            </button>
+            <button
+              className="button ghost"
+              type="button"
               onClick={() => void handleDeleteEvent(event.id, event.title)}
               disabled={deletingId === event.id}
             >
@@ -4316,6 +4497,7 @@ export default function AdminPage() {
               {editForm.signup_mode === "waitlist" ? (
                 <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
               ) : null}
+              {renderRecurrenceControls("edit", editForm)}
               {renderRegistrationBuilder("edit", editForm)}
               {renderEventFlyerControls(event)}
               <div className="cta-row">
@@ -4712,6 +4894,7 @@ export default function AdminPage() {
                   {form.signup_mode === "waitlist" ? (
                     <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
                   ) : null}
+                  {renderRecurrenceControls("create", form)}
                   {renderRegistrationBuilder("create", form)}
                   {renderCreateFlyerControls()}
                   <div className="cta-row">

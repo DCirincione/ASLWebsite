@@ -13,15 +13,24 @@ export const WEEKDAY_OPTIONS = [
 
 export const MAX_RECURRING_OCCURRENCES = 120;
 
-export type EventRecurrenceMode = "none" | "weekly";
+export type EventRecurrenceMode = "none" | "dates" | "weekly";
 
-export type EventRecurrenceRule = {
-  mode: "weekly";
-  weekdays: number[];
-  until: string;
-};
+export type EventRecurrenceRule =
+  | {
+      mode: "dates";
+      dates: string[];
+    }
+  | {
+      mode: "weekly";
+      weekdays: number[];
+      until: string;
+    };
 
-export type EventRecurrenceMetadata = EventRecurrenceRule & {
+export type EventRecurrenceMetadata = {
+  mode: EventRecurrenceRule["mode"];
+  dates?: string[];
+  weekdays?: number[];
+  until?: string;
   series_id: string;
   template_start_date: string;
   template_end_date: string | null;
@@ -37,6 +46,7 @@ type RegistrationSchemaWithRecurrence = {
 
 type RecurrenceInput = {
   mode?: unknown;
+  dates?: unknown;
   weekdays?: unknown;
   until?: unknown;
 };
@@ -72,6 +82,12 @@ export const formatWeekdayList = (weekdays: number[], format: "short" | "long" =
     .join(", ");
 
 export const formatRecurrenceSummary = (recurrence: EventRecurrenceRule) => {
+  if (recurrence.mode === "dates") {
+    return recurrence.dates.length === 1
+      ? `Repeats on ${recurrence.dates[0]}`
+      : `Repeats on ${recurrence.dates.length} dates`;
+  }
+
   const days = formatWeekdayList(recurrence.weekdays);
   return days ? `Every ${days} until ${recurrence.until}` : `Repeats until ${recurrence.until}`;
 };
@@ -89,12 +105,39 @@ export const normalizeWeekdays = (value: unknown) => {
   ).sort((a, b) => a - b);
 };
 
+export const normalizeExactDates = (value: unknown) => {
+  if (!Array.isArray(value)) return [];
+
+  return Array.from(
+    new Set(
+      value.flatMap((entry) => {
+        const dateValue = typeof entry === "string" ? entry.trim() : "";
+        return parseDateOnlyUTC(dateValue) ? [dateValue] : [];
+      }),
+    ),
+  ).sort();
+};
+
 export const parseEventRecurrenceInput = (value: unknown) => {
   const input = (isRecord(value) ? value : {}) as RecurrenceInput;
-  const mode = input.mode === "weekly" ? "weekly" : "none";
+  const mode = input.mode === "dates" || input.mode === "weekly" ? input.mode : "none";
 
   if (mode === "none") {
     return { recurrence: null as EventRecurrenceRule | null };
+  }
+
+  if (mode === "dates") {
+    const dates = normalizeExactDates(input.dates);
+    if (dates.length === 0) {
+      return { error: "Choose at least one recurring date." };
+    }
+
+    return {
+      recurrence: {
+        mode,
+        dates,
+      },
+    };
   }
 
   const weekdays = normalizeWeekdays(input.weekdays);
@@ -121,11 +164,21 @@ export const readEventRecurrence = (schema: JsonValue | null | undefined) => {
   const recurrenceValue = schemaObject?.recurrence;
   if (!isRecord(recurrenceValue)) return null;
 
-  const mode = recurrenceValue.mode === "weekly" ? "weekly" : null;
+  const mode = recurrenceValue.mode === "dates" || recurrenceValue.mode === "weekly" ? recurrenceValue.mode : null;
+  if (mode === "dates") {
+    const dates = normalizeExactDates(recurrenceValue.dates);
+    if (!dates.length) return null;
+
+    return {
+      mode,
+      dates,
+    } satisfies EventRecurrenceRule;
+  }
+
   const until = typeof recurrenceValue.until === "string" ? recurrenceValue.until.trim() : "";
   const weekdays = normalizeWeekdays(recurrenceValue.weekdays);
 
-  if (!mode || !weekdays.length || !parseDateOnlyUTC(until)) {
+  if (mode !== "weekly" || !weekdays.length || !parseDateOnlyUTC(until)) {
     return null;
   }
 
@@ -165,6 +218,30 @@ export const buildRecurringDatePairs = (
   const startDate = parseDateOnlyUTC(startDateValue);
   if (!startDate) {
     return { error: "Choose a start date before creating a recurring event." };
+  }
+
+  if (recurrence.mode === "dates") {
+    const dates = normalizeExactDates(recurrence.dates);
+    if (dates.length === 0) {
+      return { error: "Choose at least one recurring date." };
+    }
+    if (dates.length > MAX_RECURRING_OCCURRENCES) {
+      return {
+        error: `Recurring events can create up to ${MAX_RECURRING_OCCURRENCES} dates at one time. Remove a few dates and try again.`,
+      };
+    }
+
+    const endDate = parseDateOnlyUTC(endDateValue);
+    const durationDays = endDate && endDate.getTime() >= startDate.getTime() ? diffDaysUTC(startDate, endDate) : 0;
+    return {
+      occurrences: dates.map((date) => {
+        const dateValue = parseDateOnlyUTC(date) ?? startDate;
+        return {
+          start_date: date,
+          end_date: durationDays > 0 ? formatDateOnlyUTC(addDaysUTC(dateValue, durationDays)) : endDateValue ? date : null,
+        };
+      }),
+    };
   }
 
   const untilDate = parseDateOnlyUTC(recurrence.until);
@@ -212,8 +289,9 @@ export const buildRecurrenceMetadata = (
   seriesId = createId()
 ): EventRecurrenceMetadata => ({
   mode: recurrence.mode,
-  weekdays: recurrence.weekdays,
-  until: recurrence.until,
+  ...(recurrence.mode === "dates"
+    ? { dates: recurrence.dates }
+    : { weekdays: recurrence.weekdays, until: recurrence.until }),
   series_id: seriesId,
   template_start_date: templateStartDate,
   template_end_date: templateEndDate ?? null,
