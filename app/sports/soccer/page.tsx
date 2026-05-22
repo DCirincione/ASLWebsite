@@ -13,7 +13,12 @@ import { Section } from "@/components/section";
 import { SportEventCard } from "@/components/sport-event-card";
 import { filterVisiblePublicEvents } from "@/lib/event-approval";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
-import { attachPublicEventSignupCounts, formatEventSignupLabel, type PublicEventSignupStats } from "@/lib/public-event-signups";
+import {
+  attachPublicEventSignupCounts,
+  formatEventSignupLabel,
+  shouldShowPublicEventSignups,
+  type PublicEventSignupStats,
+} from "@/lib/public-event-signups";
 import { sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
@@ -50,7 +55,7 @@ export default function SoccerPage() {
       const [{ data, error }, { data: sportsData, error: sportsError }] = await Promise.all([
         supabase
           .from("events")
-          .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled,registration_limit")
+          .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled,registration_limit,registration_schema")
           .order("start_date", { ascending: true, nullsFirst: false }),
         supabase.from("sports").select("id,title").order("title", { ascending: true }),
       ]);
@@ -140,7 +145,7 @@ export default function SoccerPage() {
               image={item.image}
               dateLabel={primaryTimeLabel(item)}
               location={item.location}
-              signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit, item.signup_unit)}
+              signupLabel={shouldShowPublicEventSignups(item) ? formatEventSignupLabel(item.signup_count, item.registration_limit, item.signup_unit) : null}
               description={item.description}
               onOpen={isSundayLeague ? undefined : () => setDetailEvent(item)}
               actions={
@@ -290,7 +295,7 @@ export default function SoccerPage() {
                   image={ev.image}
                   dateLabel={primaryTimeLabel(ev)}
                   location={ev.location}
-                  signupLabel={formatEventSignupLabel(ev.signup_count, ev.registration_limit, ev.signup_unit)}
+                  signupLabel={shouldShowPublicEventSignups(ev) ? formatEventSignupLabel(ev.signup_count, ev.registration_limit, ev.signup_unit) : null}
                   description={ev.description}
                   onOpen={isSundayLeague ? undefined : () => setDetailEvent(ev)}
                   actions={

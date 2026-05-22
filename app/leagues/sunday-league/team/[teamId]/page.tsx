@@ -18,7 +18,7 @@ import {
 } from "@/lib/aldrich-communications";
 import { countryCodeToFlag, getCountryFlagAsset, getCountryNameFromCode } from "@/lib/countries";
 import { createId } from "@/lib/create-id";
-import { formatSundayLeaguePlayerName, getSundayLeagueColor, getSundayLeagueDivisionLogoSrc, type SundayLeagueDivision } from "@/lib/sunday-league";
+import { formatSundayLeaguePlayerName, getSundayLeagueColor } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
 import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
@@ -130,7 +130,7 @@ const buildTeamHistory = (team: SundayLeagueTeam | null) => {
   if (!team) return [];
 
   return [
-    `${team.division ?? "Division placement pending"} reserved for the upcoming season`,
+    "Sunday League spot reserved for the upcoming season",
     team.deposit_status
      === "paid" ? "Deposit received and team spot confirmed" : "Deposit pending before final approval",
     "Club history will expand after the first official league match",
@@ -1144,16 +1144,6 @@ export default function SundayLeagueTeamPortalPage() {
                                 <div className="sunday-league-team-board__player-badge">
                                   <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="42px" />
                                 </div>
-                              </div>
-                              <div className="sunday-league-team-board__player-division">
-                                <Image
-                                  src={getSundayLeagueDivisionLogoSrc(team.division as SundayLeagueDivision)}
-                                  alt={`Division ${team.division}`}
-                                  width={3141}
-                                  height={949}
-                                  className="sunday-league-team-board__player-division-image"
-                                  style={{ width: "144px", height: "auto" }}
-                                />
                               </div>
                             </div>
                           </>

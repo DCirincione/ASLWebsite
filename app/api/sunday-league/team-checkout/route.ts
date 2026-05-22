@@ -13,7 +13,7 @@ import {
   sanitizeUploadedFileMap,
   validateSundayLeagueCheckoutInput,
 } from "@/lib/sunday-league-team-checkout";
-import { getNextOpenSundayLeagueSlot, SUNDAY_LEAGUE_SLOT_COUNT } from "@/lib/sunday-league";
+import { SUNDAY_LEAGUE_DEFAULT_DIVISION, SUNDAY_LEAGUE_SLOT_COUNT } from "@/lib/sunday-league";
 import type {
   SundayLeagueTeam,
   SundayLeagueTeamCheckoutDraft,
@@ -203,33 +203,27 @@ export async function POST(req: NextRequest) {
     const [{ data: teamsData }, { data: draftsData }] = await Promise.all([
       serviceClient
         .from("sunday_league_teams")
-        .select("division,slot_number")
-        .eq("division", body.division),
+        .select("division,slot_number"),
       serviceClient
         .from("sunday_league_team_checkout_drafts")
         .select("division,slot_number")
-        .eq("division", body.division)
         .in("status", ["pending", "paid"]),
     ]);
 
     const occupiedSlots = [
       ...((teamsData ?? []) as Array<Pick<SundayLeagueTeam, "division" | "slot_number">>),
       ...((draftsData ?? []) as Array<Pick<SundayLeagueTeamCheckoutDraft, "division" | "slot_number">>),
-    ].map((entry) => ({
-      id: `${entry.division}-${entry.slot_number}`,
-      division: entry.division,
-      slot_number: entry.slot_number,
-    })) as SundayLeagueTeam[];
+    ];
 
-    const slotNumber = getNextOpenSundayLeagueSlot(occupiedSlots, body.division, SUNDAY_LEAGUE_SLOT_COUNT);
-    if (!slotNumber) {
-      return NextResponse.json({ error: `Division ${body.division} is currently full.` }, { status: 409 });
+    const slotNumber = occupiedSlots.length + 1;
+    if (slotNumber > SUNDAY_LEAGUE_SLOT_COUNT) {
+      return NextResponse.json({ error: "Sunday League is currently full." }, { status: 409 });
     }
 
     const teamPayload = buildSundayLeagueTeamCheckoutPayload({
       signupForm,
       userId,
-      division: body.division,
+      division: SUNDAY_LEAGUE_DEFAULT_DIVISION,
       slotNumber,
       values,
       uploadedFiles,
@@ -239,7 +233,7 @@ export async function POST(req: NextRequest) {
       .from("sunday_league_team_checkout_drafts")
       .insert({
         user_id: userId,
-        division: body.division,
+        division: SUNDAY_LEAGUE_DEFAULT_DIVISION,
         slot_number: slotNumber,
         status: "pending",
         amount_cents: sundayLeagueSettings.depositAmountCents,
@@ -251,7 +245,7 @@ export async function POST(req: NextRequest) {
 
     if (insertError || !insertedDraft) {
       const message = insertError?.message?.includes("duplicate")
-        ? `Division ${body.division} just had another team reserve that slot. Try again.`
+        ? "Another team just reserved that slot. Try again."
         : insertError?.message ?? "Could not start the team checkout.";
       return NextResponse.json({ error: message }, { status: 409 });
     }
@@ -265,7 +259,7 @@ export async function POST(req: NextRequest) {
       const squareResponse = await createSquarePaymentLink({
         idempotency_key: draft.id,
         quick_pay: {
-          name: `ASL Sunday League Division ${body.division} Deposit - ${teamPayload.team_name}`,
+          name: `ASL Sunday League Deposit - ${teamPayload.team_name}`,
           price_money: {
             amount: sundayLeagueSettings.depositAmountCents,
             currency: SUNDAY_LEAGUE_DEPOSIT_CURRENCY,

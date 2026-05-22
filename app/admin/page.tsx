@@ -88,6 +88,7 @@ type EventFormState = {
   registration_limit: string;
   payment_required: boolean;
   payment_amount: string;
+  show_public_signups: boolean;
   require_waiver: boolean;
   registration_fields: RegistrationFieldEditor[];
 };
@@ -320,7 +321,7 @@ const buildSundayLeagueRegistrationAnswers = (
   const agreements = getJsonRecord((teamPayload?.agreements as JsonValue | undefined) ?? team.agreements ?? null);
   const customFields = getJsonRecord((agreements?.custom_fields as JsonValue | undefined) ?? null);
 
-  appendSundayLeagueAnswer(answers, "Division", `Division ${team.division}`);
+  appendSundayLeagueAnswer(answers, "Conference", "Sunday League");
   appendSundayLeagueAnswer(answers, "Slot Number", team.slot_number);
   appendSundayLeagueAnswer(answers, "Team Name", team.team_name);
   appendSundayLeagueAnswer(answers, "Captain Name", team.captain_name);
@@ -391,7 +392,7 @@ const createEmptyRegistrationField = (): RegistrationFieldEditor => ({
   expanded: false,
 });
 
-const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick<EventFormState, "require_waiver" | "registration_fields"> => {
+const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick<EventFormState, "show_public_signups" | "require_waiver" | "registration_fields"> => {
   const schema = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
   const rawFields = Array.isArray(schema?.fields) ? schema.fields : Array.isArray(value) ? value : [];
   const registrationFields = rawFields.flatMap((entry) => {
@@ -410,6 +411,7 @@ const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick
   });
 
   return {
+    show_public_signups: schema?.show_public_signups !== false,
     require_waiver: Boolean(schema?.require_waiver),
     registration_fields: registrationFields,
   };
@@ -435,11 +437,12 @@ const buildRegistrationSchema = (formState: EventFormState) => {
     })
     .filter(Boolean);
 
-  if (!formState.require_waiver && fields.length === 0) {
+  if (formState.show_public_signups && !formState.require_waiver && fields.length === 0) {
     return null;
   }
 
   return {
+    show_public_signups: formState.show_public_signups,
     require_waiver: formState.require_waiver,
     fields,
   };
@@ -666,6 +669,7 @@ export default function AdminPage() {
     registration_limit: "",
     payment_required: false,
     payment_amount: "",
+    show_public_signups: true,
     require_waiver: false,
     registration_fields: [],
   });
@@ -686,6 +690,7 @@ export default function AdminPage() {
     registration_limit: "",
     payment_required: false,
     payment_amount: "",
+    show_public_signups: true,
     require_waiver: false,
     registration_fields: [],
   });
@@ -1307,8 +1312,8 @@ export default function AdminPage() {
         answers: buildSundayLeagueRegistrationAnswers(team, teamPayload),
         attachments: collectSundayLeagueAttachments(team, teamPayload),
         waiver_accepted: false,
-        event_id: `sunday-league-division-${team.division}`,
-        event_title: `Sunday League Division ${team.division}`,
+        event_id: "sunday-league",
+        event_title: "Sunday League",
         signup_mode: "registration",
         paid_amount_cents: checkoutDraft?.amount_cents ?? (team.deposit_status === "paid" ? sundayLeagueDepositAmountCents : null),
         type_label: "Sunday League Team",
@@ -1468,6 +1473,7 @@ export default function AdminPage() {
       registration_limit: "",
       payment_required: false,
       payment_amount: "",
+      show_public_signups: true,
       require_waiver: false,
       registration_fields: [],
     });
@@ -1566,6 +1572,7 @@ export default function AdminPage() {
       registration_limit: event.registration_limit?.toString() ?? "",
       payment_required: Boolean(event.payment_required),
       payment_amount: event.payment_amount_cents ? (event.payment_amount_cents / 100).toFixed(2) : "",
+      show_public_signups: registrationState.show_public_signups,
       require_waiver: registrationState.require_waiver,
       registration_fields: registrationState.registration_fields,
     });
@@ -2067,7 +2074,7 @@ export default function AdminPage() {
                         value={field.optionsText}
                         onChange={(e) => updateSundayLeagueSignupField(field.id, "optionsText", e.target.value)}
                         rows={4}
-                        placeholder={"Division 1\nDivision 2"}
+                        placeholder={"Option 1\nOption 2"}
                       />
                       <p className="form-help muted">One option per line.</p>
                     </div>
@@ -4289,6 +4296,16 @@ export default function AdminPage() {
                 <label className="checkbox-label">
                   <input
                     type="checkbox"
+                    checked={editForm.show_public_signups}
+                    onChange={(e) => updateEdit("show_public_signups", e.target.checked)}
+                  />
+                  <span>Show signup count and who signed up publicly</span>
+                </label>
+              </div>
+              <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+                <label className="checkbox-label">
+                  <input
+                    type="checkbox"
                     checked={editForm.payment_required}
                     onChange={(e) => updateEdit("payment_required", e.target.checked)}
                     disabled={editForm.signup_mode === "waitlist"}
@@ -4668,7 +4685,17 @@ export default function AdminPage() {
                         checked={form.registration_enabled}
                         onChange={(e) => update("registration_enabled", e.target.checked)}
                       />
-                      <span>Accept signups</span>
+                  <span>Accept signups</span>
+                </label>
+              </div>
+                  <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+                    <label className="checkbox-label">
+                      <input
+                        type="checkbox"
+                        checked={form.show_public_signups}
+                        onChange={(e) => update("show_public_signups", e.target.checked)}
+                      />
+                      <span>Show signup count and who signed up publicly</span>
                     </label>
                   </div>
                   <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>

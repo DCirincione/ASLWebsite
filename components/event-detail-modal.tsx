@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
+import { shouldShowPublicEventSignups } from "@/lib/public-event-signups";
 import { isRegularAslSundayLeagueEvent } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
 import type { JsonValue } from "@/lib/supabase/types";
@@ -21,6 +22,7 @@ type EventDetail = {
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
   registration_enabled?: boolean | null;
+  registration_schema?: JsonValue | null;
   image?: string | null;
 };
 
@@ -361,7 +363,7 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
           <span className="pill pill--muted">{event.location || "Location TBD"}</span>
         </div>
 
-        {!isSundayLeague ? (
+        {!isSundayLeague && shouldShowPublicEventSignups(event) ? (
           <div className="event-detail__who">
             <button
               className="event-detail__who-btn"

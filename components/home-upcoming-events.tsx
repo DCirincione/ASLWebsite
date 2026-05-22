@@ -11,7 +11,13 @@ import {
   getSignupUnavailableLabel,
   getSignupUnavailableMessage,
 } from "@/lib/event-signups";
-import { formatEventSignupLabel, loadVisiblePublicEvents, type PublicEventSignupStats } from "@/lib/public-event-signups";
+import {
+  formatEventSignupLabel,
+  loadVisiblePublicEvents,
+  shouldShowPublicEventSignups,
+  type PublicEventSignupStats,
+} from "@/lib/public-event-signups";
+import type { JsonValue } from "@/lib/supabase/types";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
@@ -31,6 +37,7 @@ type HomeEvent = {
   registration_program_slug?: string | null;
   registration_enabled?: boolean | null;
   registration_limit?: number | null;
+  registration_schema?: JsonValue | null;
   image?: string | null;
 } & PublicEventSignupStats;
 
@@ -149,9 +156,11 @@ export function HomeUpcomingEvents() {
                 }}
                 aria-hidden
               >
-                <span className="event-card__image-badge">
-                  {formatEventSignupLabel(event.signup_count, event.registration_limit, event.signup_unit)}
-                </span>
+                {shouldShowPublicEventSignups(event) ? (
+                  <span className="event-card__image-badge">
+                    {formatEventSignupLabel(event.signup_count, event.registration_limit, event.signup_unit)}
+                  </span>
+                ) : null}
               </div>
               <div className="event-card__body">
                 <h3 className="event-card__title">{event.title}</h3>

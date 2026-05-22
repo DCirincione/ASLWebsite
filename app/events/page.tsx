@@ -15,7 +15,12 @@ import {
   getSignupUnavailableMessage,
 } from "@/lib/event-signups";
 import { filterVisiblePublicEvents } from "@/lib/event-approval";
-import { formatEventSignupLabel, loadVisiblePublicEvents, type PublicEventSignupStats } from "@/lib/public-event-signups";
+import {
+  formatEventSignupLabel,
+  loadVisiblePublicEvents,
+  shouldShowPublicEventSignups,
+  type PublicEventSignupStats,
+} from "@/lib/public-event-signups";
 import { normalizeSportSlug } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
@@ -878,9 +883,11 @@ export default function EventsPage() {
             }
           }}
         >
-          <span className="event-card__image-badge">
-            {formatEventSignupLabel(event.signup_count, event.registration_limit, event.signup_unit)}
-          </span>
+          {shouldShowPublicEventSignups(event) ? (
+            <span className="event-card__image-badge">
+              {formatEventSignupLabel(event.signup_count, event.registration_limit, event.signup_unit)}
+            </span>
+          ) : null}
         </div>
         <div className="event-card__body">
           <div className="event-card__header">

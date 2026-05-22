@@ -9,10 +9,10 @@ export type SundayLeagueSlot = {
 };
 
 export const SUNDAY_LEAGUE_HREF = "/leagues/sunday-league";
-export const SUNDAY_LEAGUE_SLOT_COUNT = 8;
+export const SUNDAY_LEAGUE_DEFAULT_DIVISION: SundayLeagueDivision = 1;
+export const SUNDAY_LEAGUE_SLOT_COUNT = 16;
 export const SUNDAY_LEAGUE_DIVISIONS: Array<{ value: SundayLeagueDivision; label: string }> = [
-  { value: 1, label: "Division 1" },
-  { value: 2, label: "Division 2" },
+  { value: SUNDAY_LEAGUE_DEFAULT_DIVISION, label: "Sunday League" },
 ];
 
 export const getSundayLeagueDivisionLogoSrc = (division: SundayLeagueDivision) =>

@@ -20,13 +20,10 @@ import {
   type SundayLeagueSignupFormValues,
 } from "@/lib/sunday-league-signup-form";
 import {
-  SUNDAY_LEAGUE_DIVISIONS,
+  SUNDAY_LEAGUE_DEFAULT_DIVISION,
   SUNDAY_LEAGUE_SLOT_COUNT,
   findPendingFriendRequestBetweenUsers,
-  getNextOpenSundayLeagueSlot,
-  getSundayLeagueDivisionLogoSrc,
   isFriendRequestPairConstraintError,
-  type SundayLeagueDivision,
 } from "@/lib/sunday-league";
 import {
   asTrimmedString,
@@ -80,7 +77,6 @@ export default function SundayLeaguePageClient({
   const [activeSection, setActiveSection] = useState<SundayLeagueSection>(initialSection);
   const [createTeamInfoOpen, setCreateTeamInfoOpen] = useState(false);
   const [createTeamOpen, setCreateTeamOpen] = useState(false);
-  const [selectedDivision, setSelectedDivision] = useState<SundayLeagueDivision>(1);
   const [overviewFlyer, setOverviewFlyer] = useState<string>("/sundayLeague/champs2025.jpeg");
   const [teams, setTeams] = useState<SundayLeagueTeam[]>([]);
   const [leaderboard, setLeaderboard] = useState<SundayLeagueLeaderboard[]>([]);
@@ -321,12 +317,10 @@ export default function SundayLeaguePageClient({
     [acceptedMembership?.team_id, teams],
   );
 
-  const divisionTeams = useMemo(
-    () => teams.filter((team) => team.division === selectedDivision).sort((a, b) => a.slot_number - b.slot_number),
-    [selectedDivision, teams],
+  const leagueTeams = useMemo(
+    () => [...teams].sort((a, b) => a.team_name.localeCompare(b.team_name)),
+    [teams],
   );
-
-  const divisionCounts = useMemo(() => SUNDAY_LEAGUE_DIVISIONS, []);
 
   const teamsById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
 
@@ -335,7 +329,7 @@ export default function SundayLeaguePageClient({
       leaderboard
         .map((entry) => {
           const team = teamsById.get(entry.team_id);
-          if (!team || team.division !== selectedDivision) return null;
+          if (!team) return null;
 
           return {
             id: entry.id,
@@ -366,30 +360,7 @@ export default function SundayLeaguePageClient({
 
           return a.team.localeCompare(b.team);
         }),
-    [leaderboard, selectedDivision, teamsById],
-  );
-
-  const renderDivisionTabs = (ariaLabel: string) => (
-    <div className="sunday-league-division-tabs" role="tablist" aria-label={ariaLabel}>
-      {divisionCounts.map((division) => (
-        <button
-          key={division.value}
-          type="button"
-          role="tab"
-          aria-selected={selectedDivision === division.value}
-          className={`sunday-league-division-tab${selectedDivision === division.value ? " is-active" : ""}`}
-          onClick={() => setSelectedDivision(division.value)}
-        >
-          <Image
-            src={getSundayLeagueDivisionLogoSrc(division.value)}
-            alt={division.label}
-            width={176}
-            height={56}
-            className="sunday-league-division-tab__image"
-          />
-        </button>
-      ))}
-    </div>
+    [leaderboard, teamsById],
   );
 
   const updateInquiryForm = <Key extends keyof typeof inquiryForm>(key: Key, value: (typeof inquiryForm)[Key]) => {
@@ -515,9 +486,8 @@ export default function SundayLeaguePageClient({
       return;
     }
 
-    const slotNumber = getNextOpenSundayLeagueSlot(teams, selectedDivision, SUNDAY_LEAGUE_SLOT_COUNT);
-    if (!slotNumber) {
-      setTeamStatus({ type: "error", message: `Division ${selectedDivision} is currently full.` });
+    if (teams.length >= SUNDAY_LEAGUE_SLOT_COUNT) {
+      setTeamStatus({ type: "error", message: "Sunday League is currently full." });
       return;
     }
 
@@ -567,7 +537,7 @@ export default function SundayLeaguePageClient({
         authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        division: selectedDivision,
+        division: SUNDAY_LEAGUE_DEFAULT_DIVISION,
         values: teamForm,
         uploadedFiles,
       }),
@@ -840,7 +810,7 @@ export default function SundayLeaguePageClient({
               <div className="sunday-league-team-header sunday-league-team-header--spread">
                 <div className="sunday-league-stack">
                   <h2>Teams</h2>
-                  <p className="muted">Select a division to see which slots are already reserved and which are still open.</p>
+                  <p className="muted">All Sunday League teams are listed in one conference.</p>
                 </div>
               {!myTeam ? (
                 <button
@@ -855,16 +825,14 @@ export default function SundayLeaguePageClient({
               ) : null}
             </div>
 
-            {renderDivisionTabs("Sunday League divisions")}
+            {loadingTeams ? <p className="muted">Loading teams...</p> : null}
 
-            {loadingTeams ? <p className="muted">Loading division slots...</p> : null}
-
-            {!loadingTeams && divisionTeams.length === 0 ? (
-              <p className="muted">No teams added to this division yet.</p>
+            {!loadingTeams && leagueTeams.length === 0 ? (
+              <p className="muted">No teams added yet.</p>
             ) : null}
 
             <div className="sunday-league-team-grid">
-              {divisionTeams.map((team) => (
+              {leagueTeams.map((team) => (
                 <article key={team.id} className="sunday-league-team-card">
                   <div className="sunday-league-team-card__logo">
                     <TeamLogoImage src={team.team_logo_url} alt="" fill sizes="120px" />
@@ -941,10 +909,9 @@ export default function SundayLeaguePageClient({
         return (
           <div className="sunday-league-leaderboard">
             <h2>Leaderboard</h2>
-            {renderDivisionTabs("Sunday League leaderboard divisions")}
             {loadingLeaderboard ? <p className="muted">Loading leaderboard...</p> : null}
             {!loadingLeaderboard && leaderboardRows.length === 0 ? (
-              <p className="muted">No leaderboard rows added for this division yet.</p>
+              <p className="muted">No leaderboard rows added yet.</p>
             ) : null}
             {leaderboardRows.length > 0 ? (
               <div className="sunday-league-table-wrap">
@@ -1084,7 +1051,7 @@ export default function SundayLeaguePageClient({
         <div className="sunday-league-topbar">
           <div className="sunday-league-topbar__title">
             <h1>Aldrich Sunday League</h1>
-            <p className="muted">Division-based team registration, live slot tracking, and your captain portal in one place.</p>
+            <p className="muted">Team registration, live slot tracking, and your captain portal in one place.</p>
             <div className="sunday-league-topbar__actions">
               {myTeam ? (
                 <button className="button primary" type="button" onClick={() => router.push(`/leagues/sunday-league/team/${myTeam.id}`)}>
@@ -1228,7 +1195,7 @@ export default function SundayLeaguePageClient({
                 <div className="sunday-league-panel-box">
                   <h3>Team already created</h3>
                   <p>
-                    You already reserved <strong>{myTeam.team_name}</strong> in Division {myTeam.division}, slot {myTeam.slot_number}.
+                    You already reserved <strong>{myTeam.team_name}</strong>, slot {myTeam.slot_number}.
                   </p>
                   <div className="sunday-league-inline-actions">
                     <button className="button primary" type="button" onClick={() => router.push(`/leagues/sunday-league/team/${myTeam.id}`)}>
@@ -1255,9 +1222,6 @@ export default function SundayLeaguePageClient({
                     <h3>Create a Sunday League Team</h3>
                     <p>
                       Only the team captain should complete this form. By creating a team, the captain is reserving a spot in the Aldrich Sunday League and agrees to submit the required {depositAmountLabel} deposit. The remaining balance will be due on the first Sunday of the season. After the deposit is successfully paid and confirmed, the captain will gain access to the team portal, where they can manage their roster, invite players, and update team information.
-                    </p>
-                    <p className="muted" style={{ marginBottom: 0 }}>
-                      You are currently creating for Division {selectedDivision}.
                     </p>
                   </div>
 

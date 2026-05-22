@@ -13,7 +13,12 @@ import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { SportEventCard } from "@/components/sport-event-card";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
-import { formatEventSignupLabel, loadVisiblePublicEvents, type PublicEventSignupStats } from "@/lib/public-event-signups";
+import {
+  formatEventSignupLabel,
+  loadVisiblePublicEvents,
+  shouldShowPublicEventSignups,
+  type PublicEventSignupStats,
+} from "@/lib/public-event-signups";
 import { getEventSectionLabel, normalizeSportSlug, parseSportSectionHeaders, slugifySportValue, sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
@@ -148,7 +153,7 @@ export default function DynamicSportPage() {
               image={item.image}
               dateLabel={primaryTimeLabel(item)}
               location={item.location}
-              signupLabel={formatEventSignupLabel(item.signup_count, item.registration_limit, item.signup_unit)}
+              signupLabel={shouldShowPublicEventSignups(item) ? formatEventSignupLabel(item.signup_count, item.registration_limit, item.signup_unit) : null}
               description={item.description}
               onOpen={isSundayLeague ? undefined : () => setDetailEvent(item)}
               actions={
@@ -206,7 +211,7 @@ export default function DynamicSportPage() {
               image={event.image}
               dateLabel={primaryTimeLabel(event)}
               location={event.location}
-              signupLabel={formatEventSignupLabel(event.signup_count, event.registration_limit, event.signup_unit)}
+              signupLabel={shouldShowPublicEventSignups(event) ? formatEventSignupLabel(event.signup_count, event.registration_limit, event.signup_unit) : null}
               description={event.description}
               onOpen={isSundayLeague ? undefined : () => setDetailEvent(event)}
               actions={
