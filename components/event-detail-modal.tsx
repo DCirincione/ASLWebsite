@@ -3,9 +3,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+import { ShareEventButton } from "@/components/share-event-button";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import { shouldShowPublicEventSignups } from "@/lib/public-event-signups";
-import { isRegularAslSundayLeagueEvent } from "@/lib/sunday-league";
+import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
 import type { JsonValue } from "@/lib/supabase/types";
 
@@ -290,6 +291,7 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
   const flyerImage = hasFlyerMatch ? (flyerImageUrl || undefined) : (event.image || event.image_url || undefined);
   const eventPhoto = event.image || event.image_url || flyerImage || undefined;
   const moreInfo = flyerDetails || event.description || null;
+  const shareUrl = isSundayLeague ? SUNDAY_LEAGUE_HREF : `/events?eventId=${encodeURIComponent(event.id)}`;
   const teamPlayers = whoIsPlayingPlayers?.filter((player) => player.teammates.length > 0) ?? [];
   const soloPlayers = whoIsPlayingPlayers?.filter((player) => player.teammates.length === 0) ?? [];
 
@@ -351,6 +353,7 @@ export function EventDetailModal({ open, event, dateLabel, isRegistered = false,
             ) : (
               <span className="muted">{getSignupUnavailableLabel(event)}</span>
             )}
+            <ShareEventButton title={event.title} url={shareUrl} />
             <button className="button ghost" type="button" onClick={onClose}>
               Close
             </button>

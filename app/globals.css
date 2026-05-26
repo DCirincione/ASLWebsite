@@ -1897,6 +1897,8 @@ html[data-theme="dark"] .search-dropdown__item:hover {
 
 .event-detail__header-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 10px;
   align-items: center;
 }
