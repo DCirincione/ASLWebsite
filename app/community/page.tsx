@@ -4,6 +4,7 @@ import Image from "next/image";
 import { unstable_noStore as noStore } from "next/cache";
 
 import { PageShell } from "@/components/page-shell";
+import { CommunityDonationButton } from "@/components/community-donation-button";
 import { Section } from "@/components/section";
 import communityContent from "@/data/community-content.json";
 import { readCommunityArticles } from "@/lib/community-articles";
@@ -59,6 +60,7 @@ export default async function CommunityPage() {
         title="Community Hub"
         description="A note from ownership."
         headingLevel="h1"
+        headerAction={<CommunityDonationButton />}
       >
         <div className="community-stack">
           <div className="community-board static-copy">

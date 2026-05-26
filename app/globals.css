@@ -765,8 +765,23 @@ html[data-theme="dark"] .font-controls__value {
 }
 
 .section__header {
-  max-width: 760px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: 1200px;
   margin-bottom: 24px;
+}
+
+.section__header-copy {
+  max-width: 760px;
+}
+
+.section__header-action {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-top: 26px;
 }
 
 .section h1,

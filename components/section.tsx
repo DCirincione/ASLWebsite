@@ -5,6 +5,7 @@ type SectionProps = {
   eyebrow?: string;
   title: string;
   description?: string;
+  headerAction?: ReactNode;
   headingLevel?: "h1" | "h2" | "h3";
   className?: string;
   children?: ReactNode;
@@ -17,6 +18,7 @@ export function Section({
   eyebrow,
   title,
   description,
+  headerAction,
   headingLevel = "h2",
   className,
   children,
@@ -30,9 +32,12 @@ export function Section({
     <section id={id} className={classes} style={style}>
       {showHeader ? (
         <div className="section__header">
-          {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
-          <Heading>{title}</Heading>
-          {description ? <p className="muted">{description}</p> : null}
+          <div className="section__header-copy">
+            {eyebrow ? <p className="eyebrow">{eyebrow}</p> : null}
+            <Heading>{title}</Heading>
+            {description ? <p className="muted">{description}</p> : null}
+          </div>
+          {headerAction ? <div className="section__header-action">{headerAction}</div> : null}
         </div>
       ) : null}
       {children}
