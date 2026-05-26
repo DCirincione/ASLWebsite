@@ -11,6 +11,7 @@ export type Profile = {
   skill_level: number | null;
   sports: string[] | null;
   about: string | null;
+  instagram_url?: string | null;
   height_cm: number | null;
   weight_lbs: number | null;
   country_code?: string | null;
@@ -29,6 +30,7 @@ export type ProfileInsert = {
   skill_level?: number | null;
   sports?: string[] | null;
   about?: string | null;
+  instagram_url?: string | null;
   height_cm?: number | null;
   weight_lbs?: number | null;
   country_code?: string | null;
@@ -47,6 +49,7 @@ export type ProfileUpdate = {
   skill_level?: number | null;
   sports?: string[] | null;
   about?: string | null;
+  instagram_url?: string | null;
   height_cm?: number | null;
   weight_lbs?: number | null;
   country_code?: string | null;

@@ -374,6 +374,45 @@ html[data-theme="dark"] .settings-notifications__row .checkbox-label {
   line-height: 1;
 }
 
+.profile-social-link {
+  width: fit-content;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  font-weight: 800;
+  text-decoration: none;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.profile-social-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(233, 93, 42, 0.44);
+  color: #e95d2a;
+  box-shadow: 0 10px 24px rgba(233, 93, 42, 0.12);
+}
+
+.profile-social-link--empty {
+  color: var(--muted);
+}
+
+.profile-social-link svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
 .avatar-upload {
   display: flex;
   flex-direction: column;
@@ -860,6 +899,17 @@ html[data-theme="dark"] .account-nav__links,
 html[data-theme="dark"] .account-card .muted,
 html[data-theme="dark"] .account-header__text .muted {
   color: #cbd5e1;
+}
+
+html[data-theme="dark"] .profile-social-link {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: #1f2a40;
+  color: #e8edf7;
+}
+
+html[data-theme="dark"] .profile-social-link:hover {
+  border-color: rgba(244, 183, 138, 0.42);
+  color: #f4b78a;
 }
 
 html[data-theme="dark"] .account-create-modal {

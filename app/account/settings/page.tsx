@@ -10,6 +10,7 @@ import {
   getAldrichCommunicationsPreferenceFromMetadata,
 } from "@/lib/aldrich-communications";
 import { COUNTRY_OPTIONS, normalizeCountryCode } from "@/lib/countries";
+import { normalizeInstagramProfileUrl } from "@/lib/instagram-url";
 import { supabase } from "@/lib/supabase/client";
 
 const PASSWORD_RESET_REDIRECT = "https://aldrichsports.com/reset-password";
@@ -19,6 +20,7 @@ type SettingsFormState = {
   sports: string;
   about: string;
   country_code: string;
+  instagram_url: string;
   email: string;
   birthday: string;
   profile_visibility: "public" | "members" | "private";
@@ -30,11 +32,21 @@ type SettingsFormState = {
 
 type SaveStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
 
+type SettingsProfileRow = {
+  name?: string | null;
+  age?: string | null;
+  sports?: string[] | null;
+  about?: string | null;
+  country_code?: string | null;
+  instagram_url?: string | null;
+};
+
 const emptySettingsForm: SettingsFormState = {
   display_name: "",
   sports: "",
   about: "",
   country_code: "",
+  instagram_url: "",
   email: "",
   birthday: "",
   profile_visibility: "members",
@@ -68,11 +80,20 @@ export default function AccountSettingsPage() {
       }
 
       const rawSettings = user.user_metadata?.settings as Partial<SettingsFormState> | undefined;
-      const { data: profile } = await supabase
+      const { data: profileWithInstagram, error: profileWithInstagramError } = await supabase
         .from("profiles")
-        .select("name,age,sports,about,country_code")
+        .select("name,age,sports,about,country_code,instagram_url")
         .eq("id", user.id)
         .maybeSingle();
+      const { data: profileFallback } =
+        profileWithInstagramError?.message.toLowerCase().includes("instagram_url")
+          ? await supabase
+              .from("profiles")
+              .select("name,age,sports,about,country_code")
+              .eq("id", user.id)
+              .maybeSingle()
+          : { data: null };
+      const profile = (profileWithInstagram ?? profileFallback) as SettingsProfileRow | null;
 
       const nextForm: SettingsFormState = {
         ...emptySettingsForm,
@@ -80,6 +101,7 @@ export default function AccountSettingsPage() {
         sports: Array.isArray(profile?.sports) ? profile.sports.join(", ") : "",
         about: profile?.about ?? "",
         country_code: normalizeCountryCode(profile?.country_code) ?? "",
+        instagram_url: profile?.instagram_url ?? (typeof rawSettings?.instagram_url === "string" ? rawSettings.instagram_url : ""),
         email: user.email ?? "",
         birthday: profile?.age ?? "",
         profile_visibility:
@@ -130,6 +152,12 @@ export default function AccountSettingsPage() {
       return;
     }
 
+    const instagramUrl = normalizeInstagramProfileUrl(settingsForm.instagram_url);
+    if (instagramUrl === null) {
+      setSaveStatus({ type: "error", message: "Enter a valid Instagram profile URL, like https://www.instagram.com/aldrichsportsny/." });
+      return;
+    }
+
     setSaveStatus({ type: "loading" });
 
     const profilePayload = {
@@ -140,6 +168,7 @@ export default function AccountSettingsPage() {
         .map((entry) => entry.trim())
         .filter(Boolean),
       about: settingsForm.about.trim() || null,
+      instagram_url: instagramUrl || null,
       country_code: settingsForm.country_code || null,
     };
 
@@ -149,8 +178,28 @@ export default function AccountSettingsPage() {
       .eq("id", (await supabase.auth.getUser()).data.user?.id ?? "");
 
     if (profileError) {
-      setSaveStatus({ type: "error", message: profileError.message });
-      return;
+      const isMissingInstagramColumn = profileError.message.toLowerCase().includes("instagram_url");
+      if (!isMissingInstagramColumn) {
+        setSaveStatus({ type: "error", message: profileError.message });
+        return;
+      }
+
+      const profilePayloadWithoutInstagram = {
+        name: profilePayload.name,
+        age: profilePayload.age,
+        sports: profilePayload.sports,
+        about: profilePayload.about,
+        country_code: profilePayload.country_code,
+      };
+      const { error: retryProfileError } = await supabase
+        .from("profiles")
+        .update(profilePayloadWithoutInstagram)
+        .eq("id", (await supabase.auth.getUser()).data.user?.id ?? "");
+
+      if (retryProfileError) {
+        setSaveStatus({ type: "error", message: retryProfileError.message });
+        return;
+      }
     }
 
     const settingsMetadata = {
@@ -159,6 +208,7 @@ export default function AccountSettingsPage() {
       email_event_updates: settingsForm.email_event_updates,
       email_friend_requests: settingsForm.email_friend_requests,
       email_community_updates: settingsForm.email_community_updates,
+      instagram_url: profilePayload.instagram_url,
     };
 
     const payload: {
@@ -186,6 +236,7 @@ export default function AccountSettingsPage() {
       display_name: profilePayload.name,
       sports: profilePayload.sports.join(", "),
       about: profilePayload.about ?? "",
+      instagram_url: profilePayload.instagram_url ?? "",
       email: updatedEmail,
     }));
     setSaveStatus({
@@ -305,6 +356,17 @@ export default function AccountSettingsPage() {
                         </option>
                       ))}
                     </select>
+                  </div>
+                  <div className="form-control">
+                    <label htmlFor="settings-instagram">Instagram URL</label>
+                    <input
+                      id="settings-instagram"
+                      type="text"
+                      inputMode="url"
+                      value={settingsForm.instagram_url}
+                      onChange={(event) => updateSettingsForm("instagram_url", event.target.value)}
+                      placeholder="https://www.instagram.com/username/"
+                    />
                   </div>
                   <div className="form-control">
                     <label htmlFor="settings-profile-visibility">Profile visibility</label>

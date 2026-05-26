@@ -20,6 +20,7 @@ import {
   type EffectiveRegistrationEventRow,
 } from "@/lib/effective-event-registrations";
 import { isWaitlistEvent } from "@/lib/event-signups";
+import { normalizeInstagramProfileUrl } from "@/lib/instagram-url";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Friend, JsonValue, Profile, SundayLeagueTeam } from "@/lib/supabase/types";
@@ -59,8 +60,19 @@ const fallbackProfile: ProfileData = {
     "Community player focused on team play and sportsmanship. Loves weekend tournaments and pickup games.",
   height_cm: null,
   weight_lbs: null,
+  instagram_url: null,
   friends: [],
 };
+
+function InstagramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="1" />
+    </svg>
+  );
+}
 
 const fallbackEvents: Event[] = [
   {
@@ -149,6 +161,7 @@ export default function AccountPage() {
   const [status, setStatus] = useState<"loading" | "ready" | "error" | "no-session">("loading");
   const [signingOut, setSigningOut] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [accountInstagramUrl, setAccountInstagramUrl] = useState("");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [profileForm, setProfileForm] = useState<ProfileFormState>(emptyProfileForm);
   const [profileSaveStatus, setProfileSaveStatus] = useState<SaveStatus>({ type: "idle" });
@@ -290,18 +303,37 @@ export default function AccountPage() {
         return;
       }
       const { data: sessionData } = await supabase.auth.getSession();
-      const uid = sessionData.session?.user.id ?? null;
+      const user = sessionData.session?.user ?? null;
+      const uid = user?.id ?? null;
       if (!uid) {
         setStatus("no-session");
         return;
       }
       setUserId(uid);
+      const settings = user?.user_metadata?.settings;
+      setAccountInstagramUrl(
+        settings && typeof settings === "object" && !Array.isArray(settings) && typeof settings.instagram_url === "string"
+          ? settings.instagram_url
+          : "",
+      );
 
-      const { data, error } = await supabase
+      const { data: profileWithInstagram, error: profileWithInstagramError } = await supabase
         .from("profiles")
-        .select("id,name,about,age,positions,skill_level,sports,avatar_url,country_code")
+        .select("id,name,about,age,positions,skill_level,sports,avatar_url,country_code,instagram_url")
         .eq("id", uid)
         .maybeSingle();
+      const { data: profileFallback, error: profileFallbackError } =
+        profileWithInstagramError?.message.toLowerCase().includes("instagram_url")
+          ? await supabase
+              .from("profiles")
+              .select("id,name,about,age,positions,skill_level,sports,avatar_url,country_code")
+              .eq("id", uid)
+              .maybeSingle()
+          : { data: null, error: null };
+      const data = profileWithInstagram ?? profileFallback;
+      const error = profileWithInstagramError?.message.toLowerCase().includes("instagram_url")
+        ? profileFallbackError
+        : profileWithInstagramError;
 
       if (error || !data) {
         setProfile(fallbackProfile);
@@ -687,6 +719,8 @@ export default function AccountPage() {
 
   const data = profile ?? fallbackProfile;
   const avatarSrc = data.avatar_url ?? "/avatar-placeholder.svg";
+  const instagramUrl =
+    normalizeInstagramProfileUrl(data.instagram_url ?? "") || normalizeInstagramProfileUrl(accountInstagramUrl) || "";
 
   return (
     <div className="account-page">
@@ -704,6 +738,27 @@ export default function AccountPage() {
                 <p className="eyebrow">Account</p>
                 <h1>{data.name}</h1>
                 <p className="muted">Manage your profile, events, teams, and friends.</p>
+                {instagramUrl ? (
+                  <a
+                    className="profile-social-link profile-social-link--instagram"
+                    href={instagramUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label="Open your Instagram"
+                  >
+                    <InstagramIcon />
+                    <span>Instagram</span>
+                  </a>
+                ) : (
+                  <Link
+                    className="profile-social-link profile-social-link--instagram profile-social-link--empty"
+                    href="/account/settings"
+                    aria-label="Add your Instagram URL"
+                  >
+                    <InstagramIcon />
+                    <span>Add Instagram</span>
+                  </Link>
+                )}
                 <div className="account-create__actions account-profile-card__actions">
                   {!isEditingProfile ? (
                     <button

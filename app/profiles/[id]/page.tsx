@@ -11,6 +11,7 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { TeamLogoImage } from "@/components/team-logo-image";
 import { getCountryNameFromCode } from "@/lib/countries";
 import { filterVisiblePublicEvents } from "@/lib/event-approval";
+import { normalizeInstagramProfileUrl } from "@/lib/instagram-url";
 import { calculateAgeFromDateString } from "@/lib/profile-age";
 import { supabase } from "@/lib/supabase/client";
 import type { Event, Profile, SundayLeagueTeam } from "@/lib/supabase/types";
@@ -38,10 +39,21 @@ const fallbackProfile: ProfileWithAvatar = {
   sports: null,
   about: "Community player focused on team play and sportsmanship.",
   avatar_url: null,
+  instagram_url: null,
   height_cm: null,
   weight_lbs: null,
   country_code: null,
 };
+
+function InstagramIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <rect x="3" y="3" width="18" height="18" rx="5" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="17.5" cy="6.5" r="1" />
+    </svg>
+  );
+}
 
 const parseDateUTC = (value?: string | null) => {
   if (!value) return null;
@@ -78,6 +90,7 @@ export default function PublicProfilePage() {
   const profileId = params?.id;
 
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
+  const [sessionInstagramUrl, setSessionInstagramUrl] = useState("");
   const [sessionChecked, setSessionChecked] = useState(false);
   const [profile, setProfile] = useState<ProfileWithAvatar | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -102,7 +115,15 @@ export default function PublicProfilePage() {
       }
 
       const { data: sessionData } = await supabase.auth.getSession();
-      setSessionUserId(sessionData.session?.user.id ?? null);
+      const user = sessionData.session?.user ?? null;
+      const settings = user?.user_metadata?.settings;
+      const instagramUrl =
+        settings && typeof settings === "object" && !Array.isArray(settings) && typeof settings.instagram_url === "string"
+          ? settings.instagram_url
+          : "";
+
+      setSessionUserId(user?.id ?? null);
+      setSessionInstagramUrl(instagramUrl);
       setSessionChecked(true);
     };
 
@@ -120,11 +141,23 @@ export default function PublicProfilePage() {
         setStatus("ready");
         return;
       }
-      const { data, error } = await supabase
+      const { data: profileWithInstagram, error: profileWithInstagramError } = await supabase
         .from("profiles")
-        .select("id,name,about,age,positions,skill_level,sports,avatar_url,country_code")
+        .select("id,name,about,age,positions,skill_level,sports,avatar_url,country_code,instagram_url")
         .eq("id", profileId)
         .maybeSingle();
+      const { data: profileFallback, error: profileFallbackError } =
+        profileWithInstagramError?.message.toLowerCase().includes("instagram_url")
+          ? await supabase
+              .from("profiles")
+              .select("id,name,about,age,positions,skill_level,sports,avatar_url,country_code")
+              .eq("id", profileId)
+              .maybeSingle()
+          : { data: null, error: null };
+      const data = profileWithInstagram ?? profileFallback;
+      const error = profileWithInstagramError?.message.toLowerCase().includes("instagram_url")
+        ? profileFallbackError
+        : profileWithInstagramError;
 
       if (error || !data) {
         setStatus("error");
@@ -356,8 +389,13 @@ export default function PublicProfilePage() {
 
   const data = profile ?? fallbackProfile;
   const avatarSrc = data.avatar_url ?? "/avatar-placeholder.svg";
-  const friendsCount = useMemo(() => friends.length, [friends]);
   const isOwnProfile = Boolean(sessionUserId && profileId && sessionUserId === profileId);
+  const profileInstagramUrl = normalizeInstagramProfileUrl(data.instagram_url ?? "");
+  const metadataInstagramUrl = isOwnProfile ? normalizeInstagramProfileUrl(sessionInstagramUrl) : "";
+  const instagramUrl = profileInstagramUrl || metadataInstagramUrl || "";
+  const instagramHref = instagramUrl || (isOwnProfile ? "/account/settings" : "");
+  const shouldShowInstagramLink = Boolean(instagramUrl || isOwnProfile);
+  const friendsCount = useMemo(() => friends.length, [friends]);
   const canManageFriendship = Boolean(sessionUserId && profileId && !isOwnProfile);
   const canPromptFriendSignIn = Boolean(sessionChecked && !sessionUserId && profileId);
   const friendButtonLabel =
@@ -391,6 +429,29 @@ export default function PublicProfilePage() {
               <p className="muted">
                 {data.about ?? "This player has not added a bio yet."}
               </p>
+              {shouldShowInstagramLink ? (
+                instagramUrl ? (
+                  <a
+                    className="profile-social-link profile-social-link--instagram"
+                    href={instagramHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`${data.name}'s Instagram`}
+                  >
+                    <InstagramIcon />
+                    <span>Instagram</span>
+                  </a>
+                ) : (
+                  <Link
+                    className="profile-social-link profile-social-link--instagram profile-social-link--empty"
+                    href="/account/settings"
+                    aria-label="Add your Instagram URL"
+                  >
+                    <InstagramIcon />
+                    <span>Add Instagram</span>
+                  </Link>
+                )
+              ) : null}
             </div>
           </div>
           <div className="cta-row">
