@@ -17,6 +17,7 @@ import {
 } from "@/lib/aldrich-communications";
 import { canAccessAdminDashboard, formatApprovalStatusLabel } from "@/lib/event-approval";
 import { createId } from "@/lib/create-id";
+import { isPastEvent, sortPastEventsNewestFirst } from "@/lib/event-date-status";
 import {
   parseEventRecurrenceInput,
   readEventRecurrence,
@@ -4083,8 +4084,10 @@ export default function AdminPage() {
   const flyerByEventId = new Map(
     flyers.filter((flyer) => flyer.event_id).map((flyer) => [flyer.event_id as string, flyer])
   );
-  const partnerEvents = events.filter((event) => event.host_type === "partner");
-  const existingManageableEvents = events.filter((event) => event.host_type !== "partner");
+  const activeEvents = events.filter((event) => !isPastEvent(event));
+  const pastEvents = sortPastEventsNewestFirst(events.filter((event) => isPastEvent(event)));
+  const partnerEvents = activeEvents.filter((event) => event.host_type === "partner");
+  const existingManageableEvents = activeEvents.filter((event) => event.host_type !== "partner");
   const existingRegularEvents = existingManageableEvents.filter((event) => !isPickupEvent(event));
   const existingPickupEvents = existingManageableEvents.filter(isPickupEvent);
   const pendingPartnerRequestCount = partnerEvents.filter((event) => event.approval_status === "pending_approval").length;
@@ -4946,7 +4949,7 @@ export default function AdminPage() {
                   {flyersStatus.message ? (
                     <p className={`form-help ${flyersStatus.type === "error" ? "error" : "muted"}`}>{flyersStatus.message}</p>
                   ) : null}
-                  {!loadingEvents && existingManageableEvents.length === 0 ? <p className="muted">No events found.</p> : null}
+                  {!loadingEvents && existingManageableEvents.length === 0 ? <p className="muted">No active events found.</p> : null}
                   {!loadingEvents && existingManageableEvents.length > 0 ? (
                     <div className="admin-events-split-list">
                       <section>
@@ -4973,6 +4976,21 @@ export default function AdminPage() {
                         )}
                       </section>
                     </div>
+                  ) : null}
+                  {!loadingEvents ? (
+                    <section className="admin-events-split-list">
+                      <div>
+                        <div className="account-card__header">
+                          <div>
+                            <h3>Past Events</h3>
+                            <p className="muted">{pastEvents.length} event{pastEvents.length === 1 ? "" : "s"}</p>
+                          </div>
+                        </div>
+                        {pastEvents.length > 0 ? renderAdminEventCards(pastEvents, true) : (
+                          <p className="muted">No past events found.</p>
+                        )}
+                      </div>
+                    </section>
                   ) : null}
                 </>
               ) : null}

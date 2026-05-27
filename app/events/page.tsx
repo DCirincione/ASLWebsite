@@ -15,6 +15,7 @@ import {
   getSignupUnavailableMessage,
 } from "@/lib/event-signups";
 import { filterVisiblePublicEvents } from "@/lib/event-approval";
+import { isPastEvent } from "@/lib/event-date-status";
 import {
   formatEventSignupLabel,
   loadVisiblePublicEvents,
@@ -510,7 +511,7 @@ export default function EventsPage() {
       ]);
 
       setSports((sportsData ?? []) as Sport[]);
-      setEvents(filterVisiblePublicEvents(eventData));
+      setEvents(filterVisiblePublicEvents(eventData).filter((event) => !isPastEvent(event)));
       setLoading(false);
     };
 
