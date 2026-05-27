@@ -3,10 +3,10 @@
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { getPasswordResetErrorMessage, getPasswordResetRedirectUrl } from "@/lib/password-reset";
 import { supabase } from "@/lib/supabase/client";
 
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
-const PASSWORD_RESET_REDIRECT = "https://aldrichsports.com/reset-password";
 
 type AccountSigninFormProps = {
   onSuccess?: () => void;
@@ -44,11 +44,11 @@ export function AccountSigninForm({ onSuccess, redirectTo }: AccountSigninFormPr
     setResetStatus({ type: "loading" });
 
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: PASSWORD_RESET_REDIRECT,
+      redirectTo: getPasswordResetRedirectUrl(),
     });
 
     if (error) {
-      setResetStatus({ type: "error", message: error.message });
+      setResetStatus({ type: "error", message: getPasswordResetErrorMessage(error.message) });
       return;
     }
 

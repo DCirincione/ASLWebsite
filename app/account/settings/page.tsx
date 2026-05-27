@@ -11,9 +11,8 @@ import {
 } from "@/lib/aldrich-communications";
 import { COUNTRY_OPTIONS, normalizeCountryCode } from "@/lib/countries";
 import { normalizeInstagramProfileUrl } from "@/lib/instagram-url";
+import { getPasswordResetErrorMessage, getPasswordResetRedirectUrl } from "@/lib/password-reset";
 import { supabase } from "@/lib/supabase/client";
-
-const PASSWORD_RESET_REDIRECT = "https://aldrichsports.com/reset-password";
 
 type SettingsFormState = {
   display_name: string;
@@ -261,11 +260,11 @@ export default function AccountSettingsPage() {
 
     setPasswordResetStatus({ type: "loading" });
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: PASSWORD_RESET_REDIRECT,
+      redirectTo: getPasswordResetRedirectUrl(),
     });
 
     if (error) {
-      setPasswordResetStatus({ type: "error", message: error.message });
+      setPasswordResetStatus({ type: "error", message: getPasswordResetErrorMessage(error.message) });
       return;
     }
 
