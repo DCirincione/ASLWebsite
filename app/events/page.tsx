@@ -511,7 +511,11 @@ export default function EventsPage() {
       ]);
 
       setSports((sportsData ?? []) as Sport[]);
-      setEvents(filterVisiblePublicEvents(eventData).filter((event) => !isPastEvent(event)));
+      setEvents(
+        filterVisiblePublicEvents(eventData).filter(
+          (event) => isRegularAslSundayLeagueEvent(event) || !isPastEvent(event),
+        ),
+      );
       setLoading(false);
     };
 

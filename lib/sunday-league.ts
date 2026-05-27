@@ -1,6 +1,7 @@
 import type { Event, FriendRequest, JsonValue, SundayLeagueTeam } from "@/lib/supabase/types";
 
-type SundayLeagueEventLike = Pick<Event, "title" | "description" | "registration_program_slug" | "sport_slug">;
+type SundayLeagueEventLike = Pick<Event, "title" | "description" | "registration_program_slug"> &
+  Partial<Pick<Event, "sport_slug">>;
 export type SundayLeagueDivision = 1 | 2;
 export type SundayLeagueSlot = {
   slotNumber: number;

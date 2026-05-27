@@ -41,6 +41,7 @@ import {
   formatSundayLeagueDepositAmount,
   type SundayLeagueRuleSection,
 } from "@/lib/sunday-league-settings-shared";
+import { isRegularAslSundayLeagueEvent } from "@/lib/sunday-league";
 import { getEventProgramSlugOptions, parseSportSectionHeaders, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type {
@@ -4084,8 +4085,10 @@ export default function AdminPage() {
   const flyerByEventId = new Map(
     flyers.filter((flyer) => flyer.event_id).map((flyer) => [flyer.event_id as string, flyer])
   );
-  const activeEvents = events.filter((event) => !isPastEvent(event));
-  const pastEvents = sortPastEventsNewestFirst(events.filter((event) => isPastEvent(event)));
+  const activeEvents = events.filter((event) => isRegularAslSundayLeagueEvent(event) || !isPastEvent(event));
+  const pastEvents = sortPastEventsNewestFirst(
+    events.filter((event) => !isRegularAslSundayLeagueEvent(event) && isPastEvent(event)),
+  );
   const partnerEvents = activeEvents.filter((event) => event.host_type === "partner");
   const existingManageableEvents = activeEvents.filter((event) => event.host_type !== "partner");
   const existingRegularEvents = existingManageableEvents.filter((event) => !isPickupEvent(event));
