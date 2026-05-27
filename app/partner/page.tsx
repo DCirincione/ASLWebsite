@@ -1287,11 +1287,11 @@ export default function PartnerPage() {
           <div className="account-card__header">
             <div>
               <h2>Create Event</h2>
-              <p className="muted">Open the event builder when you want to add a new partner event.</p>
+              <p className="muted">Open the event builder when you want to add a partner event or pickup session.</p>
             </div>
             {!showCreateEventForm ? (
               <button className="button primary" type="button" onClick={openCreateEventForm}>
-                Create Event
+                Create Event / Pickup
               </button>
             ) : null}
           </div>
@@ -1657,7 +1657,7 @@ function PartnerEventFields({
             onChange={(e) => update("registration_program_slug", e.target.value)}
             disabled={!form.sport_id}
           >
-            <option value="">{form.sport_id ? "Select an event type" : "Select a sport page first"}</option>
+            <option value="">{form.sport_id ? "Select an event or pickup type" : "Select a sport page first"}</option>
             {getEventProgramSlugOptions(sports.find((sport) => sport.id === form.sport_id) ?? null).map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}

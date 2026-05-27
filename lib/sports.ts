@@ -137,26 +137,41 @@ const getProgramSlugPrefix = (sportSlug: string) => {
   return sportSlug;
 };
 
+const withPickupSessionOption = (sportSlug: string, options: EventProgramSlugOption[]) => {
+  const prefix = getProgramSlugPrefix(sportSlug);
+  const pickupValue = `${prefix}-pickup`;
+  const hasPickupOption = options.some((option) => option.value === pickupValue || option.value.includes("pickup"));
+
+  if (hasPickupOption) return options;
+  return [
+    ...options,
+    {
+      label: "Pickup Session",
+      value: pickupValue,
+    },
+  ];
+};
+
 export const getEventProgramSlugOptions = (sport?: Pick<Sport, "title" | "section_headers"> | null) => {
   const sportSlug = normalizeSportSlug(sport);
   if (!sportSlug) return [];
 
   const preset = PRESET_EVENT_PROGRAM_OPTIONS[sportSlug];
-  if (preset) return preset;
+  if (preset) return withPickupSessionOption(sportSlug, preset);
 
   const sectionHeaders = parseSportSectionHeaders(sport?.section_headers);
   if (sectionHeaders.length > 0) {
     const prefix = getProgramSlugPrefix(sportSlug);
-    return sectionHeaders.map((label) => ({
+    return withPickupSessionOption(sportSlug, sectionHeaders.map((label) => ({
       label,
       value: `${prefix}-${getSportSectionKeyOptions(label)[0] ?? slugifySportValue(label)}`,
-    }));
+    })));
   }
 
-  return [{
+  return withPickupSessionOption(sportSlug, [{
     label: "General Event",
     value: `${getProgramSlugPrefix(sportSlug)}-event`,
-  }];
+  }]);
 };
 
 const resolveEventSportSlug = (
