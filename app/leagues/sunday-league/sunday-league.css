@@ -396,6 +396,34 @@ html[data-theme="dark"] .sunday-league-team-form select option {
   white-space: pre-wrap;
 }
 
+.sunday-league-schedule__matchups {
+  display: grid;
+  gap: 7px;
+}
+
+.sunday-league-schedule__matchup {
+  display: grid;
+  grid-template-columns: max-content max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: 9px;
+  line-height: 1.35;
+}
+
+.sunday-league-schedule__matchup a {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.sunday-league-schedule__matchup a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.sunday-league-schedule__time {
+  min-width: 64px;
+}
+
 .sunday-league-inquiries__prompt {
   font-weight: 700;
 }
@@ -1916,6 +1944,69 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
 
 .register-form-grid.sunday-league-schedule-grid {
   align-items: start;
+}
+
+.sunday-league-matchup-builder,
+.sunday-league-matchup-preview {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.sunday-league-matchup-builder__add {
+  justify-self: start;
+}
+
+.sunday-league-matchup-row {
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.72);
+}
+
+.sunday-league-matchup-row__summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sunday-league-matchup-row__summary::-webkit-details-marker {
+  display: none;
+}
+
+.sunday-league-matchup-row__summary-copy {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.sunday-league-matchup-row__summary-copy span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.sunday-league-matchup-row__fields {
+  display: grid;
+  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  align-items: end;
+  margin-top: 14px;
+}
+
+.sunday-league-matchup-preview__row {
+  display: grid;
+  grid-template-columns: 80px minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+html[data-theme="dark"] .sunday-league-matchup-row {
+  background: rgba(15, 23, 42, 0.52);
 }
 
 .register-form-grid.sunday-league-schedule-grid > .form-control:not(.register-form-control--end) {

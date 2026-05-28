@@ -535,6 +535,50 @@ export type SundayLeagueScheduleWeekUpdate = {
   updated_at?: string | null;
 };
 
+export type SundayLeagueFieldName = "Black Sheep Field" | "Magic Fountain Field";
+
+export type SundayLeagueMatchup = {
+  id: string;
+  week_id: string;
+  field_name: SundayLeagueFieldName;
+  start_time: string;
+  team_1_id?: string | null;
+  team_1_name?: string | null;
+  team_2_id?: string | null;
+  team_2_name?: string | null;
+  sort_order: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueMatchupInsert = {
+  id?: string;
+  week_id: string;
+  field_name: SundayLeagueFieldName;
+  start_time: string;
+  team_1_id?: string | null;
+  team_1_name?: string | null;
+  team_2_id?: string | null;
+  team_2_name?: string | null;
+  sort_order?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueMatchupUpdate = {
+  id?: string;
+  week_id?: string;
+  field_name?: SundayLeagueFieldName;
+  start_time?: string;
+  team_1_id?: string | null;
+  team_1_name?: string | null;
+  team_2_id?: string | null;
+  team_2_name?: string | null;
+  sort_order?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type Sport = {
   id: string;
   title: string;
@@ -929,6 +973,12 @@ export type Database = {
         Row: SundayLeagueScheduleWeek;
         Insert: SundayLeagueScheduleWeekInsert;
         Update: SundayLeagueScheduleWeekUpdate;
+        Relationships: [];
+      };
+      sunday_league_matchups: {
+        Row: SundayLeagueMatchup;
+        Insert: SundayLeagueMatchupInsert;
+        Update: SundayLeagueMatchupUpdate;
         Relationships: [];
       };
       sports: {

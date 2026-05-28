@@ -31,7 +31,7 @@ import {
 import { formatSundayLeagueDepositAmount, type SundayLeagueRuleSection } from "@/lib/sunday-league-settings-shared";
 import { createId } from "@/lib/create-id";
 import { supabase } from "@/lib/supabase/client";
-import type { FriendRequest, SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
+import type { FriendRequest, SundayLeagueLeaderboard, SundayLeagueMatchup, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
 type SundayLeagueSection = "overview" | "rules" | "teams" | "leaderboards" | "schedule" | "inquiries";
 type Status = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -47,6 +47,11 @@ type LeaderboardTableRow = {
   points: number;
   gamesPlayed: number;
 };
+type SundayLeagueScheduleWeekWithMatchups = SundayLeagueScheduleWeek & {
+  matchups: SundayLeagueMatchup[];
+};
+
+const SUNDAY_LEAGUE_FIELDS = ["Black Sheep Field", "Magic Fountain Field"] as const;
 
 const sectionOrder: Array<{ id: SundayLeagueSection; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -80,7 +85,7 @@ export default function SundayLeaguePageClient({
   const [overviewFlyer, setOverviewFlyer] = useState<string>("/sundayLeague/champs2025.jpeg");
   const [teams, setTeams] = useState<SundayLeagueTeam[]>([]);
   const [leaderboard, setLeaderboard] = useState<SundayLeagueLeaderboard[]>([]);
-  const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
+  const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeekWithMatchups[]>([]);
   const [loadingTeams, setLoadingTeams] = useState(true);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
   const [loadingSchedule, setLoadingSchedule] = useState(true);
@@ -222,11 +227,12 @@ export default function SundayLeaguePageClient({
         return;
       }
 
-      const [{ data: sessionData }, teamsResponse, leaderboardResponse, scheduleResponse] = await Promise.all([
+      const [{ data: sessionData }, teamsResponse, leaderboardResponse, scheduleResponse, matchupsResponse] = await Promise.all([
         supabase.auth.getSession(),
         supabase.from("sunday_league_teams").select("*").order("division", { ascending: true }).order("slot_number", { ascending: true }),
         supabase.from("sunday_league_leaderboard").select("*"),
         supabase.from("sunday_league_schedule_weeks").select("*").order("week_number", { ascending: true }),
+        supabase.from("sunday_league_matchups").select("*").order("sort_order", { ascending: true }),
       ]);
 
       const session = sessionData.session;
@@ -265,8 +271,18 @@ export default function SundayLeaguePageClient({
         setLeaderboard((leaderboardResponse.data ?? []) as SundayLeagueLeaderboard[]);
       }
 
-      if (!scheduleResponse.error) {
-        setScheduleWeeks((scheduleResponse.data ?? []) as SundayLeagueScheduleWeek[]);
+      if (!scheduleResponse.error && !matchupsResponse.error) {
+        const matchups = (matchupsResponse.data ?? []) as SundayLeagueMatchup[];
+        const matchupsByWeekId = new Map<string, SundayLeagueMatchup[]>();
+        for (const matchup of matchups) {
+          matchupsByWeekId.set(matchup.week_id, [...(matchupsByWeekId.get(matchup.week_id) ?? []), matchup]);
+        }
+        setScheduleWeeks(
+          ((scheduleResponse.data ?? []) as SundayLeagueScheduleWeek[]).map((week) => ({
+            ...week,
+            matchups: matchupsByWeekId.get(week.id) ?? [],
+          })),
+        );
       }
 
       setLoadingTeams(false);
@@ -291,6 +307,7 @@ export default function SundayLeaguePageClient({
       ) ?? null,
     [myMemberships, teams, userId],
   );
+  const sundayLeagueTeamById = useMemo(() => new Map(teams.map((team) => [team.id, team])), [teams]);
 
   const membershipByTeamId = useMemo(() => {
     const rank = { accepted: 4, pending: 3, declined: 2, free_agent: 1 } as const;
@@ -965,14 +982,46 @@ export default function SundayLeaguePageClient({
                     <div className="sunday-league-stack">
                       <p className="eyebrow">Week {week.week_number}</p>
                       <div className="sunday-league-schedule__grid">
-                        <div className="sunday-league-schedule__column">
-                          <h3>Black Sheep Field</h3>
-                          <p className="sunday-league-schedule__body">{week.black_sheep_field_schedule}</p>
-                        </div>
-                        <div className="sunday-league-schedule__column">
-                          <h3>Magic Fountain Field</h3>
-                          <p className="sunday-league-schedule__body">{week.magic_fountain_field_schedule}</p>
-                        </div>
+                        {SUNDAY_LEAGUE_FIELDS.map((fieldName) => {
+                          const fieldMatchups = week.matchups
+                            .filter((matchup) => matchup.field_name === fieldName)
+                            .sort((left, right) => left.sort_order - right.sort_order);
+
+                          return (
+                            <div key={fieldName} className="sunday-league-schedule__column">
+                              <h3>{fieldName}</h3>
+                              {fieldMatchups.length === 0 ? <p className="muted">No matchups posted.</p> : null}
+                              <div className="sunday-league-schedule__matchups">
+                                {fieldMatchups.map((matchup) => {
+                                  const teamOne = matchup.team_1_id ? sundayLeagueTeamById.get(matchup.team_1_id) : null;
+                                  const teamTwo = matchup.team_2_id ? sundayLeagueTeamById.get(matchup.team_2_id) : null;
+                                  const teamOneLabel = teamOne?.team_name ?? matchup.team_1_name ?? "Team TBD";
+                                  const teamTwoLabel = teamTwo?.team_name ?? matchup.team_2_name ?? "Team TBD";
+
+                                  return (
+                                    <p key={matchup.id} className="sunday-league-schedule__matchup">
+                                      <span className="sunday-league-schedule__time">{matchup.start_time}</span>
+                                      <span aria-hidden>|</span>
+                                      <span>
+                                        {teamOne ? (
+                                          <Link href={`/leagues/sunday-league/teams/${teamOne.id}`}>{teamOneLabel}</Link>
+                                        ) : (
+                                          teamOneLabel
+                                        )}{" "}
+                                        vs{" "}
+                                        {teamTwo ? (
+                                          <Link href={`/leagues/sunday-league/teams/${teamTwo.id}`}>{teamTwoLabel}</Link>
+                                        ) : (
+                                          teamTwoLabel
+                                        )}
+                                      </span>
+                                    </p>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   </article>

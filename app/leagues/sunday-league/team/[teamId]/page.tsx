@@ -20,7 +20,7 @@ import { countryCodeToFlag, getCountryFlagAsset, getCountryNameFromCode } from "
 import { createId } from "@/lib/create-id";
 import { formatSundayLeaguePlayerName, getSundayLeagueColor } from "@/lib/sunday-league";
 import { supabase } from "@/lib/supabase/client";
-import type { SundayLeagueLeaderboard, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
+import type { SundayLeagueLeaderboard, SundayLeagueMatchup, SundayLeagueScheduleWeek, SundayLeagueTeam, SundayLeagueTeamMember } from "@/lib/supabase/types";
 
 type AgreementKey =
   | "captain_confirmed"
@@ -103,6 +103,9 @@ type TeamMemberRecord = SundayLeagueTeamMember & {
   position: string | null;
 };
 type ActionState = { type: "idle" | "loading" | "success" | "error"; message?: string };
+type SundayLeagueScheduleWeekWithMatchups = SundayLeagueScheduleWeek & {
+  matchups: SundayLeagueMatchup[];
+};
 
 const createTeamPortalFormState = (team: SundayLeagueTeam): TeamPortalFormState => ({
   captain_name: team.captain_name ?? "",
@@ -150,7 +153,8 @@ export default function SundayLeagueTeamPortalPage() {
   const [team, setTeam] = useState<SundayLeagueTeam | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [viewerMembership, setViewerMembership] = useState<SundayLeagueTeamMember | null>(null);
-  const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeek[]>([]);
+  const [scheduleWeeks, setScheduleWeeks] = useState<SundayLeagueScheduleWeekWithMatchups[]>([]);
+  const [scheduleTeams, setScheduleTeams] = useState<SundayLeagueTeam[]>([]);
   const [rosterPlayers, setRosterPlayers] = useState<TeamRosterPlayer[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMemberRecord[]>([]);
   const [record, setRecord] = useState<Pick<SundayLeagueLeaderboard, "wins" | "draws" | "losses">>({ wins: 0, draws: 0, losses: 0 });
@@ -321,18 +325,36 @@ export default function SundayLeagueTeamPortalPage() {
     const loadScheduleWeeks = async () => {
       if (!supabase) return;
 
-      const { data, error } = await supabase
-        .from("sunday_league_schedule_weeks")
-        .select("*")
-        .order("week_number", { ascending: true });
+      const [weeksResponse, matchupsResponse, teamsResponse] = await Promise.all([
+        supabase
+          .from("sunday_league_schedule_weeks")
+          .select("*")
+          .order("week_number", { ascending: true }),
+        supabase
+          .from("sunday_league_matchups")
+          .select("*")
+          .or(`team_1_id.eq.${teamId},team_2_id.eq.${teamId}`)
+          .order("sort_order", { ascending: true }),
+        supabase.from("sunday_league_teams").select("*"),
+      ]);
 
-      if (!error) {
-        setScheduleWeeks((data ?? []) as SundayLeagueScheduleWeek[]);
+      if (!weeksResponse.error && !matchupsResponse.error && !teamsResponse.error) {
+        const matchups = (matchupsResponse.data ?? []) as SundayLeagueMatchup[];
+        const matchupsByWeekId = new Map<string, SundayLeagueMatchup[]>();
+        for (const matchup of matchups) {
+          matchupsByWeekId.set(matchup.week_id, [...(matchupsByWeekId.get(matchup.week_id) ?? []), matchup]);
+        }
+        setScheduleWeeks(
+          ((weeksResponse.data ?? []) as SundayLeagueScheduleWeek[])
+            .map((week) => ({ ...week, matchups: matchupsByWeekId.get(week.id) ?? [] }))
+            .filter((week) => week.matchups.length > 0),
+        );
+        setScheduleTeams((teamsResponse.data ?? []) as SundayLeagueTeam[]);
       }
     };
 
     void loadScheduleWeeks();
-  }, []);
+  }, [teamId]);
 
   useEffect(() => {
     if (!isEditing || !editSectionRef.current) return;
@@ -382,6 +404,7 @@ export default function SundayLeagueTeamPortalPage() {
 
   const historyRows = useMemo(() => buildTeamHistory(team), [team]);
   const establishedLabel = useMemo(() => getEstablishedLabel(team), [team]);
+  const scheduleTeamById = useMemo(() => new Map(scheduleTeams.map((item) => [item.id, item])), [scheduleTeams]);
   const pendingJoinRequests = useMemo(
     () => teamMembers.filter((member) => member.status === "pending" && member.source === "player_request"),
     [teamMembers],
@@ -1175,9 +1198,27 @@ export default function SundayLeagueTeamPortalPage() {
                 <section className="sunday-league-team-board__section">
                   <h3>Schedule</h3>
                   {scheduleWeeks.length === 0 ? (
-                    <p className="muted">No weekly schedule has been posted yet.</p>
+                    <p className="muted">No matchups have been posted for this team yet.</p>
                   ) : (
-                    <p className="muted">Weekly field assignments and match times are posted on the Sunday League schedule page.</p>
+                    <div className="sunday-league-team-board__list">
+                      {scheduleWeeks.map((week) =>
+                        week.matchups.map((matchup) => {
+                          const opponentId = matchup.team_1_id === team?.id ? matchup.team_2_id : matchup.team_1_id;
+                          const opponent = opponentId ? scheduleTeamById.get(opponentId) : null;
+                          const opponentName =
+                            opponent?.team_name ??
+                            (matchup.team_1_id === team?.id ? matchup.team_2_name : matchup.team_1_name) ??
+                            "Team TBD";
+
+                          return (
+                            <div key={matchup.id} className="sunday-league-team-board__list-row">
+                              <span>Week {week.week_number}</span>
+                              <span>{matchup.start_time} at {matchup.field_name} vs {opponentName}</span>
+                            </div>
+                          );
+                        }),
+                      )}
+                    </div>
                   )}
                 </section>
 
