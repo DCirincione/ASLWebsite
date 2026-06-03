@@ -5,6 +5,7 @@ import Script from "next/script";
 import { useCallback, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import "./partner.css";
+import "../account/account.css";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
@@ -28,8 +29,13 @@ import {
   type PartnerApplicationTeamMember,
 } from "@/lib/partner-application";
 import { getEventProgramSlugOptions } from "@/lib/sports";
+import {
+  getPaidPartnerPayoutAmountCents,
+  getPartnerAvailablePayoutAmountCents,
+  getPendingPartnerPayoutAmountCents,
+} from "@/lib/partner-payouts";
 import { supabase } from "@/lib/supabase/client";
-import type { Event, Profile, Sport } from "@/lib/supabase/types";
+import type { Event, PartnerPayoutRequest, Profile, Sport } from "@/lib/supabase/types";
 
 type AccessStatus = "loading" | "allowed" | "no-session" | "forbidden";
 type SaveStatus = { type: "idle" | "loading" | "success" | "error"; message?: string };
@@ -235,8 +241,9 @@ export default function PartnerPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [savingEditId, setSavingEditId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [requestingPayoutId, setRequestingPayoutId] = useState<string | null>(null);
-  const [payoutStatuses, setPayoutStatuses] = useState<Record<string, SaveStatus>>({});
+  const [requestingAvailablePayout, setRequestingAvailablePayout] = useState(false);
+  const [payoutRequests, setPayoutRequests] = useState<PartnerPayoutRequest[]>([]);
+  const [payoutRequestStatus, setPayoutRequestStatus] = useState<SaveStatus>({ type: "idle" });
   const [openSignupsEventId, setOpenSignupsEventId] = useState<string | null>(null);
   const [loadingSignupsEventId, setLoadingSignupsEventId] = useState<string | null>(null);
   const [signupsByEventId, setSignupsByEventId] = useState<Record<string, PartnerSignupRecord[]>>({});
@@ -327,6 +334,23 @@ export default function PartnerPage() {
     }
   }, [fetchWithSession]);
 
+  const loadPayoutRequests = useCallback(async () => {
+    try {
+      const response = await fetchWithSession("/api/partner/payout-request");
+      const json = (await response.json().catch(() => null)) as { error?: string; payoutRequests?: PartnerPayoutRequest[] } | null;
+      if (!response.ok) {
+        throw new Error(json?.error ?? "Could not load payout requests.");
+      }
+      setPayoutRequests(json?.payoutRequests ?? []);
+    } catch (error) {
+      setPayoutRequestStatus({
+        type: "error",
+        message: error instanceof Error ? error.message : "Could not load payout requests.",
+      });
+      setPayoutRequests([]);
+    }
+  }, [fetchWithSession]);
+
   const loadSports = useCallback(async () => {
     if (!supabase) return;
     const { data, error } = await supabase.from("sports").select("id,title,section_headers").order("title", { ascending: true });
@@ -364,10 +388,11 @@ export default function PartnerPage() {
       setStatus("allowed");
       await loadSports();
       await loadPartnerEvents();
+      await loadPayoutRequests();
     };
 
     void loadPage();
-  }, [loadPartnerApplicationDraft, loadPartnerEvents, loadSports]);
+  }, [loadPartnerApplicationDraft, loadPartnerEvents, loadPayoutRequests, loadSports]);
 
   const hasCompletedPartnerApplication = partnerApplicationDraft?.status === "completed";
   const hasPendingPartnerCheckout =
@@ -1047,51 +1072,43 @@ export default function PartnerPage() {
     }
   };
 
-  const requestPayout = async (event: PartnerEventRecord) => {
-    const earnedAmountCents = event.earned_amount_cents ?? 0;
-    if (earnedAmountCents <= 0) {
-      setPayoutStatuses((prev) => ({
-        ...prev,
-        [event.id]: { type: "error", message: "This event does not have any payout balance yet." },
-      }));
+  const requestAvailablePayout = async () => {
+    if (availablePayoutAmountCents <= 0) {
+      setPayoutRequestStatus({ type: "error", message: "There is no available payout balance right now." });
       return;
     }
 
     const confirmed = window.confirm(
-      `Send a payout request for "${event.title}" for ${formatEventPaymentAmount(earnedAmountCents)}?`,
+      `Request a payout for ${formatEventPaymentAmount(availablePayoutAmountCents)}?`,
     );
     if (!confirmed) return;
 
-    setRequestingPayoutId(event.id);
-    setPayoutStatuses((prev) => ({ ...prev, [event.id]: { type: "loading" } }));
+    setRequestingAvailablePayout(true);
+    setPayoutRequestStatus({ type: "loading" });
 
     try {
       const response = await fetchWithSession("/api/partner/payout-request", {
         method: "POST",
-        body: JSON.stringify({ eventId: event.id }),
       });
-      const json = (await response.json().catch(() => null)) as { error?: string } | null;
+      const json = (await response.json().catch(() => null)) as { error?: string; payoutRequest?: PartnerPayoutRequest } | null;
       if (!response.ok) {
         throw new Error(json?.error ?? "Could not send the payout request.");
       }
 
-      setPayoutStatuses((prev) => ({
-        ...prev,
-        [event.id]: {
-          type: "success",
-          message: `Payout request sent for ${formatEventPaymentAmount(earnedAmountCents)}.`,
-        },
-      }));
+      if (json?.payoutRequest) {
+        setPayoutRequests((prev) => [json.payoutRequest!, ...prev]);
+      }
+      setPayoutRequestStatus({
+        type: "success",
+        message: `Payout request sent for ${formatEventPaymentAmount(json?.payoutRequest?.amount_cents ?? availablePayoutAmountCents)}.`,
+      });
     } catch (error) {
-      setPayoutStatuses((prev) => ({
-        ...prev,
-        [event.id]: {
-          type: "error",
-          message: error instanceof Error ? error.message : "Could not send the payout request.",
-        },
-      }));
+      setPayoutRequestStatus({
+        type: "error",
+        message: error instanceof Error ? error.message : "Could not send the payout request.",
+      });
     } finally {
-      setRequestingPayoutId(null);
+      setRequestingAvailablePayout(false);
     }
   };
 
@@ -1138,6 +1155,9 @@ export default function PartnerPage() {
 
   const totalSignupCount = events.reduce((sum, event) => sum + (event.signup_count ?? 0), 0);
   const totalEarnedAmountCents = events.reduce((sum, event) => sum + (event.earned_amount_cents ?? 0), 0);
+  const paidPayoutAmountCents = getPaidPartnerPayoutAmountCents(payoutRequests);
+  const pendingPayoutAmountCents = getPendingPartnerPayoutAmountCents(payoutRequests);
+  const availablePayoutAmountCents = getPartnerAvailablePayoutAmountCents(events, payoutRequests);
 
   if (status === "loading") {
     return (
@@ -1272,16 +1292,44 @@ export default function PartnerPage() {
       <div className="account-body shell">
         <HistoryBackButton label="← Back" fallbackHref="/account" />
 
-        <section className="account-card account-card__intro">
-          <h1>Partner Portal</h1>
-          <p className="muted">
-            Create your own events, edit only your events, and send every version through owner approval before it goes live.
-          </p>
-          {profile?.name ? <p className="muted">Signed in as {profile.name}.</p> : null}
-          <p className="form-help muted">
-            If you edit an already approved partner event, it moves back into pending approval until an owner signs off again.
-          </p>
+        <section className="account-card account-card__intro partner-portal-intro">
+          <div className="partner-portal-intro__copy">
+            <h1>Partner Portal</h1>
+            <p className="muted">
+              Create your own events, edit only your events, and send every version through owner approval before it goes live.
+            </p>
+            {profile?.name ? <p className="muted">Signed in as {profile.name}.</p> : null}
+            <p className="form-help muted">
+              If you edit an already approved partner event, it moves back into pending approval until an owner signs off again.
+            </p>
+          </div>
+          <div className="partner-portal-earnings" aria-label="Total earned through partner events">
+            <span>Available For Payout</span>
+            <strong>{formatEventPaymentAmount(availablePayoutAmountCents)}</strong>
+            {pendingPayoutAmountCents > 0 ? <small>{formatEventPaymentAmount(pendingPayoutAmountCents)} pending</small> : null}
+            <button
+              className="button primary"
+              type="button"
+              onClick={() => void requestAvailablePayout()}
+              disabled={requestingAvailablePayout || availablePayoutAmountCents <= 0}
+            >
+              {requestingAvailablePayout ? "Sending..." : "Request Payout"}
+            </button>
+          </div>
         </section>
+        {payoutRequestStatus.message ? (
+          <p
+            className={`form-help ${
+              payoutRequestStatus.type === "error"
+                ? "error"
+                : payoutRequestStatus.type === "success"
+                  ? "success"
+                  : "muted"
+            }`}
+          >
+            {payoutRequestStatus.message}
+          </p>
+        ) : null}
 
         <section className="account-card">
           <div className="account-card__header">
@@ -1439,35 +1487,6 @@ export default function PartnerPage() {
                         )
                       ) : null}
                     </div>
-                  ) : null}
-                  <div className="partner-event-card__payout">
-                    <div>
-                      <p className="partner-event-card__payout-title">Payouts</p>
-                      <p className="muted">
-                        Request a payout once this event has collected paid signups.
-                      </p>
-                    </div>
-                    <button
-                      className="button primary"
-                      type="button"
-                      onClick={() => void requestPayout(event)}
-                      disabled={requestingPayoutId === event.id || (event.earned_amount_cents ?? 0) <= 0}
-                    >
-                      {requestingPayoutId === event.id ? "Sending..." : "Request Payout"}
-                    </button>
-                  </div>
-                  {payoutStatuses[event.id]?.message ? (
-                    <p
-                      className={`form-help ${
-                        payoutStatuses[event.id]?.type === "error"
-                          ? "error"
-                          : payoutStatuses[event.id]?.type === "success"
-                            ? "success"
-                            : "muted"
-                      }`}
-                    >
-                      {payoutStatuses[event.id]?.message}
-                    </p>
                   ) : null}
                   <div className="cta-row">
                     <button

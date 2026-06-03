@@ -48,6 +48,8 @@ import type {
   Event,
   Flyer,
   JsonValue,
+  PartnerPayoutRequest,
+  PartnerPayoutRequestStatus,
   Sport,
   SundayLeagueFieldName,
   SundayLeagueMatchup,
@@ -66,6 +68,7 @@ type AdminModule =
   | "community"
   | "contact"
   | "sports"
+  | "payouts"
   | "registrations"
   | "users"
   | "settings";
@@ -192,6 +195,9 @@ type UserManageForm = {
   role: UserRole;
   status: "active" | "suspended";
   reason: string;
+};
+type AdminPartnerPayoutRequest = PartnerPayoutRequest & {
+  partner_name?: string | null;
 };
 type ContactFilter = "all" | "unread" | "read";
 type AnnouncementFormState = {
@@ -698,6 +704,12 @@ export default function AdminPage() {
   const [contactFilter, setContactFilter] = useState<ContactFilter>("all");
   const [contactSearch, setContactSearch] = useState("");
   const [savingContactMessageId, setSavingContactMessageId] = useState<string | null>(null);
+  const [partnerPayoutRequests, setPartnerPayoutRequests] = useState<AdminPartnerPayoutRequest[]>([]);
+  const [loadingPartnerPayoutRequests, setLoadingPartnerPayoutRequests] = useState(false);
+  const [partnerPayoutRequestsError, setPartnerPayoutRequestsError] = useState<string | null>(null);
+  const [partnerPayoutRequestsStatus, setPartnerPayoutRequestsStatus] = useState<FormStatus>({ type: "idle" });
+  const [savingPartnerPayoutRequestId, setSavingPartnerPayoutRequestId] = useState<string | null>(null);
+  const [partnerPayoutDrafts, setPartnerPayoutDrafts] = useState<Record<string, { squareReferenceId: string; notes: string }>>({});
   const [users, setUsers] = useState<UserDirectoryRecord[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState<string | null>(null);
@@ -848,6 +860,12 @@ export default function AdminPage() {
       id: "registrations",
       title: "Registrations",
       description: "Review and manage event signups.",
+      enabled: true,
+    },
+    {
+      id: "payouts",
+      title: "Partner Payouts",
+      description: "Review partner payout requests and track Square payout references.",
       enabled: true,
     },
     {
@@ -3178,6 +3196,9 @@ export default function AdminPage() {
     if (module === "contact") {
       void loadContactMessages();
     }
+    if (module === "payouts") {
+      void loadPartnerPayoutRequests();
+    }
     if (module === "users") {
       void loadUsers();
     }
@@ -3382,6 +3403,99 @@ export default function AdminPage() {
     if (!supabase) return null;
     const { data: sessionData } = await supabase.auth.getSession();
     return sessionData.session?.access_token ?? null;
+  };
+
+  const loadPartnerPayoutRequests = async () => {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setPartnerPayoutRequestsError("Sign in again to continue.");
+      return;
+    }
+
+    setLoadingPartnerPayoutRequests(true);
+    setPartnerPayoutRequestsError(null);
+
+    try {
+      const response = await fetch("/api/admin/partner-payout-requests", {
+        headers: {
+          authorization: `Bearer ${accessToken}`,
+        },
+      });
+      const json = (await response.json().catch(() => null)) as {
+        error?: string;
+        payoutRequests?: AdminPartnerPayoutRequest[];
+      } | null;
+
+      if (!response.ok) {
+        throw new Error(json?.error ?? "Could not load payout requests.");
+      }
+
+      const requests = json?.payoutRequests ?? [];
+      setPartnerPayoutRequests(requests);
+      setPartnerPayoutDrafts((prev) =>
+        requests.reduce<Record<string, { squareReferenceId: string; notes: string }>>((acc, request) => {
+          acc[request.id] = prev[request.id] ?? {
+            squareReferenceId: request.square_reference_id ?? "",
+            notes: request.admin_notes ?? "",
+          };
+          return acc;
+        }, {}),
+      );
+    } catch (error) {
+      setPartnerPayoutRequestsError(error instanceof Error ? error.message : "Could not load payout requests.");
+    } finally {
+      setLoadingPartnerPayoutRequests(false);
+    }
+  };
+
+  const updatePartnerPayoutRequest = async (requestId: string, nextStatus: PartnerPayoutRequestStatus) => {
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setPartnerPayoutRequestsStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    setSavingPartnerPayoutRequestId(requestId);
+    setPartnerPayoutRequestsStatus({ type: "loading" });
+
+    try {
+      const draft = partnerPayoutDrafts[requestId] ?? { squareReferenceId: "", notes: "" };
+      const response = await fetch("/api/admin/partner-payout-requests", {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          id: requestId,
+          status: nextStatus,
+          square_reference_id: draft.squareReferenceId,
+          admin_notes: draft.notes,
+        }),
+      });
+      const json = (await response.json().catch(() => null)) as {
+        error?: string;
+        payoutRequest?: PartnerPayoutRequest;
+      } | null;
+
+      if (!response.ok || !json?.payoutRequest) {
+        throw new Error(json?.error ?? "Could not update payout request.");
+      }
+
+      setPartnerPayoutRequests((prev) =>
+        prev.map((request) =>
+          request.id === json.payoutRequest?.id ? { ...request, ...json.payoutRequest } : request,
+        ),
+      );
+      setPartnerPayoutRequestsStatus({ type: "success", message: "Payout request updated." });
+    } catch (error) {
+      setPartnerPayoutRequestsStatus({
+        type: "error",
+        message: error instanceof Error ? error.message : "Could not update payout request.",
+      });
+    } finally {
+      setSavingPartnerPayoutRequestId(null);
+    }
   };
 
   const savePartnerApproval = async (eventId: string, approvalStatus: "approved" | "changes_requested") => {
@@ -6889,6 +7003,102 @@ export default function AdminPage() {
                   }
                   onClose={() => setSelectedRegistrationSubmissionId(null)}
                 />
+              </>
+            ) : null}
+            {activeModule === "payouts" ? (
+              <>
+                <section className="account-card account-card__summary">
+                  <h2>Partner Payouts</h2>
+                  <p className="muted">Review requested partner payouts and record Square payout references once paid.</p>
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Payout Requests</h2>
+                      <p className="muted">Requested and approved payouts reduce a partner's available payout balance.</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => void loadPartnerPayoutRequests()} disabled={loadingPartnerPayoutRequests}>
+                      {loadingPartnerPayoutRequests ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  {partnerPayoutRequestsError ? <p className="form-help error">{partnerPayoutRequestsError}</p> : null}
+                  {partnerPayoutRequestsStatus.message ? (
+                    <p className={`form-help ${partnerPayoutRequestsStatus.type === "error" ? "error" : partnerPayoutRequestsStatus.type === "success" ? "success" : "muted"}`}>
+                      {partnerPayoutRequestsStatus.message}
+                    </p>
+                  ) : null}
+                  {loadingPartnerPayoutRequests ? <p className="muted">Loading payout requests...</p> : null}
+                  {!loadingPartnerPayoutRequests && partnerPayoutRequests.length === 0 ? <p className="muted">No payout requests yet.</p> : null}
+                  {!loadingPartnerPayoutRequests && partnerPayoutRequests.length > 0 ? (
+                    <div className="event-list admin-scroll-panel">
+                      {partnerPayoutRequests.map((request) => {
+                        const draft = partnerPayoutDrafts[request.id] ?? { squareReferenceId: "", notes: "" };
+                        const isSaving = savingPartnerPayoutRequestId === request.id;
+                        return (
+                          <article key={request.id} className="event-card-simple">
+                            <div className="event-card__header">
+                              <div>
+                                <h3>{request.partner_name ?? "Partner"}</h3>
+                                <p className="muted">Requested {formatEventPaymentAmount(request.amount_cents)}</p>
+                              </div>
+                              <span className={`pill ${request.status === "paid" ? "pill--green" : request.status === "rejected" ? "pill--amber" : "pill--muted"}`}>
+                                {request.status}
+                              </span>
+                            </div>
+                            <div className="event-card__meta">
+                              <p className="muted">Partner ID: {request.partner_user_id}</p>
+                              {request.requested_at ? <p className="muted">Requested: {formatMessageDate(request.requested_at)}</p> : null}
+                              {request.approved_at ? <p className="muted">Approved: {formatMessageDate(request.approved_at)}</p> : null}
+                              {request.paid_at ? <p className="muted">Paid: {formatMessageDate(request.paid_at)}</p> : null}
+                              {request.rejected_at ? <p className="muted">Rejected: {formatMessageDate(request.rejected_at)}</p> : null}
+                            </div>
+                            <div className="register-form-grid" style={{ marginTop: 12 }}>
+                              <div className="form-control">
+                                <label htmlFor={`payout-square-${request.id}`}>Square reference</label>
+                                <input
+                                  id={`payout-square-${request.id}`}
+                                  value={draft.squareReferenceId}
+                                  onChange={(event) =>
+                                    setPartnerPayoutDrafts((prev) => ({
+                                      ...prev,
+                                      [request.id]: { ...draft, squareReferenceId: event.target.value },
+                                    }))
+                                  }
+                                  placeholder="Square payout/payment reference"
+                                />
+                              </div>
+                              <div className="form-control">
+                                <label htmlFor={`payout-notes-${request.id}`}>Owner notes</label>
+                                <input
+                                  id={`payout-notes-${request.id}`}
+                                  value={draft.notes}
+                                  onChange={(event) =>
+                                    setPartnerPayoutDrafts((prev) => ({
+                                      ...prev,
+                                      [request.id]: { ...draft, notes: event.target.value },
+                                    }))
+                                  }
+                                  placeholder="Optional notes"
+                                />
+                              </div>
+                            </div>
+                            <div className="cta-row" style={{ marginTop: 12 }}>
+                              <button className="button ghost" type="button" onClick={() => void updatePartnerPayoutRequest(request.id, "approved")} disabled={isSaving || request.status === "paid"}>
+                                Approve
+                              </button>
+                              <button className="button primary" type="button" onClick={() => void updatePartnerPayoutRequest(request.id, "paid")} disabled={isSaving}>
+                                Mark Paid
+                              </button>
+                              <button className="button ghost" type="button" onClick={() => void updatePartnerPayoutRequest(request.id, "rejected")} disabled={isSaving || request.status === "paid"}>
+                                Reject
+                              </button>
+                            </div>
+                          </article>
+                        );
+                      })}
+                    </div>
+                  ) : null}
+                </section>
               </>
             ) : null}
             {activeModule === "users" ? (

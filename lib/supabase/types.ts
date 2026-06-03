@@ -301,6 +301,56 @@ export type EventCheckoutDraftUpdate = {
   completed_at?: string | null;
 };
 
+export type PartnerPayoutRequestStatus = "requested" | "approved" | "paid" | "rejected";
+
+export type PartnerPayoutRequest = {
+  id: string;
+  partner_user_id: string;
+  amount_cents: number;
+  status: PartnerPayoutRequestStatus;
+  requested_at?: string | null;
+  approved_by_user_id?: string | null;
+  approved_at?: string | null;
+  paid_at?: string | null;
+  rejected_at?: string | null;
+  square_reference_id?: string | null;
+  admin_notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type PartnerPayoutRequestInsert = {
+  id?: string;
+  partner_user_id: string;
+  amount_cents: number;
+  status?: PartnerPayoutRequestStatus;
+  requested_at?: string | null;
+  approved_by_user_id?: string | null;
+  approved_at?: string | null;
+  paid_at?: string | null;
+  rejected_at?: string | null;
+  square_reference_id?: string | null;
+  admin_notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type PartnerPayoutRequestUpdate = {
+  id?: string;
+  partner_user_id?: string;
+  amount_cents?: number;
+  status?: PartnerPayoutRequestStatus;
+  requested_at?: string | null;
+  approved_by_user_id?: string | null;
+  approved_at?: string | null;
+  paid_at?: string | null;
+  rejected_at?: string | null;
+  square_reference_id?: string | null;
+  admin_notes?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type SundayLeagueTeam = {
   id: string;
   user_id: string;
@@ -952,6 +1002,12 @@ export type Database = {
         Row: EventCheckoutDraft;
         Insert: EventCheckoutDraftInsert;
         Update: EventCheckoutDraftUpdate;
+        Relationships: [];
+      };
+      partner_payout_requests: {
+        Row: PartnerPayoutRequest;
+        Insert: PartnerPayoutRequestInsert;
+        Update: PartnerPayoutRequestUpdate;
         Relationships: [];
       };
       sunday_league_teams: {
