@@ -402,8 +402,8 @@ html[data-theme="dark"] .sunday-league-team-form select option {
 }
 
 .sunday-league-schedule__matchup {
-  display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   gap: 9px;
   line-height: 1.35;
@@ -422,6 +422,11 @@ html[data-theme="dark"] .sunday-league-team-form select option {
 
 .sunday-league-schedule__time {
   min-width: 64px;
+}
+
+.sunday-league-schedule__score {
+  color: var(--text);
+  white-space: nowrap;
 }
 
 .sunday-league-inquiries__prompt {
@@ -1992,7 +1997,7 @@ html[data-theme="dark"] .sunday-league-inquiries__form textarea:focus {
 
 .sunday-league-matchup-row__fields {
   display: grid;
-  grid-template-columns: minmax(96px, 0.7fr) minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   align-items: end;
   margin-top: 14px;

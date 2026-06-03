@@ -1,5 +1,12 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
+import { canAccessRefPortal } from "@/lib/event-approval";
+import { supabase } from "@/lib/supabase/client";
+import type { Profile } from "@/lib/supabase/types";
 
 const quickLinks = [
   { href: "/", label: "Home" },
@@ -19,6 +26,40 @@ const socials = [
 ];
 
 export function SiteFooter() {
+  const [profileRole, setProfileRole] = useState<Profile["role"] | null>(null);
+  const footerResources = canAccessRefPortal(profileRole)
+    ? [...resources, { href: "/ref-portal", label: "Ref Portal" }]
+    : resources;
+
+  useEffect(() => {
+    const client = supabase;
+    if (!client) return;
+
+    const loadRole = async (uid: string) => {
+      const { data: profile } = await client.from("profiles").select("role").eq("id", uid).maybeSingle();
+      setProfileRole((profile?.role as Profile["role"] | null | undefined) ?? null);
+    };
+
+    client.auth.getSession().then(({ data }) => {
+      const userId = data.session?.user.id;
+      if (userId) {
+        void loadRole(userId);
+      }
+    });
+
+    const { data: subscription } = client.auth.onAuthStateChange((_event, session) => {
+      if (session?.user.id) {
+        void loadRole(session.user.id);
+      } else {
+        setProfileRole(null);
+      }
+    });
+
+    return () => {
+      subscription?.subscription.unsubscribe();
+    };
+  }, []);
+
   return (
     <footer className="site-footer">
       <div className="shell site-footer__inner">
@@ -51,7 +92,7 @@ export function SiteFooter() {
           <div className="site-footer__column">
             <h4>Resources</h4>
             <ul>
-              {resources.map((link) => (
+              {footerResources.map((link) => (
                 <li key={link.href}>
                   <Link href={link.href}>{link.label}</Link>
                 </li>

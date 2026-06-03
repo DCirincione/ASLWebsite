@@ -2,7 +2,7 @@ export type Profile = {
   id: string;
   name: string;
   age: string | null;
-  role?: "player" | "partner" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "ref" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
   suspension_reason?: string | null;
@@ -21,7 +21,7 @@ export type ProfileInsert = {
   id?: string;
   name: string;
   age?: string | null;
-  role?: "player" | "partner" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "ref" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
   suspension_reason?: string | null;
@@ -40,7 +40,7 @@ export type ProfileUpdate = {
   id?: string;
   name?: string;
   age?: string | null;
-  role?: "player" | "partner" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "ref" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
   suspension_reason?: string | null;
@@ -544,8 +544,11 @@ export type SundayLeagueMatchup = {
   start_time: string;
   team_1_id?: string | null;
   team_1_name?: string | null;
+  team_1_score?: number | null;
   team_2_id?: string | null;
   team_2_name?: string | null;
+  team_2_score?: number | null;
+  forfeited_team_id?: string | null;
   sort_order: number;
   created_at?: string | null;
   updated_at?: string | null;
@@ -558,8 +561,11 @@ export type SundayLeagueMatchupInsert = {
   start_time: string;
   team_1_id?: string | null;
   team_1_name?: string | null;
+  team_1_score?: number | null;
   team_2_id?: string | null;
   team_2_name?: string | null;
+  team_2_score?: number | null;
+  forfeited_team_id?: string | null;
   sort_order?: number;
   created_at?: string | null;
   updated_at?: string | null;
@@ -572,8 +578,11 @@ export type SundayLeagueMatchupUpdate = {
   start_time?: string;
   team_1_id?: string | null;
   team_1_name?: string | null;
+  team_1_score?: number | null;
   team_2_id?: string | null;
   team_2_name?: string | null;
+  team_2_score?: number | null;
+  forfeited_team_id?: string | null;
   sort_order?: number;
   created_at?: string | null;
   updated_at?: string | null;

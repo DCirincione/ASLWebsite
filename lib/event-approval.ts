@@ -15,6 +15,9 @@ export const canAccessAdminDashboard = (role?: Profile["role"] | null) => role =
 export const canAccessPartnerPortal = (role?: Profile["role"] | null) =>
   role === "partner" || role === "admin" || role === "owner";
 
+export const canAccessRefPortal = (role?: Profile["role"] | null) =>
+  role === "ref" || role === "admin" || role === "owner";
+
 export const isPublicEventVisible = (event: Pick<Event, "host_type" | "approval_status">) =>
   event.host_type !== "partner" || event.approval_status === "approved";
 

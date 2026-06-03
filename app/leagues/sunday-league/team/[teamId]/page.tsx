@@ -402,9 +402,35 @@ export default function SundayLeagueTeamPortalPage() {
     return () => window.clearTimeout(timeoutId);
   }, [currentUserId, teamId]);
 
-  const historyRows = useMemo(() => buildTeamHistory(team), [team]);
   const establishedLabel = useMemo(() => getEstablishedLabel(team), [team]);
   const scheduleTeamById = useMemo(() => new Map(scheduleTeams.map((item) => [item.id, item])), [scheduleTeams]);
+  const historyRows = useMemo(() => {
+    const baseRows = buildTeamHistory(team);
+    if (!team) return baseRows;
+
+    const completedRows = scheduleWeeks.flatMap((week) =>
+      week.matchups
+        .filter((matchup) => Boolean(matchup.forfeited_team_id) || (matchup.team_1_score != null && matchup.team_2_score != null))
+        .map((matchup) => {
+          const isTeamOne = matchup.team_1_id === team.id;
+          const opponentId = isTeamOne ? matchup.team_2_id : matchup.team_1_id;
+          const opponent = opponentId ? scheduleTeamById.get(opponentId) : null;
+          const opponentName = opponent?.team_name ?? (isTeamOne ? matchup.team_2_name : matchup.team_1_name) ?? "Team TBD";
+          if (matchup.forfeited_team_id) {
+            const result = matchup.forfeited_team_id === team.id ? "Forfeit loss" : "Forfeit win";
+            return `Week ${week.week_number}: ${result} vs ${opponentName}`;
+          }
+
+          const teamScore = isTeamOne ? matchup.team_1_score ?? 0 : matchup.team_2_score ?? 0;
+          const opponentScore = isTeamOne ? matchup.team_2_score ?? 0 : matchup.team_1_score ?? 0;
+          const result = teamScore === opponentScore ? "Draw" : teamScore > opponentScore ? "Win" : "Loss";
+
+          return `Week ${week.week_number}: ${result} vs ${opponentName} (${teamScore}-${opponentScore})`;
+        }),
+    );
+
+    return [...baseRows, ...completedRows];
+  }, [scheduleTeamById, scheduleWeeks, team]);
   const pendingJoinRequests = useMemo(
     () => teamMembers.filter((member) => member.status === "pending" && member.source === "player_request"),
     [teamMembers],
@@ -1209,11 +1235,22 @@ export default function SundayLeagueTeamPortalPage() {
                             opponent?.team_name ??
                             (matchup.team_1_id === team?.id ? matchup.team_2_name : matchup.team_1_name) ??
                             "Team TBD";
+                          const teamScore = matchup.team_1_id === team?.id ? matchup.team_1_score : matchup.team_2_score;
+                          const opponentScore = matchup.team_1_id === team?.id ? matchup.team_2_score : matchup.team_1_score;
+                          const hasScore = teamScore != null && opponentScore != null;
+                          const forfeitLabel = matchup.forfeited_team_id
+                            ? matchup.forfeited_team_id === team?.id
+                              ? " | Forfeit loss"
+                              : " | Forfeit win"
+                            : "";
 
                           return (
                             <div key={matchup.id} className="sunday-league-team-board__list-row">
                               <span>Week {week.week_number}</span>
-                              <span>{matchup.start_time} at {matchup.field_name} vs {opponentName}</span>
+                              <span>
+                                {matchup.start_time} at {matchup.field_name} vs {opponentName}
+                                {forfeitLabel || (hasScore ? ` | Score ${teamScore}-${opponentScore}` : "")}
+                              </span>
                             </div>
                           );
                         }),

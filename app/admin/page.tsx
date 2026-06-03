@@ -179,7 +179,7 @@ type ContactMessage = {
 type UserDirectoryRecord = {
   id: string;
   name: string;
-  role?: "player" | "partner" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "ref" | "admin" | "owner" | null;
   age?: string | null;
   sports?: string[] | null;
   suspended?: boolean | null;
@@ -187,7 +187,7 @@ type UserDirectoryRecord = {
   suspension_reason?: string | null;
   created_at?: string | null;
 };
-type UserRole = "player" | "partner" | "admin" | "owner";
+type UserRole = "player" | "partner" | "ref" | "admin" | "owner";
 type UserManageForm = {
   role: UserRole;
   status: "active" | "suspended";
@@ -505,10 +505,23 @@ const normalizeContactMessage = (message: ContactMessage): ContactMessage => {
 
 const SUNDAY_LEAGUE_FIELDS = ["Black Sheep Field", "Magic Fountain Field"] as const satisfies readonly SundayLeagueFieldName[];
 const CUSTOM_SUNDAY_LEAGUE_TEAM_VALUE = "__custom_team__";
+const SUNDAY_LEAGUE_FIXED_MATCHUP_TIMES = [
+  "1:00",
+  "1:15",
+  "1:30",
+  "1:45",
+  "2:00",
+  "2:15",
+  "2:30",
+  "2:45",
+  "3:00",
+  "3:15",
+  "3:30",
+] as const;
 
-const createEmptySundayLeagueScheduleMatchup = (): SundayLeagueScheduleMatchupFormRow => ({
+const createEmptySundayLeagueScheduleMatchup = (startTime: string): SundayLeagueScheduleMatchupFormRow => ({
   id: createId(),
-  start_time: "",
+  start_time: startTime,
   team_1_mode: "",
   team_1_id: "",
   team_1_custom_name: "",
@@ -517,41 +530,50 @@ const createEmptySundayLeagueScheduleMatchup = (): SundayLeagueScheduleMatchupFo
   team_2_custom_name: "",
 });
 
+const createFixedSundayLeagueScheduleRows = () =>
+  SUNDAY_LEAGUE_FIXED_MATCHUP_TIMES.map((time) => createEmptySundayLeagueScheduleMatchup(time));
+
 const createEmptySundayLeagueScheduleForm = (): SundayLeagueScheduleFormState => ({
-  blackSheepField: [],
-  magicFountainField: [],
+  blackSheepField: createFixedSundayLeagueScheduleRows(),
+  magicFountainField: createFixedSundayLeagueScheduleRows(),
 });
 
 const getSundayLeagueScheduleFormKey = (fieldName: SundayLeagueFieldName): keyof SundayLeagueScheduleFormState =>
   fieldName === "Black Sheep Field" ? "blackSheepField" : "magicFountainField";
 
+const normalizeSundayLeagueScheduleTime = (value?: string | null) =>
+  (value ?? "").trim().replace(/\s*[ap]\.?m\.?$/i, "");
+
+function mapSundayLeagueFieldMatchupsToFixedRows(
+  matchups: SundayLeagueMatchup[],
+  fieldName: SundayLeagueFieldName,
+): SundayLeagueScheduleMatchupFormRow[] {
+  const matchupsByTime = new Map(
+    matchups
+      .filter((matchup) => matchup.field_name === fieldName)
+      .map((matchup) => [normalizeSundayLeagueScheduleTime(matchup.start_time), matchup]),
+  );
+
+  return SUNDAY_LEAGUE_FIXED_MATCHUP_TIMES.map((time) => {
+    const matchup = matchupsByTime.get(time);
+    if (!matchup) return createEmptySundayLeagueScheduleMatchup(time);
+
+    return {
+      id: matchup.id,
+      start_time: time,
+      team_1_mode: matchup.team_1_id ? "registered" : matchup.team_1_name ? "custom" : "",
+      team_1_id: matchup.team_1_id ?? "",
+      team_1_custom_name: matchup.team_1_name ?? "",
+      team_2_mode: matchup.team_2_id ? "registered" : matchup.team_2_name ? "custom" : "",
+      team_2_id: matchup.team_2_id ?? "",
+      team_2_custom_name: matchup.team_2_name ?? "",
+    };
+  });
+}
+
 const mapSundayLeagueMatchupsToForm = (matchups: SundayLeagueMatchup[]): SundayLeagueScheduleFormState => ({
-  blackSheepField: matchups
-    .filter((matchup) => matchup.field_name === "Black Sheep Field")
-    .sort((left, right) => left.sort_order - right.sort_order)
-    .map((matchup) => ({
-      id: matchup.id,
-      start_time: matchup.start_time ?? "",
-      team_1_mode: matchup.team_1_id ? "registered" : matchup.team_1_name ? "custom" : "",
-      team_1_id: matchup.team_1_id ?? "",
-      team_1_custom_name: matchup.team_1_name ?? "",
-      team_2_mode: matchup.team_2_id ? "registered" : matchup.team_2_name ? "custom" : "",
-      team_2_id: matchup.team_2_id ?? "",
-      team_2_custom_name: matchup.team_2_name ?? "",
-    })),
-  magicFountainField: matchups
-    .filter((matchup) => matchup.field_name === "Magic Fountain Field")
-    .sort((left, right) => left.sort_order - right.sort_order)
-    .map((matchup) => ({
-      id: matchup.id,
-      start_time: matchup.start_time ?? "",
-      team_1_mode: matchup.team_1_id ? "registered" : matchup.team_1_name ? "custom" : "",
-      team_1_id: matchup.team_1_id ?? "",
-      team_1_custom_name: matchup.team_1_name ?? "",
-      team_2_mode: matchup.team_2_id ? "registered" : matchup.team_2_name ? "custom" : "",
-      team_2_id: matchup.team_2_id ?? "",
-      team_2_custom_name: matchup.team_2_name ?? "",
-    })),
+  blackSheepField: mapSundayLeagueFieldMatchupsToFixedRows(matchups, "Black Sheep Field"),
+  magicFountainField: mapSundayLeagueFieldMatchupsToFixedRows(matchups, "Magic Fountain Field"),
 });
 
 const mapSportToForm = (sport: Sport): SportFormState => ({
@@ -1838,12 +1860,6 @@ export default function AdminPage() {
     setEditScheduleWeekForm((prev) => ({ ...prev, [key]: value }));
   };
 
-  const addScheduleMatchup = (target: "create" | "edit", fieldName: SundayLeagueFieldName) => {
-    const formKey = getSundayLeagueScheduleFormKey(fieldName);
-    const updater = target === "create" ? setScheduleWeekForm : setEditScheduleWeekForm;
-    updater((prev) => ({ ...prev, [formKey]: [...prev[formKey], createEmptySundayLeagueScheduleMatchup()] }));
-  };
-
   const updateScheduleMatchup = (
     target: "create" | "edit",
     fieldName: SundayLeagueFieldName,
@@ -1857,12 +1873,6 @@ export default function AdminPage() {
       ...prev,
       [formKey]: prev[formKey].map((row) => (row.id === rowId ? { ...row, [key]: value } : row)),
     }));
-  };
-
-  const removeScheduleMatchup = (target: "create" | "edit", fieldName: SundayLeagueFieldName, rowId: string) => {
-    const formKey = getSundayLeagueScheduleFormKey(fieldName);
-    const updater = target === "create" ? setScheduleWeekForm : setEditScheduleWeekForm;
-    updater((prev) => ({ ...prev, [formKey]: prev[formKey].filter((row) => row.id !== rowId) }));
   };
 
   const getScheduleMatchupTeamLabel = (teamId: string, customName: string) =>
@@ -2878,8 +2888,15 @@ export default function AdminPage() {
         const teamOneName = row.team_1_mode === "custom" ? row.team_1_custom_name.trim() : "";
         const teamTwoId = row.team_2_mode === "registered" ? row.team_2_id : "";
         const teamTwoName = row.team_2_mode === "custom" ? row.team_2_custom_name.trim() : "";
-        if (!startTime || (!teamOneId && !teamOneName) || (!teamTwoId && !teamTwoName)) {
-          return { error: "Every matchup needs a time and both teams selected or typed in." };
+        const hasTeamOne = Boolean(teamOneId || teamOneName);
+        const hasTeamTwo = Boolean(teamTwoId || teamTwoName);
+        if (!hasTeamOne && !hasTeamTwo) {
+          sortOrder += 1;
+          continue;
+        }
+
+        if (!startTime || !hasTeamOne || !hasTeamTwo) {
+          return { error: "Every started time slot needs both teams selected or typed in." };
         }
 
         if (teamOneId && teamTwoId && teamOneId === teamTwoId) {
@@ -4300,15 +4317,13 @@ export default function AdminPage() {
             <div className="account-card__header">
               <div>
                 <h3>{fieldName}</h3>
-                <p className="muted">{rows.length} matchup{rows.length === 1 ? "" : "s"}</p>
+                <p className="muted">Fixed 15-minute slots from 1:00 to 3:30</p>
               </div>
             </div>
-            {rows.length === 0 ? <p className="muted">No matchups added yet.</p> : null}
             {rows.map((row, index) => {
               const teamOneLabel = getScheduleMatchupTeamLabel(row.team_1_id, row.team_1_custom_name);
               const teamTwoLabel = getScheduleMatchupTeamLabel(row.team_2_id, row.team_2_custom_name);
               const rowIsComplete =
-                Boolean(row.start_time.trim()) &&
                 (Boolean(row.team_1_id) || Boolean(row.team_1_custom_name.trim())) &&
                 (Boolean(row.team_2_id) || Boolean(row.team_2_custom_name.trim()));
 
@@ -4316,32 +4331,12 @@ export default function AdminPage() {
                 <details key={row.id} className="sunday-league-matchup-row" open={!rowIsComplete}>
                   <summary className="sunday-league-matchup-row__summary">
                     <span className="sunday-league-matchup-row__summary-copy">
-                      <strong>{row.start_time.trim() || `Matchup ${index + 1}`}</strong>
+                      <strong>{row.start_time}</strong>
                       <span>{teamOneLabel} vs {teamTwoLabel}</span>
                     </span>
-                    <span className="sunday-league-matchup-row__summary-actions">
-                      <button
-                        className="button ghost"
-                        type="button"
-                        onClick={(event) => {
-                          event.preventDefault();
-                          removeScheduleMatchup(target, fieldName, row.id);
-                        }}
-                      >
-                        Remove
-                      </button>
-                    </span>
+                    <span className="pill">Slot {index + 1}</span>
                   </summary>
                   <div className="sunday-league-matchup-row__fields">
-                    <div className="form-control">
-                      <label htmlFor={`${target}-${formKey}-time-${row.id}`}>Time</label>
-                      <input
-                        id={`${target}-${formKey}-time-${row.id}`}
-                        value={row.start_time}
-                        onChange={(event) => updateScheduleMatchup(target, fieldName, row.id, "start_time", event.target.value)}
-                        placeholder="1:00 PM"
-                      />
-                    </div>
                     <div className="form-control">
                       <label htmlFor={`${target}-${formKey}-team-1-${row.id}`}>Team 1</label>
                       <select
@@ -4392,9 +4387,6 @@ export default function AdminPage() {
                 </details>
               );
             })}
-            <button className="button primary sunday-league-matchup-builder__add" type="button" onClick={() => addScheduleMatchup(target, fieldName)}>
-              Add Matchup
-            </button>
           </section>
         );
       })}
@@ -7024,6 +7016,13 @@ export default function AdminPage() {
                               onClick={() => setManageForm((prev) => ({ ...prev, role: "partner" }))}
                             >
                               Partner
+                            </button>
+                            <button
+                              type="button"
+                              className={`button ${manageForm.role === "ref" ? "primary" : "ghost"}`}
+                              onClick={() => setManageForm((prev) => ({ ...prev, role: "ref" }))}
+                            >
+                              Ref
                             </button>
                             <button
                               type="button"

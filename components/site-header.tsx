@@ -6,7 +6,7 @@ import { CSSProperties, MouseEvent, useCallback, useEffect, useRef, useState } f
 
 import { AccountAuthModal } from "./account-auth-modal";
 import { AvatarImage } from "./avatar-image";
-import { canAccessAdminDashboard, isPartnerRole } from "@/lib/event-approval";
+import { canAccessAdminDashboard, canAccessRefPortal, isPartnerRole } from "@/lib/event-approval";
 import { supabase } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/supabase/types";
 
@@ -185,8 +185,12 @@ export function SiteHeader() {
   }, []);
 
   const canAccessAdmin = canAccessAdminDashboard(profileRole);
+  const canAccessRef = canAccessRefPortal(profileRole);
   const shouldShowPartnerSignup = !isPartnerRole(profileRole) && !canAccessAdmin;
-  const navLinks = isPartnerRole(profileRole) ? [...links, { href: "/partner", label: "Partner Portal" }] : links;
+  const navLinks = [
+    ...links,
+    ...(isPartnerRole(profileRole) ? [{ href: "/partner", label: "Partner Portal" }] : []),
+  ];
 
   return (
     <>
@@ -251,6 +255,11 @@ export function SiteHeader() {
                           Admin Dashboard
                         </Link>
                       ) : null}
+                      {canAccessRef ? (
+                        <Link href="/ref-portal" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
+                          Ref Portal
+                        </Link>
+                      ) : null}
                     </div>
                   </details>
                 </>
@@ -294,6 +303,11 @@ export function SiteHeader() {
                     {canAccessAdmin ? (
                       <Link href="/admin" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                         Admin Dashboard
+                      </Link>
+                    ) : null}
+                    {canAccessRef ? (
+                      <Link href="/ref-portal" role="menuitem" onClick={() => setIsMenuOpen(false)}>
+                        Ref Portal
                       </Link>
                     ) : null}
                     <Link href="/account/settings" role="menuitem" onClick={() => setIsMenuOpen(false)}>

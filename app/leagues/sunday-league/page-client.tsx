@@ -46,6 +46,7 @@ type LeaderboardTableRow = {
   goalDistribution: string;
   points: number;
   gamesPlayed: number;
+  forfeitWins: number;
 };
 type SundayLeagueScheduleWeekWithMatchups = SundayLeagueScheduleWeek & {
   matchups: SundayLeagueMatchup[];
@@ -356,9 +357,10 @@ export default function SundayLeaguePageClient({
             losses: entry.losses,
             goalsFor: entry.goals_for,
             goalsAgainst: entry.goals_against,
-            goalDistribution: entry.goal_distribution,
-            points: entry.points,
-            gamesPlayed: entry.games_played,
+            goalDistribution: `${entry.goals_for - entry.goals_against > 0 ? "+" : ""}${entry.goals_for - entry.goals_against}`,
+            points: entry.wins * 3 + entry.draws + entry.forfeit_wins,
+            gamesPlayed: entry.wins + entry.draws + entry.losses + entry.forfeit_wins,
+            forfeitWins: entry.forfeit_wins,
           };
         })
         .filter((row): row is LeaderboardTableRow => row !== null)
@@ -939,6 +941,7 @@ export default function SundayLeaguePageClient({
                       <th>W</th>
                       <th>D</th>
                       <th>L</th>
+                      <th>FW</th>
                       <th>GF</th>
                       <th>GA</th>
                       <th>GF-GA</th>
@@ -953,6 +956,7 @@ export default function SundayLeaguePageClient({
                         <td>{row.wins}</td>
                         <td>{row.draws}</td>
                         <td>{row.losses}</td>
+                        <td>{row.forfeitWins}</td>
                         <td>{row.goalsFor}</td>
                         <td>{row.goalsAgainst}</td>
                         <td>{row.goalDistribution}</td>
@@ -997,6 +1001,13 @@ export default function SundayLeaguePageClient({
                                   const teamTwo = matchup.team_2_id ? sundayLeagueTeamById.get(matchup.team_2_id) : null;
                                   const teamOneLabel = teamOne?.team_name ?? matchup.team_1_name ?? "Team TBD";
                                   const teamTwoLabel = teamTwo?.team_name ?? matchup.team_2_name ?? "Team TBD";
+                                  const hasScore = matchup.team_1_score != null && matchup.team_2_score != null;
+                                  const forfeitedTeamLabel =
+                                    matchup.forfeited_team_id && matchup.forfeited_team_id === matchup.team_1_id
+                                      ? teamOneLabel
+                                      : matchup.forfeited_team_id && matchup.forfeited_team_id === matchup.team_2_id
+                                        ? teamTwoLabel
+                                        : "";
 
                                   return (
                                     <p key={matchup.id} className="sunday-league-schedule__matchup">
@@ -1015,6 +1026,21 @@ export default function SundayLeaguePageClient({
                                           teamTwoLabel
                                         )}
                                       </span>
+                                      {forfeitedTeamLabel ? (
+                                        <>
+                                          <span aria-hidden>|</span>
+                                          <strong className="sunday-league-schedule__score">
+                                            {forfeitedTeamLabel} forfeited
+                                          </strong>
+                                        </>
+                                      ) : hasScore ? (
+                                        <>
+                                          <span aria-hidden>|</span>
+                                          <strong className="sunday-league-schedule__score">
+                                            {matchup.team_1_score} - {matchup.team_2_score}
+                                          </strong>
+                                        </>
+                                      ) : null}
                                     </p>
                                   );
                                 })}
