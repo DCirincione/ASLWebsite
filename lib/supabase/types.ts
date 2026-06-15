@@ -638,6 +638,39 @@ export type SundayLeagueMatchupUpdate = {
   updated_at?: string | null;
 };
 
+export type SundayLeagueMatchupGoal = {
+  id: string;
+  matchup_id: string;
+  team_id: string;
+  player_user_id?: string | null;
+  player_name: string;
+  goal_number: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueMatchupGoalInsert = {
+  id?: string;
+  matchup_id: string;
+  team_id: string;
+  player_user_id?: string | null;
+  player_name: string;
+  goal_number: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type SundayLeagueMatchupGoalUpdate = {
+  id?: string;
+  matchup_id?: string;
+  team_id?: string;
+  player_user_id?: string | null;
+  player_name?: string;
+  goal_number?: number;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type Sport = {
   id: string;
   title: string;
@@ -1044,6 +1077,12 @@ export type Database = {
         Row: SundayLeagueMatchup;
         Insert: SundayLeagueMatchupInsert;
         Update: SundayLeagueMatchupUpdate;
+        Relationships: [];
+      };
+      sunday_league_matchup_goals: {
+        Row: SundayLeagueMatchupGoal;
+        Insert: SundayLeagueMatchupGoalInsert;
+        Update: SundayLeagueMatchupGoalUpdate;
         Relationships: [];
       };
       sports: {

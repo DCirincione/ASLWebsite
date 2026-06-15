@@ -1012,8 +1012,10 @@ export default function SundayLeaguePageClient({
                                   return (
                                     <p key={matchup.id} className="sunday-league-schedule__matchup">
                                       <span className="sunday-league-schedule__time">{matchup.start_time}</span>
-                                      <span aria-hidden>|</span>
-                                      <span>
+                                      <span className="sunday-league-schedule__divider" aria-hidden>
+                                        |
+                                      </span>
+                                      <span className="sunday-league-schedule__teams">
                                         {teamOne ? (
                                           <Link href={`/leagues/sunday-league/teams/${teamOne.id}`}>{teamOneLabel}</Link>
                                         ) : (
@@ -1028,14 +1030,22 @@ export default function SundayLeaguePageClient({
                                       </span>
                                       {forfeitedTeamLabel ? (
                                         <>
-                                          <span aria-hidden>|</span>
-                                          <strong className="sunday-league-schedule__score">
-                                            {forfeitedTeamLabel} forfeited
+                                          <span className="sunday-league-schedule__divider" aria-hidden>
+                                            |
+                                          </span>
+                                          <strong
+                                            className="sunday-league-schedule__score sunday-league-schedule__score--forfeit"
+                                            title={`${forfeitedTeamLabel} forfeited`}
+                                            aria-label={`${forfeitedTeamLabel} forfeited`}
+                                          >
+                                            Forfeit
                                           </strong>
                                         </>
                                       ) : hasScore ? (
                                         <>
-                                          <span aria-hidden>|</span>
+                                          <span className="sunday-league-schedule__divider" aria-hidden>
+                                            |
+                                          </span>
                                           <strong className="sunday-league-schedule__score">
                                             {matchup.team_1_score} - {matchup.team_2_score}
                                           </strong>

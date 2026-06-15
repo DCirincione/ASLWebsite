@@ -131,13 +131,7 @@ const createTeamPortalFormState = (team: SundayLeagueTeam): TeamPortalFormState 
 
 const buildTeamHistory = (team: SundayLeagueTeam | null) => {
   if (!team) return [];
-
-  return [
-    "Sunday League spot reserved for the upcoming season",
-    team.deposit_status
-     === "paid" ? "Deposit received and team spot confirmed" : "Deposit pending before final approval",
-    "Club history will expand after the first official league match",
-  ];
+  return [];
 };
 
 const getEstablishedLabel = (team: SundayLeagueTeam | null) => {
@@ -431,6 +425,18 @@ export default function SundayLeagueTeamPortalPage() {
 
     return [...baseRows, ...completedRows];
   }, [scheduleTeamById, scheduleWeeks, team]);
+  const upcomingScheduleWeeks = useMemo(
+    () =>
+      scheduleWeeks
+        .map((week) => ({
+          ...week,
+          matchups: week.matchups.filter(
+            (matchup) => !matchup.forfeited_team_id && (matchup.team_1_score == null || matchup.team_2_score == null),
+          ),
+        }))
+        .filter((week) => week.matchups.length > 0),
+    [scheduleWeeks],
+  );
   const pendingJoinRequests = useMemo(
     () => teamMembers.filter((member) => member.status === "pending" && member.source === "player_request"),
     [teamMembers],
@@ -1223,11 +1229,11 @@ export default function SundayLeagueTeamPortalPage() {
 
                 <section className="sunday-league-team-board__section">
                   <h3>Schedule</h3>
-                  {scheduleWeeks.length === 0 ? (
-                    <p className="muted">No matchups have been posted for this team yet.</p>
+                  {upcomingScheduleWeeks.length === 0 ? (
+                    <p className="muted">No upcoming matchups have been posted for this team yet.</p>
                   ) : (
                     <div className="sunday-league-team-board__list">
-                      {scheduleWeeks.map((week) =>
+                      {upcomingScheduleWeeks.map((week) =>
                         week.matchups.map((matchup) => {
                           const opponentId = matchup.team_1_id === team?.id ? matchup.team_2_id : matchup.team_1_id;
                           const opponent = opponentId ? scheduleTeamById.get(opponentId) : null;
@@ -1238,18 +1244,15 @@ export default function SundayLeagueTeamPortalPage() {
                           const teamScore = matchup.team_1_id === team?.id ? matchup.team_1_score : matchup.team_2_score;
                           const opponentScore = matchup.team_1_id === team?.id ? matchup.team_2_score : matchup.team_1_score;
                           const hasScore = teamScore != null && opponentScore != null;
-                          const forfeitLabel = matchup.forfeited_team_id
-                            ? matchup.forfeited_team_id === team?.id
-                              ? " | Forfeit loss"
-                              : " | Forfeit win"
-                            : "";
 
                           return (
-                            <div key={matchup.id} className="sunday-league-team-board__list-row">
-                              <span>Week {week.week_number}</span>
-                              <span>
-                                {matchup.start_time} at {matchup.field_name} vs {opponentName}
-                                {forfeitLabel || (hasScore ? ` | Score ${teamScore}-${opponentScore}` : "")}
+                            <div key={matchup.id} className="sunday-league-team-board__list-row sunday-league-team-board__schedule-row">
+                              <span className="sunday-league-team-board__schedule-week">Week {week.week_number}</span>
+                              <span className="sunday-league-team-board__schedule-detail">
+                                <strong>{matchup.start_time}</strong>
+                                <span>{matchup.field_name}</span>
+                                <span>vs {opponentName}</span>
+                                {hasScore ? <span>Score {teamScore}-{opponentScore}</span> : null}
                               </span>
                             </div>
                           );

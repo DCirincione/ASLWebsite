@@ -7,8 +7,11 @@ import type {
   SundayLeagueLeaderboardInsert,
   SundayLeagueLeaderboardUpdate,
   SundayLeagueMatchup,
+  SundayLeagueMatchupGoal,
+  SundayLeagueMatchupGoalInsert,
   SundayLeagueMatchupUpdate,
   SundayLeagueTeam,
+  SundayLeagueTeamMember,
 } from "@/lib/supabase/types";
 
 type SupabaseServiceClient = NonNullable<ReturnType<typeof getSupabaseServiceRole>>;
@@ -29,6 +32,86 @@ const parseScore = (value: unknown) => {
   }
   return undefined;
 };
+
+const parseScorerIds = (value: unknown) => {
+  if (!Array.isArray(value)) return undefined;
+  const ids = value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
+  return ids.every((id) => id.length > 0) ? ids : undefined;
+};
+
+const getRosterPlayersByProfileId = async (supabase: SupabaseServiceClient, team: SundayLeagueTeam) => {
+  const { data: membersData, error: membersError } = await supabase
+    .from("sunday_league_team_members")
+    .select("*")
+    .eq("team_id", team.id)
+    .eq("status", "accepted")
+    .order("created_at", { ascending: true });
+
+  if (membersError) throw membersError;
+
+  const members = (membersData ?? []) as SundayLeagueTeamMember[];
+  const profileIds = new Set<string>();
+  if (team.captain_is_playing) {
+    profileIds.add(team.user_id);
+  }
+  for (const member of members) {
+    if (member.player_user_id) {
+      profileIds.add(member.player_user_id);
+    }
+  }
+
+  const namesByProfileId = new Map<string, string>();
+  if (profileIds.size > 0) {
+    const { data: profilesData, error: profilesError } = await supabase
+      .from("profiles")
+      .select("id,name")
+      .in("id", Array.from(profileIds));
+
+    if (profilesError) throw profilesError;
+
+    for (const profile of (profilesData ?? []) as Array<{ id: string; name: string | null }>) {
+      namesByProfileId.set(profile.id, profile.name?.trim() || "Player");
+    }
+  }
+
+  const rosterByProfileId = new Map<string, string>();
+  if (team.captain_is_playing) {
+    rosterByProfileId.set(team.user_id, namesByProfileId.get(team.user_id) || team.captain_name);
+  }
+
+  for (const member of members) {
+    if (!member.player_user_id || member.player_user_id === team.user_id) continue;
+    rosterByProfileId.set(
+      member.player_user_id,
+      namesByProfileId.get(member.player_user_id) || member.invite_name?.trim() || "Player",
+    );
+  }
+
+  return rosterByProfileId;
+};
+
+const buildGoalRows = (
+  matchupId: string,
+  teamId: string,
+  scorerIds: string[],
+  rosterByProfileId: Map<string, string>,
+) =>
+  scorerIds.map((profileId, index): SundayLeagueMatchupGoalInsert => {
+    const playerName = rosterByProfileId.get(profileId);
+    if (!playerName) {
+      throw new Error("Each scorer must be on that team's accepted roster.");
+    }
+
+    return {
+      matchup_id: matchupId,
+      team_id: teamId,
+      player_user_id: profileId,
+      player_name: playerName,
+      goal_number: index + 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+  });
 
 const createEmptyLeaderboardRow = (teamId: string): LeaderboardAccumulator => ({
   team_id: teamId,
@@ -162,6 +245,8 @@ export async function PATCH(req: NextRequest) {
         team_1_score?: unknown;
         team_2_score?: unknown;
         forfeited_team_id?: unknown;
+        team_1_scorers?: unknown;
+        team_2_scorers?: unknown;
       }
     | null;
 
@@ -170,6 +255,8 @@ export async function PATCH(req: NextRequest) {
   const teamTwoScore = parseScore(body?.team_2_score);
   const forfeitedTeamId =
     typeof body?.forfeited_team_id === "string" ? body.forfeited_team_id.trim() || null : null;
+  const teamOneScorers = parseScorerIds(body?.team_1_scorers);
+  const teamTwoScorers = parseScorerIds(body?.team_2_scorers);
 
   if (!matchupId) {
     return NextResponse.json({ error: "Missing matchup ID." }, { status: 400 });
@@ -177,6 +264,10 @@ export async function PATCH(req: NextRequest) {
 
   if (teamOneScore === undefined || teamTwoScore === undefined) {
     return NextResponse.json({ error: "Scores must be blank or nonnegative whole numbers." }, { status: 400 });
+  }
+
+  if (teamOneScorers === undefined || teamTwoScorers === undefined) {
+    return NextResponse.json({ error: "Scorers must be submitted as player lists." }, { status: 400 });
   }
 
   const { data: existingMatchup, error: existingMatchupError } = await supabase
@@ -197,6 +288,47 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Forfeit team must be one of the registered matchup teams." }, { status: 400 });
   }
 
+  if (!forfeitedTeamId) {
+    if (teamOneScore !== null && teamOneScorers.length !== teamOneScore) {
+      return NextResponse.json({ error: "Select one roster scorer for every Team 1 goal." }, { status: 400 });
+    }
+
+    if (teamTwoScore !== null && teamTwoScorers.length !== teamTwoScore) {
+      return NextResponse.json({ error: "Select one roster scorer for every Team 2 goal." }, { status: 400 });
+    }
+  }
+
+  const [teamOneResponse, teamTwoResponse] = await Promise.all([
+    existingMatchup.team_1_id
+      ? supabase.from("sunday_league_teams").select("*").eq("id", existingMatchup.team_1_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    existingMatchup.team_2_id
+      ? supabase.from("sunday_league_teams").select("*").eq("id", existingMatchup.team_2_id).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  if (teamOneResponse.error || teamTwoResponse.error) {
+    return NextResponse.json({ error: teamOneResponse.error?.message ?? teamTwoResponse.error?.message ?? "Could not load teams." }, { status: 500 });
+  }
+
+  const goalRows: SundayLeagueMatchupGoalInsert[] = [];
+  try {
+    if (!forfeitedTeamId && existingMatchup.team_1_id && teamOneResponse.data) {
+      const rosterByProfileId = await getRosterPlayersByProfileId(supabase, teamOneResponse.data as SundayLeagueTeam);
+      goalRows.push(...buildGoalRows(matchupId, existingMatchup.team_1_id, teamOneScorers, rosterByProfileId));
+    }
+
+    if (!forfeitedTeamId && existingMatchup.team_2_id && teamTwoResponse.data) {
+      const rosterByProfileId = await getRosterPlayersByProfileId(supabase, teamTwoResponse.data as SundayLeagueTeam);
+      goalRows.push(...buildGoalRows(matchupId, existingMatchup.team_2_id, teamTwoScorers, rosterByProfileId));
+    }
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "Could not validate goal scorers." },
+      { status: 400 },
+    );
+  }
+
   const update: SundayLeagueMatchupUpdate = {
     team_1_score: forfeitedTeamId ? null : teamOneScore,
     team_2_score: forfeitedTeamId ? null : teamTwoScore,
@@ -215,6 +347,25 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: error?.message ?? "Could not save the score." }, { status: 500 });
   }
 
+  const { error: deleteGoalsError } = await supabase.from("sunday_league_matchup_goals").delete().eq("matchup_id", matchupId);
+  if (deleteGoalsError) {
+    return NextResponse.json({ error: `Score saved, but scorers could not be reset: ${deleteGoalsError.message}` }, { status: 500 });
+  }
+
+  let savedGoals: SundayLeagueMatchupGoal[] = [];
+  if (goalRows.length > 0) {
+    const { data: insertedGoals, error: insertGoalsError } = await supabase
+      .from("sunday_league_matchup_goals")
+      .insert(goalRows)
+      .select("*");
+
+    if (insertGoalsError) {
+      return NextResponse.json({ error: `Score saved, but scorers could not be saved: ${insertGoalsError.message}` }, { status: 500 });
+    }
+
+    savedGoals = (insertedGoals ?? []) as SundayLeagueMatchupGoal[];
+  }
+
   try {
     await recalculateSundayLeagueLeaderboard(supabase);
   } catch (leaderboardError) {
@@ -225,10 +376,11 @@ export async function PATCH(req: NextRequest) {
             ? `Score saved, but the leaderboard could not be recalculated: ${leaderboardError.message}`
             : "Score saved, but the leaderboard could not be recalculated.",
         matchup: data,
+        goals: savedGoals,
       },
       { status: 500 },
     );
   }
 
-  return NextResponse.json({ matchup: data });
+  return NextResponse.json({ matchup: data, goals: savedGoals });
 }

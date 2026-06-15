@@ -206,6 +206,83 @@
   font-weight: 800;
 }
 
+.ref-portal__scorers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.7rem;
+  align-items: start;
+  padding-top: 0.2rem;
+}
+
+.ref-portal__scorer-team {
+  display: grid;
+  gap: 0.55rem;
+  align-content: start;
+  grid-auto-rows: max-content;
+  min-width: 0;
+}
+
+.ref-portal__scorer-team h3 {
+  margin: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 0.86rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-portal__scorer-team label {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: center;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.ref-portal__scorer-team select {
+  width: 100%;
+  min-height: 38px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.88rem;
+}
+
+.ref-portal__scorer-team .muted {
+  margin: 0;
+}
+
+.ref-portal__scorer-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  align-items: center;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 750;
+}
+
+.ref-portal__scorer-links a {
+  display: inline-flex;
+  max-width: 100%;
+  padding: 0.22rem 0.45rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.ref-portal__scorer-links a:hover {
+  border-color: var(--accent);
+}
+
 html[data-theme="dark"] .ref-portal__time {
   background: #f8fafc;
   color: #111827;
@@ -229,7 +306,8 @@ html[data-theme="dark"] .ref-portal__time {
 
 @media (max-width: 620px) {
   .ref-portal__matchup-main,
-  .ref-portal__score-grid {
+  .ref-portal__score-grid,
+  .ref-portal__scorers {
     grid-template-columns: 1fr;
   }
 

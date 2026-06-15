@@ -7,7 +7,14 @@ import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { canAccessRefPortal } from "@/lib/event-approval";
 import { supabase } from "@/lib/supabase/client";
-import type { Profile, SundayLeagueMatchup, SundayLeagueScheduleWeek, SundayLeagueTeam } from "@/lib/supabase/types";
+import type {
+  Profile,
+  SundayLeagueMatchup,
+  SundayLeagueMatchupGoal,
+  SundayLeagueScheduleWeek,
+  SundayLeagueTeam,
+  SundayLeagueTeamMember,
+} from "@/lib/supabase/types";
 
 import "./ref-portal.css";
 
@@ -21,6 +28,17 @@ type ScoreDraft = {
   team_2_score: string;
   forfeited_team_id: string;
 };
+type GoalDraft = {
+  team_1_scorers: string[];
+  team_2_scorers: string[];
+};
+type RosterPlayer = {
+  id: string;
+  profileId: string;
+  name: string;
+  jerseyNumber: string | null;
+};
+type TeamMemberProfile = Pick<Profile, "id" | "name">;
 
 const SUNDAY_LEAGUE_FIELDS = ["Black Sheep Field", "Magic Fountain Field"] as const;
 
@@ -29,6 +47,17 @@ const getScoreDraft = (matchup: SundayLeagueMatchup): ScoreDraft => ({
   team_2_score: matchup.team_2_score == null ? "" : String(matchup.team_2_score),
   forfeited_team_id: matchup.forfeited_team_id ?? "",
 });
+
+const emptyGoalDraft = (): GoalDraft => ({
+  team_1_scorers: [],
+  team_2_scorers: [],
+});
+
+const resizeScorers = (scorers: string[], score: string) => {
+  const count = Number(score);
+  if (!Number.isInteger(count) || count <= 0) return [];
+  return Array.from({ length: count }, (_, index) => scorers[index] ?? "");
+};
 
 const formatScore = (matchup: SundayLeagueMatchup) =>
   matchup.forfeited_team_id
@@ -42,10 +71,12 @@ export default function RefPortalPage() {
   const [profile, setProfile] = useState<Pick<Profile, "id" | "name" | "role"> | null>(null);
   const [weeks, setWeeks] = useState<SundayLeagueScheduleWeekWithMatchups[]>([]);
   const [teams, setTeams] = useState<SundayLeagueTeam[]>([]);
+  const [rostersByTeamId, setRostersByTeamId] = useState<Record<string, RosterPlayer[]>>({});
   const [selectedWeekId, setSelectedWeekId] = useState("");
   const [loadingSchedule, setLoadingSchedule] = useState(false);
   const [scheduleError, setScheduleError] = useState<string | null>(null);
   const [scoreDrafts, setScoreDrafts] = useState<Record<string, ScoreDraft>>({});
+  const [goalDrafts, setGoalDrafts] = useState<Record<string, GoalDraft>>({});
   const [scoreStatuses, setScoreStatuses] = useState<Record<string, SaveStatus>>({});
 
   const fetchWithSession = useCallback(async (input: string, init?: RequestInit) => {
@@ -77,31 +108,120 @@ export default function RefPortalPage() {
     setLoadingSchedule(true);
     setScheduleError(null);
 
-    const [weeksResponse, matchupsResponse, teamsResponse] = await Promise.all([
+    const [weeksResponse, matchupsResponse, teamsResponse, membersResponse, goalsResponse] = await Promise.all([
       supabase.from("sunday_league_schedule_weeks").select("*").order("week_number", { ascending: true }),
       supabase.from("sunday_league_matchups").select("*").order("sort_order", { ascending: true }),
       supabase.from("sunday_league_teams").select("*").order("team_name", { ascending: true }),
+      supabase
+        .from("sunday_league_team_members")
+        .select("*")
+        .eq("status", "accepted")
+        .order("created_at", { ascending: true }),
+      supabase.from("sunday_league_matchup_goals").select("*").order("goal_number", { ascending: true }),
     ]);
 
     setLoadingSchedule(false);
 
-    if (weeksResponse.error || matchupsResponse.error || teamsResponse.error) {
+    if (weeksResponse.error || matchupsResponse.error || teamsResponse.error || membersResponse.error || goalsResponse.error) {
       setScheduleError(
         weeksResponse.error?.message ??
           matchupsResponse.error?.message ??
           teamsResponse.error?.message ??
+          membersResponse.error?.message ??
+          goalsResponse.error?.message ??
           "Could not load the schedule.",
       );
       return;
     }
 
     const matchups = (matchupsResponse.data ?? []) as SundayLeagueMatchup[];
+    const nextTeams = (teamsResponse.data ?? []) as SundayLeagueTeam[];
+    const members = (membersResponse.data ?? []) as SundayLeagueTeamMember[];
+    const profileIds = new Set<string>();
+    for (const team of nextTeams) {
+      if (team.captain_is_playing) {
+        profileIds.add(team.user_id);
+      }
+    }
+    for (const member of members) {
+      if (member.player_user_id) {
+        profileIds.add(member.player_user_id);
+      }
+    }
+
+    const profileById = new Map<string, TeamMemberProfile>();
+    if (profileIds.size > 0) {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("id,name")
+        .in("id", Array.from(profileIds));
+
+      for (const profile of (profileData ?? []) as TeamMemberProfile[]) {
+        profileById.set(profile.id, profile);
+      }
+    }
+
+    const membersByTeamId = new Map<string, SundayLeagueTeamMember[]>();
+    for (const member of members) {
+      if (!member.team_id) continue;
+      membersByTeamId.set(member.team_id, [...(membersByTeamId.get(member.team_id) ?? []), member]);
+    }
+
+    const nextRostersByTeamId: Record<string, RosterPlayer[]> = {};
+    for (const team of nextTeams) {
+      const roster: RosterPlayer[] = [];
+      const jerseyNumbers = team.jersey_numbers ?? [];
+      if (team.captain_is_playing) {
+        roster.push({
+          id: team.user_id,
+          profileId: team.user_id,
+          name: profileById.get(team.user_id)?.name?.trim() || team.captain_name,
+          jerseyNumber: jerseyNumbers[0]?.trim() || null,
+        });
+      }
+
+      (membersByTeamId.get(team.id) ?? [])
+        .filter((member) => member.player_user_id && member.player_user_id !== team.user_id)
+        .forEach((member, index) => {
+          const profileId = member.player_user_id as string;
+          roster.push({
+            id: member.id,
+            profileId,
+            name: profileById.get(profileId)?.name?.trim() || member.invite_name?.trim() || "Player",
+            jerseyNumber: jerseyNumbers[index + (team.captain_is_playing ? 1 : 0)]?.trim() || null,
+          });
+        });
+
+      nextRostersByTeamId[team.id] = roster;
+    }
+
+    const goalsByMatchupTeam = new Map<string, SundayLeagueMatchupGoal[]>();
+    for (const goal of (goalsResponse.data ?? []) as SundayLeagueMatchupGoal[]) {
+      const key = `${goal.matchup_id}:${goal.team_id}`;
+      goalsByMatchupTeam.set(key, [...(goalsByMatchupTeam.get(key) ?? []), goal]);
+    }
+
     const matchupsByWeekId = new Map<string, SundayLeagueMatchup[]>();
     const nextScoreDrafts: Record<string, ScoreDraft> = {};
+    const nextGoalDrafts: Record<string, GoalDraft> = {};
 
     for (const matchup of matchups) {
       matchupsByWeekId.set(matchup.week_id, [...(matchupsByWeekId.get(matchup.week_id) ?? []), matchup]);
       nextScoreDrafts[matchup.id] = getScoreDraft(matchup);
+      nextGoalDrafts[matchup.id] = {
+        team_1_scorers: matchup.team_1_id
+          ? resizeScorers(
+              (goalsByMatchupTeam.get(`${matchup.id}:${matchup.team_1_id}`) ?? []).map((goal) => goal.player_user_id ?? ""),
+              matchup.team_1_score == null ? "" : String(matchup.team_1_score),
+            )
+          : [],
+        team_2_scorers: matchup.team_2_id
+          ? resizeScorers(
+              (goalsByMatchupTeam.get(`${matchup.id}:${matchup.team_2_id}`) ?? []).map((goal) => goal.player_user_id ?? ""),
+              matchup.team_2_score == null ? "" : String(matchup.team_2_score),
+            )
+          : [],
+      };
     }
 
     const nextWeeks = ((weeksResponse.data ?? []) as SundayLeagueScheduleWeek[])
@@ -109,8 +229,10 @@ export default function RefPortalPage() {
       .filter((week) => week.matchups.length > 0);
 
     setWeeks(nextWeeks);
-    setTeams((teamsResponse.data ?? []) as SundayLeagueTeam[]);
+    setTeams(nextTeams);
+    setRostersByTeamId(nextRostersByTeamId);
     setScoreDrafts(nextScoreDrafts);
+    setGoalDrafts(nextGoalDrafts);
     setSelectedWeekId((current) => (current && nextWeeks.some((week) => week.id === current) ? current : nextWeeks.at(-1)?.id ?? ""));
   }, []);
 
@@ -163,6 +285,19 @@ export default function RefPortalPage() {
         [key]: cleaned,
       },
     }));
+    setGoalDrafts((prev) => {
+      const current = prev[matchupId] ?? emptyGoalDraft();
+      return {
+        ...prev,
+        [matchupId]: {
+          ...current,
+          [key === "team_1_score" ? "team_1_scorers" : "team_2_scorers"]: resizeScorers(
+            key === "team_1_score" ? current.team_1_scorers : current.team_2_scorers,
+            cleaned,
+          ),
+        },
+      };
+    });
   };
 
   const updateForfeitDraft = (matchupId: string, forfeitedTeamId: string) => {
@@ -173,11 +308,35 @@ export default function RefPortalPage() {
         forfeited_team_id: forfeitedTeamId,
       },
     }));
+    if (forfeitedTeamId) {
+      setGoalDrafts((prev) => ({
+        ...prev,
+        [matchupId]: emptyGoalDraft(),
+      }));
+    }
+  };
+
+  const updateGoalDraft = (matchupId: string, key: keyof GoalDraft, index: number, profileId: string) => {
+    setGoalDrafts((prev) => {
+      const current = prev[matchupId] ?? emptyGoalDraft();
+      const nextScorers = [...current[key]];
+      nextScorers[index] = profileId;
+      return {
+        ...prev,
+        [matchupId]: {
+          ...current,
+          [key]: nextScorers,
+        },
+      };
+    });
   };
 
   const saveScore = async (event: FormEvent, matchup: SundayLeagueMatchup) => {
     event.preventDefault();
     const draft = scoreDrafts[matchup.id] ?? getScoreDraft(matchup);
+    const goalDraft = goalDrafts[matchup.id] ?? emptyGoalDraft();
+    const teamOneScorers = draft.forfeited_team_id ? [] : goalDraft.team_1_scorers.filter(Boolean);
+    const teamTwoScorers = draft.forfeited_team_id ? [] : goalDraft.team_2_scorers.filter(Boolean);
 
     setScoreStatuses((prev) => ({ ...prev, [matchup.id]: { type: "loading" } }));
 
@@ -189,15 +348,20 @@ export default function RefPortalPage() {
           team_1_score: draft.team_1_score,
           team_2_score: draft.team_2_score,
           forfeited_team_id: draft.forfeited_team_id,
+          team_1_scorers: teamOneScorers,
+          team_2_scorers: teamTwoScorers,
         }),
       });
-      const json = (await response.json().catch(() => null)) as { error?: string; matchup?: SundayLeagueMatchup } | null;
+      const json = (await response.json().catch(() => null)) as
+        | { error?: string; matchup?: SundayLeagueMatchup; goals?: SundayLeagueMatchupGoal[] }
+        | null;
 
       if (!response.ok || !json?.matchup) {
         throw new Error(json?.error ?? "Could not save this score.");
       }
 
       const updatedMatchup = json.matchup;
+      const updatedGoals = json.goals ?? [];
       setWeeks((prev) =>
         prev.map((week) => ({
           ...week,
@@ -205,6 +369,29 @@ export default function RefPortalPage() {
         })),
       );
       setScoreDrafts((prev) => ({ ...prev, [updatedMatchup.id]: getScoreDraft(updatedMatchup) }));
+      setGoalDrafts((prev) => ({
+        ...prev,
+        [updatedMatchup.id]: {
+          team_1_scorers: updatedMatchup.team_1_id
+            ? resizeScorers(
+                updatedGoals
+                  .filter((goal) => goal.team_id === updatedMatchup.team_1_id)
+                  .sort((left, right) => left.goal_number - right.goal_number)
+                  .map((goal) => goal.player_user_id ?? ""),
+                updatedMatchup.team_1_score == null ? "" : String(updatedMatchup.team_1_score),
+              )
+            : [],
+          team_2_scorers: updatedMatchup.team_2_id
+            ? resizeScorers(
+                updatedGoals
+                  .filter((goal) => goal.team_id === updatedMatchup.team_2_id)
+                  .sort((left, right) => left.goal_number - right.goal_number)
+                  .map((goal) => goal.player_user_id ?? ""),
+                updatedMatchup.team_2_score == null ? "" : String(updatedMatchup.team_2_score),
+              )
+            : [],
+        },
+      }));
       setScoreStatuses((prev) => ({ ...prev, [updatedMatchup.id]: { type: "success", message: "Score saved." } }));
     } catch (error) {
       setScoreStatuses((prev) => ({
@@ -319,8 +506,19 @@ export default function RefPortalPage() {
                       const teamOneLabel = getTeamLabel(matchup.team_1_id, matchup.team_1_name);
                       const teamTwoLabel = getTeamLabel(matchup.team_2_id, matchup.team_2_name);
                       const draft = scoreDrafts[matchup.id] ?? getScoreDraft(matchup);
+                      const goalDraft = goalDrafts[matchup.id] ?? emptyGoalDraft();
                       const saveStatus = scoreStatuses[matchup.id] ?? { type: "idle" };
                       const hasForfeit = Boolean(draft.forfeited_team_id);
+                      const teamOneRoster = matchup.team_1_id ? rostersByTeamId[matchup.team_1_id] ?? [] : [];
+                      const teamTwoRoster = matchup.team_2_id ? rostersByTeamId[matchup.team_2_id] ?? [] : [];
+                      const linkedScorers = [...goalDraft.team_1_scorers, ...goalDraft.team_2_scorers]
+                        .filter(Boolean)
+                        .map(
+                          (profileId) =>
+                            teamOneRoster.find((player) => player.profileId === profileId) ??
+                            teamTwoRoster.find((player) => player.profileId === profileId),
+                        )
+                        .filter((player): player is RosterPlayer => Boolean(player));
 
                       return (
                         <form key={matchup.id} className="ref-portal__matchup" onSubmit={(event) => void saveScore(event, matchup)}>
@@ -372,6 +570,76 @@ export default function RefPortalPage() {
                               {saveStatus.type === "loading" ? "Saving..." : "Save"}
                             </button>
                           </div>
+                          {!hasForfeit ? (
+                            <div className="ref-portal__scorers">
+                              <div className="ref-portal__scorer-team">
+                                <h3>{teamOneLabel} scorers</h3>
+                                {goalDraft.team_1_scorers.length > 0 ? (
+                                  goalDraft.team_1_scorers.map((profileId, index) => (
+                                    <label key={`${matchup.id}-team-1-goal-${index}`}>
+                                      <span>Goal {index + 1}</span>
+                                      <select
+                                        value={profileId}
+                                        onChange={(event) =>
+                                          updateGoalDraft(matchup.id, "team_1_scorers", index, event.target.value)
+                                        }
+                                        disabled={teamOneRoster.length === 0}
+                                        aria-label={`${teamOneLabel} goal ${index + 1} scorer`}
+                                      >
+                                        <option value="">Select scorer</option>
+                                        {teamOneRoster.map((player) => (
+                                          <option key={player.id} value={player.profileId}>
+                                            {player.jerseyNumber ? `#${player.jerseyNumber} ` : ""}
+                                            {player.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                  ))
+                                ) : (
+                                  <p className="muted">No goals entered.</p>
+                                )}
+                              </div>
+                              <div className="ref-portal__scorer-team">
+                                <h3>{teamTwoLabel} scorers</h3>
+                                {goalDraft.team_2_scorers.length > 0 ? (
+                                  goalDraft.team_2_scorers.map((profileId, index) => (
+                                    <label key={`${matchup.id}-team-2-goal-${index}`}>
+                                      <span>Goal {index + 1}</span>
+                                      <select
+                                        value={profileId}
+                                        onChange={(event) =>
+                                          updateGoalDraft(matchup.id, "team_2_scorers", index, event.target.value)
+                                        }
+                                        disabled={teamTwoRoster.length === 0}
+                                        aria-label={`${teamTwoLabel} goal ${index + 1} scorer`}
+                                      >
+                                        <option value="">Select scorer</option>
+                                        {teamTwoRoster.map((player) => (
+                                          <option key={player.id} value={player.profileId}>
+                                            {player.jerseyNumber ? `#${player.jerseyNumber} ` : ""}
+                                            {player.name}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </label>
+                                  ))
+                                ) : (
+                                  <p className="muted">No goals entered.</p>
+                                )}
+                              </div>
+                            </div>
+                          ) : null}
+                          {linkedScorers.length > 0 ? (
+                            <div className="ref-portal__scorer-links">
+                              <span>Linked scorers:</span>
+                              {linkedScorers.map((player, index) => (
+                                <Link key={`${player.profileId}-${index}`} href={`/profiles/${player.profileId}`}>
+                                  {player.name}
+                                </Link>
+                              ))}
+                            </div>
+                          ) : null}
                           {saveStatus.message ? (
                             <p className={`form-help ${saveStatus.type === "error" ? "error" : "muted"}`}>{saveStatus.message}</p>
                           ) : null}
