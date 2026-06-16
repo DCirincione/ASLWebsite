@@ -565,17 +565,12 @@ function ProductOptionsDialog({
 
   const handleSizeChange = (size: string) => {
     setSelectedSize(size);
-
-    const imageUrl = findVariantImageUrl(effectiveSelectedColor, size);
-    if (imageUrl) {
-      setSelectedImageUrl(imageUrl);
-    }
   };
 
   const handleColorChange = (color: string) => {
     setSelectedColor(color);
 
-    const imageUrl = findVariantImageUrl(color, effectiveSelectedSize);
+    const imageUrl = findVariantImageUrl(color, "");
     if (imageUrl) {
       setSelectedImageUrl(imageUrl);
     }
