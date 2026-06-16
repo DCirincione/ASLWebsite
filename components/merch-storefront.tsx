@@ -106,7 +106,10 @@ const shouldBypassImageOptimization = (imageUrl: string | null | undefined) => {
   if (!imageUrl) return false;
 
   try {
-    return new URL(imageUrl).hostname === "items-images-production.s3.us-west-2.amazonaws.com";
+    return [
+      "files.cdn.printful.com",
+      "items-images-production.s3.us-west-2.amazonaws.com",
+    ].includes(new URL(imageUrl).hostname);
   } catch {
     return false;
   }
