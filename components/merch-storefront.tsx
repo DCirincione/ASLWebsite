@@ -102,6 +102,16 @@ const getProductGalleryImages = (product: MerchProduct | null | undefined) => {
   return product?.imageUrl ? [product.imageUrl] : [];
 };
 
+const shouldBypassImageOptimization = (imageUrl: string | null | undefined) => {
+  if (!imageUrl) return false;
+
+  try {
+    return new URL(imageUrl).hostname === "items-images-production.s3.us-west-2.amazonaws.com";
+  } catch {
+    return false;
+  }
+};
+
 const getVisibleGalleryDotIndexes = (imageCount: number, activeIndex: number) => {
   if (imageCount <= MAX_VISIBLE_GALLERY_DOTS) {
     return Array.from({ length: imageCount }, (_, index) => index);
@@ -333,6 +343,7 @@ function ProductCard({
               fill
               sizes="(max-width: 640px) 100vw, (max-width: 960px) 50vw, (max-width: 1200px) 33vw, 25vw"
               className="merch-card__image"
+              unoptimized={shouldBypassImageOptimization(activeImageUrl)}
             />
           </div>
         ) : null}
@@ -595,6 +606,7 @@ function ProductOptionsDialog({
                     fill
                     sizes="(max-width: 900px) 100vw, 48vw"
                     className="merch-product-dialog__image"
+                    unoptimized={shouldBypassImageOptimization(activeImageUrl)}
                   />
                 </div>
               ) : (
@@ -623,6 +635,7 @@ function ProductOptionsDialog({
                         fill
                         sizes="72px"
                         className="merch-product-dialog__thumbnail-image"
+                        unoptimized={shouldBypassImageOptimization(imageUrl)}
                       />
                     </span>
                   </button>
@@ -815,6 +828,7 @@ function CartDialog({
                               fill
                               sizes="88px"
                               className="merch-cart__item-image"
+                              unoptimized={shouldBypassImageOptimization(item.product.imageUrl)}
                             />
                           ) : (
                             <span className="merch-cart__item-fallback" aria-hidden="true">
