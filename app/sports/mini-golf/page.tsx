@@ -11,6 +11,7 @@ import { PageShell } from "@/components/page-shell";
 import { RegistrationModal } from "@/components/registration-modal";
 import { Section } from "@/components/section";
 import { SportEventCard } from "@/components/sport-event-card";
+import { SportSponsorBanner } from "@/components/sport-sponsor-banner";
 import { filterVisiblePublicEvents } from "@/lib/event-approval";
 import { getSignupActionLabel, getSignupSubmittedLabel, getSignupUnavailableLabel } from "@/lib/event-signups";
 import {
@@ -167,6 +168,7 @@ export default function MiniGolfPage() {
       <div style={{ paddingTop: 16 }}>
         <HistoryBackButton label="← Back" fallbackHref="/sports" />
       </div>
+      <SportSponsorBanner sportSlug="mini-golf" />
       <Section
         id="mini-golf-hero"
         eyebrow="Mini-Golf"

@@ -31,6 +31,17 @@ export async function PUT(req: NextRequest) {
       merch?: {
         purchasesEnabled?: boolean;
       };
+      sportSponsors?: Record<
+        string,
+        {
+          enabled?: boolean;
+          sponsorName?: string;
+          imageUrl?: string;
+          linkUrl?: string;
+          buttonText?: string;
+          altText?: string;
+        }
+      >;
     };
 
     const currentSettings = await readSiteSettings();
@@ -61,6 +72,29 @@ export async function PUT(req: NextRequest) {
       typeof body.merch?.purchasesEnabled === "boolean"
         ? body.merch.purchasesEnabled
         : currentSettings.merch.purchasesEnabled;
+    const sportSponsors = body.sportSponsors
+      ? Object.fromEntries(
+          Object.entries(body.sportSponsors)
+            .map(([rawSlug, settings]) => {
+              const slug = rawSlug.trim().toLowerCase();
+              if (!slug) return null;
+              return [
+                slug,
+                {
+                  enabled: Boolean(settings?.enabled),
+                  sponsorName: typeof settings?.sponsorName === "string" ? settings.sponsorName.trim() : "",
+                  imageUrl: typeof settings?.imageUrl === "string" ? settings.imageUrl.trim() : "",
+                  linkUrl: typeof settings?.linkUrl === "string" ? settings.linkUrl.trim() : "",
+                  buttonText: typeof settings?.buttonText === "string" ? settings.buttonText.trim() : "Take Me There",
+                  altText: typeof settings?.altText === "string" ? settings.altText.trim() : "",
+                },
+              ] as const;
+            })
+            .filter((entry): entry is readonly [string, NonNullable<(typeof currentSettings.sportSponsors)[string]>] =>
+              Boolean(entry),
+            ),
+        )
+      : currentSettings.sportSponsors;
 
     if (enabled && !text) {
       return NextResponse.json({ error: "Banner text is required when the banner is enabled." }, { status: 400 });
@@ -83,6 +117,7 @@ export async function PUT(req: NextRequest) {
       merch: {
         purchasesEnabled,
       },
+      sportSponsors,
     });
 
     return NextResponse.json({ ok: true, settings });

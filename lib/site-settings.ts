@@ -23,9 +23,19 @@ export type MerchSettings = {
   purchasesEnabled: boolean;
 };
 
+export type SportSponsorSettings = {
+  enabled: boolean;
+  sponsorName: string;
+  imageUrl: string;
+  linkUrl: string;
+  buttonText: string;
+  altText: string;
+};
+
 export type SiteSettings = {
   homeBanner: HomeBannerSettings;
   merch: MerchSettings;
+  sportSponsors: Record<string, SportSponsorSettings>;
 };
 
 const SITE_SETTINGS_KEY = "site_settings";
@@ -41,6 +51,7 @@ const DEFAULT_SITE_SETTINGS: SiteSettings = {
   merch: {
     purchasesEnabled: true,
   },
+  sportSponsors: {},
 };
 
 const siteSettingsFilePath = path.join(process.cwd(), "data", "site-settings.json");
@@ -70,6 +81,22 @@ const normalizeSiteSettings = (value?: Partial<SiteSettings> | null): SiteSettin
     ? requestedButtonPageHref
     : DEFAULT_SITE_SETTINGS.homeBanner.buttonPageHref;
 
+  const sportSponsors: Record<string, SportSponsorSettings> = {};
+  if (value?.sportSponsors && typeof value.sportSponsors === "object" && !Array.isArray(value.sportSponsors)) {
+    for (const [rawSlug, rawSettings] of Object.entries(value.sportSponsors)) {
+      const slug = rawSlug.trim().toLowerCase();
+      if (!slug || !rawSettings || typeof rawSettings !== "object" || Array.isArray(rawSettings)) continue;
+      sportSponsors[slug] = {
+        enabled: typeof rawSettings.enabled === "boolean" ? rawSettings.enabled : false,
+        sponsorName: typeof rawSettings.sponsorName === "string" ? rawSettings.sponsorName.trim() : "",
+        imageUrl: typeof rawSettings.imageUrl === "string" ? rawSettings.imageUrl.trim() : "",
+        linkUrl: typeof rawSettings.linkUrl === "string" ? rawSettings.linkUrl.trim() : "",
+        buttonText: typeof rawSettings.buttonText === "string" ? rawSettings.buttonText.trim() : "Take Me There",
+        altText: typeof rawSettings.altText === "string" ? rawSettings.altText.trim() : "",
+      };
+    }
+  }
+
   return {
     homeBanner: {
       enabled:
@@ -90,6 +117,7 @@ const normalizeSiteSettings = (value?: Partial<SiteSettings> | null): SiteSettin
           ? value.merch.purchasesEnabled
           : DEFAULT_SITE_SETTINGS.merch.purchasesEnabled,
     },
+    sportSponsors,
   };
 };
 

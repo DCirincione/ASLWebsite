@@ -32,6 +32,68 @@
   gap: 18px;
 }
 
+.sport-sponsor-banner {
+  width: 100%;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  background: linear-gradient(90deg, rgba(233, 93, 42, 0.98), rgba(245, 129, 66, 0.94));
+  color: #ffffff;
+  box-shadow: 0 18px 48px rgba(4, 12, 24, 0.22);
+  backdrop-filter: blur(10px);
+}
+
+.sport-sponsor-banner__inner {
+  width: min(1120px, calc(100% - 32px));
+  min-height: 92px;
+  margin: 0 auto;
+  padding: 18px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  text-align: center;
+}
+
+.sport-sponsor-banner__mark {
+  display: inline-flex;
+  width: 96px;
+  height: 44px;
+  flex: 0 0 auto;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.sport-sponsor-banner__message {
+  margin: 0;
+  color: #ffffff;
+  font-size: clamp(16px, 1.6vw, 20px);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.sport-sponsor-banner__link {
+  text-decoration: none;
+}
+
+.sport-sponsor-banner__button.button.ghost {
+  background: linear-gradient(90deg, rgba(233, 93, 42, 0.98), rgba(245, 129, 66, 0.94));
+  border-color: rgba(255, 255, 255, 0.92);
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(9, 16, 30, 0.12);
+  white-space: nowrap;
+}
+
+.sport-sponsor-banner__button.button.ghost:hover {
+  background: linear-gradient(90deg, rgba(241, 108, 58, 1), rgba(247, 142, 84, 0.98));
+  border-color: #ffffff;
+  color: #ffffff;
+  box-shadow: 0 14px 28px rgba(9, 16, 30, 0.18);
+}
+
 .sport-card {
   position: relative;
   height: clamp(260px, 30vw, 320px);

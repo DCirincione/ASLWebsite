@@ -217,6 +217,15 @@ type AdminSiteSettings = {
   merch?: {
     purchasesEnabled?: boolean;
   };
+  sportSponsors?: Record<string, SportSponsorDraft>;
+};
+type SportSponsorDraft = {
+  enabled: boolean;
+  sponsorName: string;
+  imageUrl: string;
+  linkUrl: string;
+  buttonText: string;
+  altText: string;
 };
 
 const isJsonRecord = (value: unknown): value is Record<string, JsonValue | undefined> =>
@@ -500,6 +509,15 @@ const createEmptySportForm = (): SportFormState => ({
   image_url: "",
 });
 
+const createEmptySportSponsorDraft = (): SportSponsorDraft => ({
+  enabled: false,
+  sponsorName: "",
+  imageUrl: "",
+  linkUrl: "",
+  buttonText: "Take Me There",
+  altText: "",
+});
+
 const normalizeContactMessage = (message: ContactMessage): ContactMessage => {
   const parsed = parseAldrichCommunicationsPreferenceFromMessage(message.message);
   return {
@@ -641,6 +659,7 @@ export default function AdminPage() {
   const [communitySponsorsStatus, setCommunitySponsorsStatus] = useState<FormStatus>({ type: "idle" });
   const [siteSettingsStatus, setSiteSettingsStatus] = useState<FormStatus>({ type: "idle" });
   const [merchSettingsStatus, setMerchSettingsStatus] = useState<FormStatus>({ type: "idle" });
+  const [sportSponsorStatus, setSportSponsorStatus] = useState<FormStatus>({ type: "idle" });
   const [announcementStatus, setAnnouncementStatus] = useState<FormStatus>({ type: "idle" });
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [partnerApprovalNotes, setPartnerApprovalNotes] = useState<Record<string, string>>({});
@@ -768,6 +787,9 @@ export default function AdminPage() {
     homeBannerButtonPageHref: "",
     merchPurchasesEnabled: true,
   });
+  const [sportSponsorDrafts, setSportSponsorDrafts] = useState<Record<string, SportSponsorDraft>>({});
+  const [expandedSportSponsorSlug, setExpandedSportSponsorSlug] = useState<string | null>(null);
+  const [sportSponsorListExpanded, setSportSponsorListExpanded] = useState(false);
   const [announcementForm, setAnnouncementForm] = useState<AnnouncementFormState>(createEmptyAnnouncementForm());
   const [announcementRecipientSearch, setAnnouncementRecipientSearch] = useState("");
   const [form, setForm] = useState<EventFormState>({
@@ -1141,6 +1163,7 @@ export default function AdminPage() {
     setLoadingSiteSettings(true);
     setSiteSettingsStatus({ type: "idle" });
     setMerchSettingsStatus({ type: "idle" });
+    setSportSponsorStatus({ type: "idle" });
     try {
       const response = await fetch("/api/admin/site-settings");
       const json = await response.json();
@@ -1148,6 +1171,7 @@ export default function AdminPage() {
         const message = json?.error ?? "Could not load site settings.";
         setSiteSettingsStatus({ type: "error", message });
         setMerchSettingsStatus({ type: "error", message });
+        setSportSponsorStatus({ type: "error", message });
         return;
       }
 
@@ -1175,9 +1199,21 @@ export default function AdminPage() {
             ? settings.merch.purchasesEnabled
             : true,
       });
+      setSportSponsorDrafts(
+        Object.fromEntries(
+          Object.entries(settings.sportSponsors ?? {}).map(([slug, sponsor]) => [
+            slug,
+            {
+              ...createEmptySportSponsorDraft(),
+              ...sponsor,
+            },
+          ]),
+        ),
+      );
     } catch {
       setSiteSettingsStatus({ type: "error", message: "Could not load site settings." });
       setMerchSettingsStatus({ type: "error", message: "Could not load site settings." });
+      setSportSponsorStatus({ type: "error", message: "Could not load site settings." });
     } finally {
       setLoadingSiteSettings(false);
     }
@@ -3183,6 +3219,7 @@ export default function AdminPage() {
     }
     if (module === "sports") {
       void loadSports();
+      void loadSiteSettings();
     }
     if (module === "registrations") {
       void loadSundayLeagueSettings();
@@ -3360,6 +3397,20 @@ export default function AdminPage() {
 
   const updateSiteSettings = <K extends keyof typeof siteSettingsForm>(key: K, value: (typeof siteSettingsForm)[K]) => {
     setSiteSettingsForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const updateSportSponsorDraft = <K extends keyof SportSponsorDraft>(
+    sportSlug: string,
+    key: K,
+    value: SportSponsorDraft[K],
+  ) => {
+    setSportSponsorDrafts((prev) => ({
+      ...prev,
+      [sportSlug]: {
+        ...(prev[sportSlug] ?? createEmptySportSponsorDraft()),
+        [key]: value,
+      },
+    }));
   };
 
   const updateSundayLeagueSettings = <K extends keyof typeof sundayLeagueSettingsForm>(
@@ -4187,6 +4238,81 @@ export default function AdminPage() {
       setMerchSettingsStatus({ type: "success", message: "Merch storefront settings updated." });
     } catch {
       setMerchSettingsStatus({ type: "error", message: "Could not update merch settings." });
+    }
+  };
+
+  const handleSaveSportSponsors = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setSportSponsorStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    const nextSponsors = Object.fromEntries(
+      sports.map((sport) => {
+        const slug = slugifySportValue(sport.title ?? "");
+        const draft = sportSponsorDrafts[slug] ?? createEmptySportSponsorDraft();
+        return [
+          slug,
+          {
+            enabled: draft.enabled,
+            sponsorName: draft.sponsorName.trim(),
+            imageUrl: draft.imageUrl.trim(),
+            linkUrl: draft.linkUrl.trim(),
+            buttonText: draft.buttonText.trim() || "Take Me There",
+            altText: draft.altText.trim(),
+          },
+        ] as const;
+      }).filter(([slug]) => Boolean(slug)),
+    );
+
+    const missingImageSport = sports.find((sport) => {
+      const slug = slugifySportValue(sport.title ?? "");
+      const draft = nextSponsors[slug];
+      return draft?.enabled && !draft.imageUrl;
+    });
+
+    if (missingImageSport) {
+      setSportSponsorStatus({ type: "error", message: `Add an image URL or hide the ${missingImageSport.title} sponsor banner.` });
+      return;
+    }
+
+    setSportSponsorStatus({ type: "loading" });
+    try {
+      const response = await fetch("/api/admin/site-settings", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          sportSponsors: nextSponsors,
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setSportSponsorStatus({ type: "error", message: json?.error ?? "Could not update sport sponsor banners." });
+        return;
+      }
+
+      const settings = (json?.settings ?? {}) as AdminSiteSettings;
+      setSportSponsorDrafts(
+        Object.fromEntries(
+          Object.entries(settings.sportSponsors ?? {}).map(([slug, sponsor]) => [
+            slug,
+            {
+              ...createEmptySportSponsorDraft(),
+              ...sponsor,
+            },
+          ]),
+        ),
+      );
+      setSportSponsorStatus({ type: "success", message: "Sport sponsor banners updated." });
+    } catch {
+      setSportSponsorStatus({ type: "error", message: "Could not update sport sponsor banners." });
     }
   };
 
@@ -5813,6 +5939,151 @@ export default function AdminPage() {
                   ) : null}
                   {sportsStatus.message ? (
                     <p className={`form-help ${sportsStatus.type === "error" ? "error" : "muted"}`}>{sportsStatus.message}</p>
+                  ) : null}
+                </section>
+
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Sport Sponsor Banners</h2>
+                      <p className="muted">Show or hide a sponsor announcement bar at the top of each sport page.</p>
+                    </div>
+                    <div className="cta-row" style={{ margin: 0 }}>
+                      <button
+                        className="button ghost"
+                        type="button"
+                        onClick={() => {
+                          setSportSponsorListExpanded((current) => !current);
+                          setExpandedSportSponsorSlug(null);
+                        }}
+                      >
+                        {sportSponsorListExpanded ? "Collapse" : "Expand"}
+                      </button>
+                      <button className="button ghost" type="button" onClick={() => void loadSiteSettings()} disabled={loadingSiteSettings}>
+                        {loadingSiteSettings ? "Refreshing..." : "Refresh"}
+                      </button>
+                    </div>
+                  </div>
+                  {!sportSponsorListExpanded ? (
+                    <p className="muted">
+                      {sports.filter((sport) => sportSponsorDrafts[slugifySportValue(sport.title ?? "")]?.enabled).length} sponsor banner
+                      {sports.filter((sport) => sportSponsorDrafts[slugifySportValue(sport.title ?? "")]?.enabled).length === 1 ? "" : "s"} visible.
+                    </p>
+                  ) : sports.length === 0 ? (
+                    <p className="muted">Create sports before adding sponsor banners.</p>
+                  ) : (
+                    <form className="register-form" onSubmit={handleSaveSportSponsors}>
+                      <div className="cta-row" style={{ justifyContent: "space-between" }}>
+                        <button className="button primary" type="submit" disabled={sportSponsorStatus.type === "loading"}>
+                          {sportSponsorStatus.type === "loading" ? "Saving..." : "Save Sponsor Banners"}
+                        </button>
+                        <p className="muted" style={{ margin: 0 }}>
+                          {sports.filter((sport) => sportSponsorDrafts[slugifySportValue(sport.title ?? "")]?.enabled).length} visible
+                        </p>
+                      </div>
+                      <div className="event-list admin-scroll-panel admin-sport-sponsor-list">
+                        {sports.map((sport) => {
+                          const sportSlug = slugifySportValue(sport.title ?? "");
+                          const draft = sportSponsorDrafts[sportSlug] ?? createEmptySportSponsorDraft();
+                          const isExpanded = expandedSportSponsorSlug === sportSlug;
+
+                          return (
+                            <article key={sport.id} className="event-card-simple">
+                              <div className="event-card__header">
+                                <div>
+                                  <h3>{sport.title}</h3>
+                                  <p className="muted">
+                                    /sports/{sportSlug}
+                                    {draft.sponsorName.trim() ? ` • ${draft.sponsorName.trim()}` : ""}
+                                  </p>
+                                </div>
+                                <div className="cta-row" style={{ margin: 0 }}>
+                                  <span className={`pill ${draft.enabled ? "" : "pill--muted"}`}>
+                                    {draft.enabled ? "Visible" : "Hidden"}
+                                  </span>
+                                  <button
+                                    className="button ghost"
+                                    type="button"
+                                    onClick={() => updateSportSponsorDraft(sportSlug, "enabled", !draft.enabled)}
+                                  >
+                                    {draft.enabled ? "Hide" : "Show"}
+                                  </button>
+                                  <button
+                                    className="button ghost"
+                                    type="button"
+                                    onClick={() => setExpandedSportSponsorSlug((current) => (current === sportSlug ? null : sportSlug))}
+                                  >
+                                    {isExpanded ? "Close" : "Edit"}
+                                  </button>
+                                </div>
+                              </div>
+                              {isExpanded ? (
+                                <div className="register-form" style={{ marginTop: 12 }}>
+                                  <div className="register-form-grid">
+                                    <div className="form-control">
+                                      <label htmlFor={`sport-sponsor-name-${sport.id}`}>Sponsor Name</label>
+                                      <input
+                                        id={`sport-sponsor-name-${sport.id}`}
+                                        value={draft.sponsorName}
+                                        onChange={(event) => updateSportSponsorDraft(sportSlug, "sponsorName", event.target.value)}
+                                        placeholder="BoxPickleball"
+                                      />
+                                    </div>
+                                    <div className="form-control">
+                                      <label htmlFor={`sport-sponsor-image-${sport.id}`}>Sponsor Image URL</label>
+                                      <input
+                                        id={`sport-sponsor-image-${sport.id}`}
+                                        value={draft.imageUrl}
+                                        onChange={(event) => updateSportSponsorDraft(sportSlug, "imageUrl", event.target.value)}
+                                        placeholder="https://..."
+                                      />
+                                    </div>
+                                    <div className="form-control">
+                                      <label htmlFor={`sport-sponsor-link-${sport.id}`}>Sponsor Link URL</label>
+                                      <input
+                                        id={`sport-sponsor-link-${sport.id}`}
+                                        value={draft.linkUrl}
+                                        onChange={(event) => updateSportSponsorDraft(sportSlug, "linkUrl", event.target.value)}
+                                        placeholder="https://..."
+                                      />
+                                    </div>
+                                    <div className="form-control">
+                                      <label htmlFor={`sport-sponsor-button-${sport.id}`}>Button Text</label>
+                                      <input
+                                        id={`sport-sponsor-button-${sport.id}`}
+                                        value={draft.buttonText}
+                                        onChange={(event) => updateSportSponsorDraft(sportSlug, "buttonText", event.target.value)}
+                                        placeholder="Take Me There"
+                                      />
+                                    </div>
+                                    <div className="form-control">
+                                      <label htmlFor={`sport-sponsor-alt-${sport.id}`}>Image Alt Text</label>
+                                      <input
+                                        id={`sport-sponsor-alt-${sport.id}`}
+                                        value={draft.altText}
+                                        onChange={(event) => updateSportSponsorDraft(sportSlug, "altText", event.target.value)}
+                                        placeholder={`${sport.title} sponsor logo`}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="cta-row">
+                                    <button className="button primary" type="submit" disabled={sportSponsorStatus.type === "loading"}>
+                                      {sportSponsorStatus.type === "loading" ? "Saving..." : "Save All Banners"}
+                                    </button>
+                                    <button className="button ghost" type="button" onClick={() => setExpandedSportSponsorSlug(null)}>
+                                      Done Editing
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : null}
+                            </article>
+                          );
+                        })}
+                      </div>
+                    </form>
+                  )}
+                  {sportSponsorStatus.message ? (
+                    <p className={`form-help ${sportSponsorStatus.type === "error" ? "error" : "muted"}`}>{sportSponsorStatus.message}</p>
                   ) : null}
                 </section>
 

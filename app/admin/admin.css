@@ -151,6 +151,10 @@
   padding-right: 6px;
 }
 
+.admin-sport-sponsor-list {
+  max-height: 420px;
+}
+
 .admin-signups-toolbar {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
