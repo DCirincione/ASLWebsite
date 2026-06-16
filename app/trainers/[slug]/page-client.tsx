@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useMemo, useState, type FormEvent } from "react";
 
 import { HistoryBackButton } from "@/components/history-back-button";
@@ -135,20 +134,17 @@ export default function TrainerPageClient({ trainer }: TrainerPageClientProps) {
         <div className="trainer-profile">
           <div className="trainer-profile__media">
             <div className="trainer-profile__headshot">
-              <Image
+              <img
                 src={trainer.headshotUrl}
                 alt={`${trainer.name} headshot`}
-                fill
-                sizes="(max-width: 720px) 100vw, 380px"
-                priority
+                loading="eager"
               />
             </div>
             <div className="trainer-profile__flyer">
-              <Image
+              <img
                 src={trainer.flyerUrl}
                 alt={`${trainer.name} training flyer`}
-                fill
-                sizes="(max-width: 720px) 100vw, 420px"
+                loading="lazy"
               />
             </div>
           </div>
