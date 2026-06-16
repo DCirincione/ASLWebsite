@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getSupabaseServiceRole } from "@/lib/admin-route-auth";
 import type { JsonValue, TrainerAvailabilitySlot, TrainerProfile } from "@/lib/supabase/types";
+import { parseSessionDurationMinutes } from "@/lib/trainers";
 
 type BookingRequestBody = Partial<{
   trainerId: unknown;
@@ -24,6 +25,14 @@ const findSessionOptionSnapshot = (sessionOptions: JsonValue, sessionOptionName:
   return isRecord(match) ? match as JsonValue : {};
 };
 
+const getSlotDurationMinutes = (slot: Pick<TrainerAvailabilitySlot, "starts_at" | "ends_at">) => {
+  const startsAt = new Date(slot.starts_at);
+  const endsAt = new Date(slot.ends_at);
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) return null;
+  const duration = Math.round((endsAt.getTime() - startsAt.getTime()) / 60_000);
+  return duration > 0 ? duration : null;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const supabase = getSupabaseServiceRole();
@@ -37,11 +46,11 @@ export async function POST(req: NextRequest) {
     const sessionOptionName = trimString(body.sessionOptionName);
     const customerName = trimString(body.customerName);
     const customerEmail = trimString(body.customerEmail);
-    const customerPhone = trimString(body.customerPhone) || null;
+    const customerPhone = trimString(body.customerPhone);
     const notes = trimString(body.notes) || null;
 
-    if (!trainerId || !availabilitySlotId || !sessionOptionName || !customerName || !customerEmail) {
-      return NextResponse.json({ error: "Choose a session time and enter your name and email." }, { status: 400 });
+    if (!trainerId || !availabilitySlotId || !sessionOptionName || !customerName || !customerEmail || !customerPhone) {
+      return NextResponse.json({ error: "Choose a session time and enter your name, email, and phone number." }, { status: 400 });
     }
 
     const { data: trainer, error: trainerError } = await supabase
@@ -60,6 +69,9 @@ export async function POST(req: NextRequest) {
     if (isRecord(sessionOptionSnapshot) && Object.keys(sessionOptionSnapshot).length === 0) {
       return NextResponse.json({ error: "Choose a valid session option." }, { status: 400 });
     }
+    const sessionDuration = isRecord(sessionOptionSnapshot) && typeof sessionOptionSnapshot.duration === "string"
+      ? parseSessionDurationMinutes(sessionOptionSnapshot.duration)
+      : null;
 
     const { data: claimedSlot, error: slotError } = await supabase
       .from("trainer_availability_slots")
@@ -76,6 +88,17 @@ export async function POST(req: NextRequest) {
     }
 
     const slot = claimedSlot as TrainerAvailabilitySlot;
+    const slotDuration = getSlotDurationMinutes(slot);
+    if (!sessionDuration || slotDuration !== sessionDuration) {
+      await supabase
+        .from("trainer_availability_slots")
+        .update({ status: "available", updated_at: new Date().toISOString() })
+        .eq("id", slot.id)
+        .eq("status", "booked");
+
+      return NextResponse.json({ error: "That time is not available for the selected session option." }, { status: 409 });
+    }
+
     const { data: booking, error: bookingError } = await supabase
       .from("trainer_bookings")
       .insert({

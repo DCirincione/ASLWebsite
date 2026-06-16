@@ -21,6 +21,11 @@ type SessionOptionDraft = {
   description: string;
 };
 
+type AvailabilityTimeDraft = {
+  startTime: string;
+  sessionIndex: string;
+};
+
 type TrainerProfileForm = {
   id: string;
   slug: string;
@@ -115,6 +120,21 @@ const formatDateTime = (value: string) => {
   });
 };
 
+const parseDurationMinutes = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const hourMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/);
+  const minuteMatch = normalized.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/);
+  const plainNumberMatch = normalized.match(/^(\d+)$/);
+
+  const hours = hourMatch ? Number(hourMatch[1]) : 0;
+  const minutes = minuteMatch ? Number(minuteMatch[1]) : plainNumberMatch ? Number(plainNumberMatch[1]) : 0;
+  const total = Math.round(hours * 60 + minutes);
+
+  return Number.isFinite(total) && total > 0 ? total : null;
+};
+
 export default function TrainingPage() {
   const [accessStatus, setAccessStatus] = useState<"loading" | "allowed" | "no-session" | "forbidden">("loading");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -124,8 +144,10 @@ export default function TrainingPage() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>({ type: "idle" });
   const [slotStatus, setSlotStatus] = useState<SaveStatus>({ type: "idle" });
   const [uploadStatus, setUploadStatus] = useState<SaveStatus>({ type: "idle" });
-  const [slotStart, setSlotStart] = useState("");
-  const [slotEnd, setSlotEnd] = useState("");
+  const [slotDate, setSlotDate] = useState("");
+  const [slotStartTimes, setSlotStartTimes] = useState<AvailabilityTimeDraft[]>([
+    { startTime: "", sessionIndex: "0" },
+  ]);
 
   const fetchWithSession = useCallback(async (input: RequestInfo | URL, init?: RequestInit) => {
     const { data } = await supabase!.auth.getSession();
@@ -219,6 +241,32 @@ export default function TrainingPage() {
     }));
   };
 
+  const updateSlotStartTime = (index: number, value: string) => {
+    setSlotStartTimes((current) =>
+      current.map((entry, timeIndex) => (timeIndex === index ? { ...entry, startTime: value } : entry)),
+    );
+  };
+
+  const updateSlotSessionIndex = (index: number, value: string) => {
+    setSlotStartTimes((current) =>
+      current.map((entry, timeIndex) => (timeIndex === index ? { ...entry, sessionIndex: value } : entry)),
+    );
+  };
+
+  const addSlotStartTime = () => {
+    setSlotStartTimes((current) => [
+      ...current,
+      {
+        startTime: "",
+        sessionIndex: current[current.length - 1]?.sessionIndex ?? "0",
+      },
+    ]);
+  };
+
+  const removeSlotStartTime = (index: number) => {
+    setSlotStartTimes((current) => current.filter((_, timeIndex) => timeIndex !== index));
+  };
+
   const handleUpload = async (kind: "trainer-headshot" | "trainer-flyer", event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -281,21 +329,58 @@ export default function TrainingPage() {
     }
     setSlotStatus({ type: "loading", message: "Adding availability..." });
     try {
-      const response = await fetchWithSession("/api/trainer/availability", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          trainerId: form.id,
-          startsAt: new Date(slotStart).toISOString(),
-          endsAt: new Date(slotEnd).toISOString(),
-        }),
-      });
-      const json = (await response.json()) as { slot?: TrainerAvailabilitySlot; error?: string };
-      if (!response.ok || !json.slot) throw new Error(json.error ?? "Could not add availability.");
-      setSlots((current) => [...current, json.slot!].sort((left, right) => left.starts_at.localeCompare(right.starts_at)));
-      setSlotStart("");
-      setSlotEnd("");
-      setSlotStatus({ type: "success", message: "Availability added." });
+      const timeEntries = slotStartTimes
+        .map((entry) => ({
+          startTime: entry.startTime.trim(),
+          sessionIndex: entry.sessionIndex,
+          session: sessionOptions[Number(entry.sessionIndex)] ?? null,
+        }))
+        .filter((entry) => entry.startTime);
+      const uniqueTimeEntries = Array.from(
+        new Map(timeEntries.map((entry) => [`${entry.startTime}:${entry.sessionIndex}`, entry])).values(),
+      );
+
+      if (!slotDate || uniqueTimeEntries.length === 0) {
+        setSlotStatus({ type: "error", message: "Choose a date and at least one start time." });
+        return;
+      }
+
+      if (uniqueTimeEntries.some((entry) => !entry.session || !parseDurationMinutes(entry.session.duration))) {
+        setSlotStatus({ type: "error", message: "Each start time needs a session option with a duration like 60 min or 1 hour." });
+        return;
+      }
+
+      const createdSlots: TrainerAvailabilitySlot[] = [];
+      for (const entry of uniqueTimeEntries) {
+        const durationMinutes = parseDurationMinutes(entry.session!.duration);
+        if (!durationMinutes) {
+          throw new Error("Each start time needs a valid session duration.");
+        }
+
+        const startsAt = new Date(`${slotDate}T${entry.startTime}`);
+        if (Number.isNaN(startsAt.getTime())) {
+          throw new Error("One of the start times is invalid.");
+        }
+        const endsAt = new Date(startsAt.getTime() + durationMinutes * 60_000);
+
+        const response = await fetchWithSession("/api/trainer/availability", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            trainerId: form.id,
+            startsAt: startsAt.toISOString(),
+            endsAt: endsAt.toISOString(),
+          }),
+        });
+        const json = (await response.json()) as { slot?: TrainerAvailabilitySlot; error?: string };
+        if (!response.ok || !json.slot) throw new Error(json.error ?? "Could not add availability.");
+        createdSlots.push(json.slot);
+      }
+
+      setSlots((current) => [...current, ...createdSlots].sort((left, right) => left.starts_at.localeCompare(right.starts_at)));
+      setSlotDate("");
+      setSlotStartTimes([{ startTime: "", sessionIndex: "0" }]);
+      setSlotStatus({ type: "success", message: `${createdSlots.length} availability slot${createdSlots.length === 1 ? "" : "s"} added.` });
     } catch (error) {
       setSlotStatus({ type: "error", message: error instanceof Error ? error.message : "Could not add availability." });
     }
@@ -457,13 +542,46 @@ export default function TrainingPage() {
           <h2>Availability</h2>
           <form className="training-slot-form" onSubmit={handleAddSlot}>
             <label>
-              Start
-              <input type="datetime-local" value={slotStart} onChange={(e) => setSlotStart(e.target.value)} required />
+              Date
+              <input type="date" value={slotDate} onChange={(e) => setSlotDate(e.target.value)} required />
             </label>
-            <label>
-              End
-              <input type="datetime-local" value={slotEnd} onChange={(e) => setSlotEnd(e.target.value)} required />
-            </label>
+            <div className="training-time-list">
+              <span className="training-time-list__label">Start times and session lengths</span>
+              {slotStartTimes.map((entry, index) => (
+                <div className="training-time-row" key={index}>
+                  <input
+                    type="time"
+                    value={entry.startTime}
+                    onChange={(e) => updateSlotStartTime(index, e.target.value)}
+                    required={index === 0}
+                  />
+                  <select
+                    value={entry.sessionIndex}
+                    onChange={(e) => updateSlotSessionIndex(index, e.target.value)}
+                    disabled={sessionOptions.length === 0}
+                    required
+                  >
+                    {sessionOptions.length > 0 ? (
+                      sessionOptions.map((option, optionIndex) => (
+                        <option key={`${option.name}-${optionIndex}`} value={optionIndex}>
+                          {option.name} {option.duration ? `- ${option.duration}` : ""}
+                        </option>
+                      ))
+                    ) : (
+                      <option value="0">Add a session option first</option>
+                    )}
+                  </select>
+                  {slotStartTimes.length > 1 ? (
+                    <button className="button ghost" type="button" onClick={() => removeSlotStartTime(index)}>
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+              ))}
+              <button className="button ghost" type="button" onClick={addSlotStartTime}>
+                Add Another Time
+              </button>
+            </div>
             <button className="button primary" type="submit" disabled={slotStatus.type === "loading"}>
               Add Slot
             </button>

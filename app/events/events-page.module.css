@@ -255,12 +255,20 @@
 
 .trainerCard {
   width: 300px;
+  height: 100%;
+  min-height: 500px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: #ffffff;
   overflow: hidden;
   box-shadow: 0 18px 34px rgba(12, 21, 38, 0.08);
   scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+}
+
+.trainerCardGrid {
+  align-items: stretch;
 }
 
 .trainerCardMedia {
@@ -268,6 +276,7 @@
   display: block;
   width: 100%;
   aspect-ratio: 4 / 3;
+  flex: 0 0 auto;
   border: 0;
   background:
     linear-gradient(180deg, rgba(15, 25, 45, 0.08), rgba(15, 25, 45, 0.2)),
@@ -291,47 +300,75 @@
 }
 
 .trainerCardBody {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   padding: 16px;
+  flex: 1;
 }
 
-.trainerCardBody h3,
-.trainerCardBody p {
-  margin: 0;
-}
-
-.trainerCardBody h3 {
-  font-size: 1.08rem;
-}
-
-.trainerCardBody p {
-  color: var(--muted);
-  line-height: 1.45;
-}
-
-.trainerCardMeta {
-  display: flex;
-  flex-wrap: wrap;
+.trainerCardSummary {
+  display: grid;
+  align-content: start;
   gap: 8px;
 }
 
+.trainerCardSummary h3,
+.trainerCardSummary p {
+  margin: 0;
+}
+
+.trainerCardSummary h3 {
+  font-size: 1.08rem;
+}
+
+.trainerCardSummary p {
+  color: var(--muted);
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.trainerCardMeta {
+  display: grid;
+  gap: 6px;
+  color: #64748b;
+  font-size: 0.86rem;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
 .trainerCardMeta span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 6px 9px;
-  border-radius: 999px;
-  background: rgba(233, 93, 42, 0.1);
+  display: block;
+}
+
+.trainerCardLocation {
+  max-width: 100%;
+  color: #334155;
+}
+
+.trainerCardAvailability,
+.trainerCardAvailabilityMuted {
   color: #9a3412;
-  font-size: 0.78rem;
-  font-weight: 800;
+}
+
+.trainerCardAvailabilityMuted {
+  color: #64748b !important;
 }
 
 .trainerCardActions {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+  margin-top: auto;
+  align-items: center;
+}
+
+.trainerCardActions :global(.button) {
+  min-width: 132px;
+  justify-content: center;
 }
 
 .eventsCalendar {
@@ -599,6 +636,19 @@
   .eventCardGrid {
     grid-auto-columns: 85%;
     padding-bottom: 10px;
+  }
+
+  .trainerCardGrid {
+    grid-auto-flow: column;
+    grid-auto-columns: 85%;
+    grid-template-columns: none;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+  }
+
+  .trainerCard {
+    width: 100%;
+    min-width: 0;
   }
 
   .eventsSection {

@@ -1106,13 +1106,17 @@ export default function EventsPage() {
         <span>{trainer.sport}</span>
       </button>
       <div className={styles.trainerCardBody}>
-        <div>
+        <div className={styles.trainerCardSummary}>
           <h3>{trainer.name}</h3>
           <p>{trainer.headline}</p>
         </div>
         <div className={styles.trainerCardMeta}>
-          <span>{trainer.location}</span>
-          <span>{trainer.availability.length} open day{trainer.availability.length === 1 ? "" : "s"}</span>
+          <span className={styles.trainerCardLocation}>{trainer.location || "Location TBD"}</span>
+          <span className={trainer.availability.length > 0 ? styles.trainerCardAvailability : styles.trainerCardAvailabilityMuted}>
+            {trainer.availability.length > 0
+              ? `${trainer.availability.length} open day${trainer.availability.length === 1 ? "" : "s"}`
+              : "No open dates"}
+          </span>
         </div>
         <div className={styles.trainerCardActions}>
           <button className="button ghost" type="button" onClick={() => router.push(`/trainers/${trainer.slug}`)}>
@@ -1353,7 +1357,7 @@ export default function EventsPage() {
                       <p className="muted">Trainer profiles with private sessions, clinics, and available booking times.</p>
                     </div>
                     {filteredTrainers.length > 0 ? (
-                      <div className={styles.eventCardGrid}>
+                      <div className={`${styles.eventCardGrid} ${styles.trainerCardGrid}`}>
                         {filteredTrainers.map(renderTrainerCard)}
                       </div>
                     ) : (

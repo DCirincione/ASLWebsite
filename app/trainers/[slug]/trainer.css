@@ -96,19 +96,19 @@
 
 .trainer-session-option {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr) auto;
   gap: 12px;
-  align-items: start;
+  align-items: center;
   padding: 14px;
   border: 1px solid rgba(15, 23, 42, 0.1);
   border-radius: 14px;
   background: rgba(248, 250, 252, 0.9);
-  cursor: pointer;
 }
 
-.trainer-session-option input {
-  margin-top: 4px;
-  accent-color: #e95d2a;
+.trainer-session-option__marker {
+  color: #e95d2a;
+  font-size: 18px;
+  line-height: 1;
 }
 
 .trainer-session-option span {
@@ -120,11 +120,56 @@
   color: var(--muted);
 }
 
+.trainer-session-option__button {
+  white-space: nowrap;
+}
+
+.trainer-booking-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+}
+
+.trainer-booking-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  border: 0;
+  background: rgba(2, 6, 23, 0.56);
+  cursor: pointer;
+}
+
 .trainer-booking {
   display: grid;
   gap: 22px;
   margin-top: 30px;
   padding: 26px;
+}
+
+.trainer-booking--modal {
+  position: relative;
+  z-index: 1;
+  width: min(980px, 100%);
+  max-height: min(760px, calc(100vh - 44px));
+  margin-top: 0;
+  overflow: auto;
+}
+
+.trainer-booking__close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 999px;
+  background: #ffffff;
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 24px;
+  line-height: 1;
 }
 
 .trainer-booking__header {
@@ -133,6 +178,13 @@
   justify-content: space-between;
   gap: 14px;
   flex-wrap: wrap;
+  padding-right: 42px;
+}
+
+.trainer-booking__session-label {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-weight: 800;
 }
 
 .trainer-booking__grid {
@@ -268,6 +320,12 @@ html[data-theme="dark"] .trainer-booking__time {
   color: #f8fafc;
 }
 
+html[data-theme="dark"] .trainer-booking__close {
+  background: #0f192d;
+  border-color: #1f2a40;
+  color: #f8fafc;
+}
+
 html[data-theme="dark"] .trainer-booking__contact label,
 html[data-theme="dark"] .trainer-booking__contact input,
 html[data-theme="dark"] .trainer-booking__contact textarea {
@@ -287,8 +345,14 @@ html[data-theme="dark"] .trainer-session-option small {
 
 @media (max-width: 900px) {
   .trainer-profile,
-  .trainer-booking__grid {
+  .trainer-booking__grid,
+  .trainer-session-option {
     grid-template-columns: 1fr;
+  }
+
+  .trainer-session-option__button {
+    width: 100%;
+    justify-content: center;
   }
 }
 

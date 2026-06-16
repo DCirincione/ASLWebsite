@@ -63,7 +63,8 @@
 .training-form-grid select,
 .training-session-card input,
 .training-session-card textarea,
-.training-slot-form input {
+.training-slot-form input,
+.training-slot-form select {
   width: 100%;
   border: 1px solid rgba(15, 23, 42, 0.14);
   border-radius: 12px;
@@ -94,6 +95,24 @@
 
 .training-slot-form {
   align-items: end;
+}
+
+.training-time-list {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+}
+
+.training-time-list__label {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.training-time-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 0.5fr) minmax(180px, 1fr) auto;
+  gap: 10px;
+  align-items: center;
 }
 
 .training-slot-list,
@@ -167,7 +186,8 @@ html[data-theme="dark"] .training-form-grid textarea,
 html[data-theme="dark"] .training-form-grid select,
 html[data-theme="dark"] .training-session-card input,
 html[data-theme="dark"] .training-session-card textarea,
-html[data-theme="dark"] .training-slot-form input {
+html[data-theme="dark"] .training-slot-form input,
+html[data-theme="dark"] .training-slot-form select {
   color: #f8fafc;
 }
 
@@ -176,9 +196,14 @@ html[data-theme="dark"] .training-form-grid textarea,
 html[data-theme="dark"] .training-form-grid select,
 html[data-theme="dark"] .training-session-card input,
 html[data-theme="dark"] .training-session-card textarea,
-html[data-theme="dark"] .training-slot-form input {
+html[data-theme="dark"] .training-slot-form input,
+html[data-theme="dark"] .training-slot-form select {
   background: rgba(15, 23, 42, 0.86);
   border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .training-time-list__label {
+  color: #f8fafc;
 }
 
 @media (max-width: 900px) {
@@ -194,6 +219,7 @@ html[data-theme="dark"] .training-slot-form input {
 
   .training-form-grid,
   .training-slot-form,
+  .training-time-row,
   .training-slot-row,
   .training-booking-row {
     grid-template-columns: 1fr;

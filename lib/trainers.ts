@@ -16,6 +16,7 @@ export type TrainerAvailabilityDay = {
     id: string;
     startsAt: string;
     endsAt: string;
+    durationMinutes: number | null;
     label: string;
   }>;
 };
@@ -95,6 +96,29 @@ const formatSlotTime = (startsAt: string, endsAt: string) => {
   })}`;
 };
 
+export const parseSessionDurationMinutes = (value: string) => {
+  const normalized = value.trim().toLowerCase();
+  if (!normalized) return null;
+
+  const hourMatch = normalized.match(/(\d+(?:\.\d+)?)\s*(?:h|hr|hrs|hour|hours)\b/);
+  const minuteMatch = normalized.match(/(\d+)\s*(?:m|min|mins|minute|minutes)\b/);
+  const plainNumberMatch = normalized.match(/^(\d+)$/);
+
+  const hours = hourMatch ? Number(hourMatch[1]) : 0;
+  const minutes = minuteMatch ? Number(minuteMatch[1]) : plainNumberMatch ? Number(plainNumberMatch[1]) : 0;
+  const total = Math.round(hours * 60 + minutes);
+
+  return Number.isFinite(total) && total > 0 ? total : null;
+};
+
+const getSlotDurationMinutes = (startsAt: string, endsAt: string) => {
+  const startDate = new Date(startsAt);
+  const endDate = new Date(endsAt);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) return null;
+  const duration = Math.round((endDate.getTime() - startDate.getTime()) / 60_000);
+  return duration > 0 ? duration : null;
+};
+
 const groupAvailabilitySlots = (slots: TrainerAvailabilitySlot[]): TrainerAvailabilityDay[] => {
   const grouped = new Map<string, TrainerAvailabilityDay>();
 
@@ -107,6 +131,7 @@ const groupAvailabilitySlots = (slots: TrainerAvailabilitySlot[]): TrainerAvaila
       id: slot.id,
       startsAt: slot.starts_at,
       endsAt: slot.ends_at,
+      durationMinutes: getSlotDurationMinutes(slot.starts_at, slot.ends_at),
       label: formatSlotTime(slot.starts_at, slot.ends_at),
     });
   }

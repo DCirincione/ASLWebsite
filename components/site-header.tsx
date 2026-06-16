@@ -191,7 +191,6 @@ export function SiteHeader() {
   const navLinks = [
     ...links,
     ...(isPartnerRole(profileRole) ? [{ href: "/partner", label: "Partner Portal" }] : []),
-    ...(canAccessTraining ? [{ href: "/training", label: "Training Portal" }] : []),
   ];
 
   return (

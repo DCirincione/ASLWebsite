@@ -1,13 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useMemo, useState, type FormEvent } from "react";
 
 import { HistoryBackButton } from "@/components/history-back-button";
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
-import type { TrainerProfile } from "@/lib/trainers";
+import { parseSessionDurationMinutes, type TrainerProfile } from "@/lib/trainers";
 
 type TrainerPageClientProps = {
   trainer: TrainerProfile;
@@ -25,21 +24,58 @@ const formatAvailabilityDate = (value: string) => {
   });
 };
 
+const getAvailabilityForSession = (trainer: TrainerProfile, sessionName: string) => {
+  const session = trainer.sessionTypes.find((entry) => entry.name === sessionName) ?? trainer.sessionTypes[0] ?? null;
+  const durationMinutes = session ? parseSessionDurationMinutes(session.duration) : null;
+
+  if (!durationMinutes) return [];
+
+  return trainer.availability.flatMap((day) => {
+    const slots = day.slots.filter((slot) => slot.durationMinutes === durationMinutes);
+    return slots.length > 0 ? [{ ...day, slots }] : [];
+  });
+};
+
 export default function TrainerPageClient({ trainer }: TrainerPageClientProps) {
-  const firstAvailableDate = trainer.availability[0]?.date ?? "";
-  const [selectedDate, setSelectedDate] = useState(firstAvailableDate);
+  const defaultSession = trainer.sessionTypes[0]?.name ?? "";
+  const defaultAvailability = getAvailabilityForSession(trainer, defaultSession);
+  const [selectedDate, setSelectedDate] = useState(defaultAvailability[0]?.date ?? "");
   const [selectedSlotId, setSelectedSlotId] = useState("");
-  const [selectedSession, setSelectedSession] = useState(trainer.sessionTypes[0]?.name ?? "");
+  const [selectedSession, setSelectedSession] = useState(defaultSession);
+  const [bookingOpen, setBookingOpen] = useState(false);
   const [bookingStatus, setBookingStatus] = useState<{ type: "idle" | "loading" | "success" | "error"; message?: string }>({ type: "idle" });
 
+  const filteredAvailability = useMemo(
+    () => getAvailabilityForSession(trainer, selectedSession),
+    [selectedSession, trainer],
+  );
+
   const selectedDay = useMemo(
-    () => trainer.availability.find((day) => day.date === selectedDate) ?? null,
-    [selectedDate, trainer.availability],
+    () => filteredAvailability.find((day) => day.date === selectedDate) ?? null,
+    [filteredAvailability, selectedDate],
   );
 
   const handleDateChange = (date: string) => {
     setSelectedDate(date);
     setSelectedSlotId("");
+    setBookingStatus({ type: "idle" });
+  };
+
+  const selectSession = (sessionName: string) => {
+    const nextAvailability = getAvailabilityForSession(trainer, sessionName);
+    setSelectedSession(sessionName);
+    setSelectedDate(nextAvailability[0]?.date ?? "");
+    setSelectedSlotId("");
+    setBookingStatus({ type: "idle" });
+  };
+
+  const openBooking = (sessionName: string) => {
+    selectSession(sessionName);
+    setBookingOpen(true);
+  };
+
+  const closeBooking = () => {
+    setBookingOpen(false);
     setBookingStatus({ type: "idle" });
   };
 
@@ -144,22 +180,18 @@ export default function TrainerPageClient({ trainer }: TrainerPageClientProps) {
                 <h3>Session Options</h3>
                 <div className="trainer-session-list">
                   {trainer.sessionTypes.map((session) => (
-                    <label key={session.name} className="trainer-session-option">
-                      <input
-                        type="radio"
-                        name="sessionType"
-                        value={session.name}
-                        checked={selectedSession === session.name}
-                        onChange={() => {
-                          setSelectedSession(session.name);
-                          setBookingStatus({ type: "idle" });
-                        }}
-                      />
+                    <div key={session.name} className="trainer-session-option">
+                      <span className="trainer-session-option__marker" aria-hidden>
+                        {selectedSession === session.name ? "●" : "○"}
+                      </span>
                       <span>
                         <strong>{session.name}</strong>
                         <small>{session.duration} • {session.price}</small>
                       </span>
-                    </label>
+                      <button className="button primary trainer-session-option__button" type="button" onClick={() => openBooking(session.name)}>
+                        Find Available Dates
+                      </button>
+                    </div>
                   ))}
                 </div>
               </div>
@@ -167,84 +199,90 @@ export default function TrainerPageClient({ trainer }: TrainerPageClientProps) {
           </div>
         </div>
 
-        <div className="trainer-booking" id="book-session">
-          <div className="trainer-booking__header">
-            <div>
-              <p className="eyebrow">Book a Session</p>
-              <h2>Choose an Available Time</h2>
-            </div>
-            <Link className="button ghost" href="/events">
-              Back to Events
-            </Link>
-          </div>
-
-          {trainer.availability.length > 0 ? (
-            <form className="trainer-booking__grid" onSubmit={handleSubmit}>
-              <div className="trainer-booking__calendar" aria-label="Available training dates">
-                {trainer.availability.map((day) => (
-                  <button
-                    key={day.date}
-                    className={`trainer-booking__date${selectedDate === day.date ? " is-selected" : ""}`}
-                    type="button"
-                    onClick={() => handleDateChange(day.date)}
-                  >
-                    <span>{formatAvailabilityDate(day.date)}</span>
-                    <small>{day.slots.length} time{day.slots.length === 1 ? "" : "s"}</small>
-                  </button>
-                ))}
+        {bookingOpen ? (
+          <div className="trainer-booking-modal" role="dialog" aria-modal="true" aria-labelledby="trainer-booking-title">
+            <button className="trainer-booking-modal__backdrop" type="button" aria-label="Close booking calendar" onClick={closeBooking} />
+            <div className="trainer-booking trainer-booking--modal" id="book-session">
+              <button className="trainer-booking__close" type="button" aria-label="Close booking calendar" onClick={closeBooking}>
+                ×
+              </button>
+              <div className="trainer-booking__header">
+                <div>
+                  <p className="eyebrow">Book a Session</p>
+                  <h2 id="trainer-booking-title">Choose an Available Time</h2>
+                  <p className="trainer-booking__session-label">{selectedSession}</p>
+                </div>
               </div>
 
-              <div className="trainer-booking__times">
-                <h3>{selectedDate ? formatAvailabilityDate(selectedDate) : "Select a date"}</h3>
-                <div className="trainer-booking__time-grid">
-                  {selectedDay?.slots.map((slot) => (
-                    <button
-                      key={slot.id}
-                      className={`trainer-booking__time${selectedSlotId === slot.id ? " is-selected" : ""}`}
-                      type="button"
-                      onClick={() => {
-                        setSelectedSlotId(slot.id);
-                        setBookingStatus({ type: "idle" });
-                      }}
-                    >
-                      {slot.label}
+              {filteredAvailability.length > 0 ? (
+                <form className="trainer-booking__grid" onSubmit={handleSubmit}>
+                  <div className="trainer-booking__calendar" aria-label="Available training dates">
+                    {filteredAvailability.map((day) => (
+                      <button
+                        key={day.date}
+                        className={`trainer-booking__date${selectedDate === day.date ? " is-selected" : ""}`}
+                        type="button"
+                        onClick={() => handleDateChange(day.date)}
+                      >
+                        <span>{formatAvailabilityDate(day.date)}</span>
+                        <small>{day.slots.length} time{day.slots.length === 1 ? "" : "s"}</small>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="trainer-booking__times">
+                    <h3>{selectedDate ? formatAvailabilityDate(selectedDate) : "Select a date"}</h3>
+                    <div className="trainer-booking__time-grid">
+                      {selectedDay?.slots.map((slot) => (
+                        <button
+                          key={slot.id}
+                          className={`trainer-booking__time${selectedSlotId === slot.id ? " is-selected" : ""}`}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSlotId(slot.id);
+                            setBookingStatus({ type: "idle" });
+                          }}
+                        >
+                          {slot.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div className="trainer-booking__contact">
+                      <label>
+                        Name
+                        <input name="name" type="text" placeholder="Your name" required />
+                      </label>
+                      <label>
+                        Email
+                        <input name="email" type="email" placeholder="you@example.com" required />
+                      </label>
+                      <label>
+                        Phone
+                        <input name="phone" type="tel" placeholder="Your phone number" required />
+                      </label>
+                      <label>
+                        Notes
+                        <textarea name="notes" rows={3} placeholder="Goals, age group, or anything the trainer should know" />
+                      </label>
+                    </div>
+
+                    <button className="button primary" type="submit" disabled={!selectedDate || !selectedSlotId || !selectedSession || bookingStatus.type === "loading"}>
+                      {bookingStatus.type === "loading" ? "Booking..." : "Book Session"}
                     </button>
-                  ))}
-                </div>
-
-                <div className="trainer-booking__contact">
-                  <label>
-                    Name
-                    <input name="name" type="text" placeholder="Your name" required />
-                  </label>
-                  <label>
-                    Email
-                    <input name="email" type="email" placeholder="you@example.com" required />
-                  </label>
-                  <label>
-                    Phone
-                    <input name="phone" type="tel" placeholder="Optional" />
-                  </label>
-                  <label>
-                    Notes
-                    <textarea name="notes" rows={3} placeholder="Goals, age group, or anything the trainer should know" />
-                  </label>
-                </div>
-
-                <button className="button primary" type="submit" disabled={!selectedDate || !selectedSlotId || !selectedSession || bookingStatus.type === "loading"}>
-                  {bookingStatus.type === "loading" ? "Booking..." : "Book Session"}
-                </button>
-                {bookingStatus.message ? (
-                  <p className={`trainer-booking__status trainer-booking__status--${bookingStatus.type}`} role="status">
-                    {bookingStatus.message}
-                  </p>
-                ) : null}
-              </div>
-            </form>
-          ) : (
-            <p className="muted">This trainer has not posted availability yet.</p>
-          )}
-        </div>
+                    {bookingStatus.message ? (
+                      <p className={`trainer-booking__status trainer-booking__status--${bookingStatus.type}`} role="status">
+                        {bookingStatus.message}
+                      </p>
+                    ) : null}
+                  </div>
+                </form>
+              ) : (
+                <p className="muted">No available times are posted for this session option yet.</p>
+              )}
+            </div>
+          </div>
+        ) : null}
       </Section>
     </PageShell>
   );

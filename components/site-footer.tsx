@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-import { canAccessRefPortal } from "@/lib/event-approval";
+import { canAccessRefPortal, canAccessTrainerPortal } from "@/lib/event-approval";
 import { supabase } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/supabase/types";
 
@@ -27,9 +27,11 @@ const socials = [
 
 export function SiteFooter() {
   const [profileRole, setProfileRole] = useState<Profile["role"] | null>(null);
-  const footerResources = canAccessRefPortal(profileRole)
-    ? [...resources, { href: "/ref-portal", label: "Ref Portal" }]
-    : resources;
+  const footerResources = [
+    ...resources,
+    ...(canAccessTrainerPortal(profileRole) ? [{ href: "/training", label: "Training Portal" }] : []),
+    ...(canAccessRefPortal(profileRole) ? [{ href: "/ref-portal", label: "Ref Portal" }] : []),
+  ];
 
   useEffect(() => {
     const client = supabase;
