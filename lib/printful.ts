@@ -459,7 +459,9 @@ async function resolvePrintfulStoreContext() {
 
 const getConfiguredProductModes = (): PrintfulProductPathMode[] => {
   const configured = getPrintfulProductSource();
-  if (configured) return [configured];
+  if (configured) {
+    return [configured, configured === "store" ? "sync" : "store"];
+  }
   return ["store", "sync"];
 };
 
