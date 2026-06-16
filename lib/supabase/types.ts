@@ -2,7 +2,7 @@ export type Profile = {
   id: string;
   name: string;
   age: string | null;
-  role?: "player" | "partner" | "ref" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "trainer" | "ref" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
   suspension_reason?: string | null;
@@ -21,7 +21,7 @@ export type ProfileInsert = {
   id?: string;
   name: string;
   age?: string | null;
-  role?: "player" | "partner" | "ref" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "trainer" | "ref" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
   suspension_reason?: string | null;
@@ -40,7 +40,7 @@ export type ProfileUpdate = {
   id?: string;
   name?: string;
   age?: string | null;
-  role?: "player" | "partner" | "ref" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "trainer" | "ref" | "admin" | "owner" | null;
   suspended?: boolean | null;
   suspended_at?: string | null;
   suspension_reason?: string | null;
@@ -998,6 +998,136 @@ export type UserDirectMessageUpdate = {
   created_at?: string | null;
 };
 
+export type TrainerProfileStatus = "draft" | "pending_approval" | "approved" | "hidden";
+export type TrainerAvailabilitySlotStatus = "available" | "held" | "booked" | "cancelled";
+export type TrainerBookingStatus = "requested" | "confirmed" | "cancelled" | "completed";
+
+export type TrainerProfile = {
+  id: string;
+  user_id: string;
+  slug: string;
+  display_name: string;
+  headline: string;
+  bio: string;
+  sport: string;
+  location: string;
+  headshot_url?: string | null;
+  flyer_url?: string | null;
+  specialties: JsonValue;
+  session_options: JsonValue;
+  status: TrainerProfileStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type TrainerProfileInsert = {
+  id?: string;
+  user_id: string;
+  slug: string;
+  display_name: string;
+  headline?: string;
+  bio?: string;
+  sport?: string;
+  location?: string;
+  headshot_url?: string | null;
+  flyer_url?: string | null;
+  specialties?: JsonValue;
+  session_options?: JsonValue;
+  status?: TrainerProfileStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type TrainerProfileUpdate = {
+  id?: string;
+  user_id?: string;
+  slug?: string;
+  display_name?: string;
+  headline?: string;
+  bio?: string;
+  sport?: string;
+  location?: string;
+  headshot_url?: string | null;
+  flyer_url?: string | null;
+  specialties?: JsonValue;
+  session_options?: JsonValue;
+  status?: TrainerProfileStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type TrainerAvailabilitySlot = {
+  id: string;
+  trainer_id: string;
+  starts_at: string;
+  ends_at: string;
+  status: TrainerAvailabilitySlotStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type TrainerAvailabilitySlotInsert = {
+  id?: string;
+  trainer_id: string;
+  starts_at: string;
+  ends_at: string;
+  status?: TrainerAvailabilitySlotStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type TrainerAvailabilitySlotUpdate = {
+  id?: string;
+  trainer_id?: string;
+  starts_at?: string;
+  ends_at?: string;
+  status?: TrainerAvailabilitySlotStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type TrainerBooking = {
+  id: string;
+  trainer_id: string;
+  availability_slot_id: string;
+  session_option_snapshot: JsonValue;
+  customer_name: string;
+  customer_email: string;
+  customer_phone?: string | null;
+  notes?: string | null;
+  status: TrainerBookingStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type TrainerBookingInsert = {
+  id?: string;
+  trainer_id: string;
+  availability_slot_id: string;
+  session_option_snapshot?: JsonValue;
+  customer_name: string;
+  customer_email: string;
+  customer_phone?: string | null;
+  notes?: string | null;
+  status?: TrainerBookingStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type TrainerBookingUpdate = {
+  id?: string;
+  trainer_id?: string;
+  availability_slot_id?: string;
+  session_option_snapshot?: JsonValue;
+  customer_name?: string;
+  customer_email?: string;
+  customer_phone?: string | null;
+  notes?: string | null;
+  status?: TrainerBookingStatus;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -1041,6 +1171,24 @@ export type Database = {
         Row: PartnerPayoutRequest;
         Insert: PartnerPayoutRequestInsert;
         Update: PartnerPayoutRequestUpdate;
+        Relationships: [];
+      };
+      trainer_profiles: {
+        Row: TrainerProfile;
+        Insert: TrainerProfileInsert;
+        Update: TrainerProfileUpdate;
+        Relationships: [];
+      };
+      trainer_availability_slots: {
+        Row: TrainerAvailabilitySlot;
+        Insert: TrainerAvailabilitySlotInsert;
+        Update: TrainerAvailabilitySlotUpdate;
+        Relationships: [];
+      };
+      trainer_bookings: {
+        Row: TrainerBooking;
+        Insert: TrainerBookingInsert;
+        Update: TrainerBookingUpdate;
         Relationships: [];
       };
       sunday_league_teams: {

@@ -6,7 +6,7 @@ import { CSSProperties, MouseEvent, useCallback, useEffect, useRef, useState } f
 
 import { AccountAuthModal } from "./account-auth-modal";
 import { AvatarImage } from "./avatar-image";
-import { canAccessAdminDashboard, canAccessRefPortal, isPartnerRole } from "@/lib/event-approval";
+import { canAccessAdminDashboard, canAccessRefPortal, canAccessTrainerPortal, isPartnerRole } from "@/lib/event-approval";
 import { supabase } from "@/lib/supabase/client";
 import type { Profile } from "@/lib/supabase/types";
 
@@ -186,10 +186,12 @@ export function SiteHeader() {
 
   const canAccessAdmin = canAccessAdminDashboard(profileRole);
   const canAccessRef = canAccessRefPortal(profileRole);
+  const canAccessTraining = canAccessTrainerPortal(profileRole);
   const shouldShowPartnerSignup = !isPartnerRole(profileRole) && !canAccessAdmin;
   const navLinks = [
     ...links,
     ...(isPartnerRole(profileRole) ? [{ href: "/partner", label: "Partner Portal" }] : []),
+    ...(canAccessTraining ? [{ href: "/training", label: "Training Portal" }] : []),
   ];
 
   return (
@@ -260,6 +262,11 @@ export function SiteHeader() {
                           Ref Portal
                         </Link>
                       ) : null}
+                      {canAccessTraining ? (
+                        <Link href="/training" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
+                          Training Portal
+                        </Link>
+                      ) : null}
                     </div>
                   </details>
                 </>
@@ -308,6 +315,11 @@ export function SiteHeader() {
                     {canAccessRef ? (
                       <Link href="/ref-portal" role="menuitem" onClick={() => setIsMenuOpen(false)}>
                         Ref Portal
+                      </Link>
+                    ) : null}
+                    {canAccessTraining ? (
+                      <Link href="/training" role="menuitem" onClick={() => setIsMenuOpen(false)}>
+                        Training Portal
                       </Link>
                     ) : null}
                     <Link href="/account/settings" role="menuitem" onClick={() => setIsMenuOpen(false)}>

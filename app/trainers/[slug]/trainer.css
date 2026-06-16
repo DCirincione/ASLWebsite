@@ -1,0 +1,301 @@
+.trainer-page__back {
+  padding-top: 16px;
+}
+
+.trainer-page {
+  padding-top: 28px;
+}
+
+.trainer-profile {
+  display: grid;
+  grid-template-columns: minmax(280px, 420px) minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.trainer-profile__media,
+.trainer-profile__details {
+  display: grid;
+  gap: 18px;
+}
+
+.trainer-profile__headshot,
+.trainer-profile__flyer {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: hidden;
+  background: #f8fafc;
+  box-shadow: var(--glow);
+}
+
+.trainer-profile__headshot {
+  aspect-ratio: 4 / 5;
+}
+
+.trainer-profile__flyer {
+  aspect-ratio: 4 / 5;
+}
+
+.trainer-profile__headshot img,
+.trainer-profile__flyer img {
+  object-fit: cover;
+}
+
+.trainer-profile__summary,
+.trainer-profile__panel,
+.trainer-booking {
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: var(--glow);
+}
+
+.trainer-profile__summary,
+.trainer-profile__panel {
+  padding: 24px;
+}
+
+.trainer-profile__summary h2,
+.trainer-profile__panel h3,
+.trainer-booking__header h2,
+.trainer-booking__times h3 {
+  margin: 0;
+}
+
+.trainer-profile__summary p:not(.eyebrow) {
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.trainer-profile__meta,
+.trainer-profile__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.trainer-profile__meta span,
+.trainer-profile__chips span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(233, 93, 42, 0.1);
+  color: #9a3412;
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
+.trainer-session-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.trainer-session-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.9);
+  cursor: pointer;
+}
+
+.trainer-session-option input {
+  margin-top: 4px;
+  accent-color: #e95d2a;
+}
+
+.trainer-session-option span {
+  display: grid;
+  gap: 3px;
+}
+
+.trainer-session-option small {
+  color: var(--muted);
+}
+
+.trainer-booking {
+  display: grid;
+  gap: 22px;
+  margin-top: 30px;
+  padding: 26px;
+}
+
+.trainer-booking__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.trainer-booking__grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) minmax(0, 1fr);
+  gap: 22px;
+  align-items: start;
+}
+
+.trainer-booking__calendar,
+.trainer-booking__times,
+.trainer-booking__contact {
+  display: grid;
+  gap: 12px;
+}
+
+.trainer-booking__date,
+.trainer-booking__time {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.trainer-booking__date {
+  display: grid;
+  gap: 3px;
+  padding: 14px;
+}
+
+.trainer-booking__date span {
+  font-weight: 900;
+}
+
+.trainer-booking__date small {
+  color: #64748b;
+}
+
+.trainer-booking__time-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.trainer-booking__time {
+  min-height: 46px;
+  padding: 10px 12px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.trainer-booking__date:hover,
+.trainer-booking__time:hover,
+.trainer-booking__date.is-selected,
+.trainer-booking__time.is-selected {
+  transform: translateY(-1px);
+  border-color: rgba(233, 93, 42, 0.42);
+  background: rgba(233, 93, 42, 0.1);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+}
+
+.trainer-booking__date.is-selected,
+.trainer-booking__time.is-selected {
+  color: #9a3412;
+}
+
+.trainer-booking__contact {
+  padding-top: 8px;
+}
+
+.trainer-booking__contact label {
+  display: grid;
+  gap: 7px;
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.trainer-booking__contact input,
+.trainer-booking__contact textarea {
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+}
+
+.trainer-booking__contact textarea {
+  resize: vertical;
+}
+
+.trainer-booking__status {
+  margin: 0;
+  font-weight: 700;
+}
+
+.trainer-booking__status--success {
+  color: #166534;
+}
+
+.trainer-booking__status--error {
+  color: #b42318;
+}
+
+.trainer-booking__status--loading {
+  color: #475569;
+}
+
+html[data-theme="dark"] .trainer-profile__headshot,
+html[data-theme="dark"] .trainer-profile__flyer,
+html[data-theme="dark"] .trainer-profile__summary,
+html[data-theme="dark"] .trainer-profile__panel,
+html[data-theme="dark"] .trainer-booking {
+  background: #0f192d;
+  border-color: #1f2a40;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .trainer-session-option,
+html[data-theme="dark"] .trainer-booking__date,
+html[data-theme="dark"] .trainer-booking__time {
+  background: rgba(15, 23, 42, 0.74);
+  border-color: #1f2a40;
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .trainer-booking__contact label,
+html[data-theme="dark"] .trainer-booking__contact input,
+html[data-theme="dark"] .trainer-booking__contact textarea {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .trainer-booking__contact input,
+html[data-theme="dark"] .trainer-booking__contact textarea {
+  background: rgba(15, 23, 42, 0.86);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .trainer-booking__date small,
+html[data-theme="dark"] .trainer-session-option small {
+  color: #94a3b8;
+}
+
+@media (max-width: 900px) {
+  .trainer-profile,
+  .trainer-booking__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .trainer-profile__summary,
+  .trainer-profile__panel,
+  .trainer-booking {
+    padding: 20px 18px;
+  }
+}

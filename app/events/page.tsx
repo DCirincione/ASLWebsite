@@ -26,7 +26,8 @@ import { normalizeSportSlug } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
-import type { JsonValue, Sport } from "@/lib/supabase/types";
+import type { JsonValue, Sport, TrainerProfile as TrainerProfileRow, TrainerAvailabilitySlot } from "@/lib/supabase/types";
+import type { TrainerProfile, TrainerSessionType } from "@/lib/trainers";
 
 import styles from "./events-page.module.css";
 
@@ -467,10 +468,73 @@ const eventOccursOnDay = (event: DerivedEvent, day: Date) => {
 const toggleSelection = (values: string[], value: string) =>
   values.includes(value) ? values.filter((entry) => entry !== value) : [...values, value];
 
+const trainerSearchText = (trainer: TrainerProfile) =>
+  [
+    trainer.name,
+    trainer.headline,
+    trainer.sport,
+    trainer.location,
+    trainer.bio,
+    ...trainer.specialties,
+    ...trainer.sessionTypes.map((session) => `${session.name} ${session.duration} ${session.price}`),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const normalizeTrainerSpecialties = (value: JsonValue): string[] => {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => (typeof entry === "string" && entry.trim() ? [entry.trim()] : []));
+};
+
+const normalizeTrainerSessions = (value: JsonValue): TrainerSessionType[] => {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry) => {
+    if (!isRecord(entry)) return [];
+    const name = typeof entry.name === "string" ? entry.name.trim() : "";
+    if (!name) return [];
+    return [{
+      name,
+      duration: typeof entry.duration === "string" ? entry.duration : "",
+      price: typeof entry.price === "string" ? entry.price : "",
+    }];
+  });
+};
+
+const mapTrainerRows = (trainerRows: TrainerProfileRow[], slots: TrainerAvailabilitySlot[]): TrainerProfile[] => {
+  const openDatesByTrainerId = new Map<string, Set<string>>();
+  for (const slot of slots) {
+    const dates = openDatesByTrainerId.get(slot.trainer_id) ?? new Set<string>();
+    dates.add(slot.starts_at.slice(0, 10));
+    openDatesByTrainerId.set(slot.trainer_id, dates);
+  }
+
+  return trainerRows.map((trainer) => ({
+    id: trainer.id,
+    userId: trainer.user_id,
+    slug: trainer.slug,
+    name: trainer.display_name,
+    headline: trainer.headline,
+    sport: trainer.sport,
+    location: trainer.location,
+    bio: trainer.bio,
+    specialties: normalizeTrainerSpecialties(trainer.specialties),
+    sessionTypes: normalizeTrainerSessions(trainer.session_options),
+    headshotUrl: trainer.headshot_url || "/ASLLogo.png",
+    flyerUrl: trainer.flyer_url || "/home-hero/Aldrich Sports Leagues.png",
+    status: trainer.status,
+    availability: Array.from(openDatesByTrainerId.get(trainer.id) ?? []).map((date) => ({ date, slots: [] })),
+  }));
+};
+
 export default function EventsPage() {
   const router = useRouter();
   const [events, setEvents] = useState<EventItem[]>([]);
   const [sports, setSports] = useState<Sport[]>([]);
+  const [trainers, setTrainers] = useState<TrainerProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [modalEventId, setModalEventId] = useState<string | null>(null);
@@ -510,7 +574,23 @@ export default function EventsPage() {
         loadVisiblePublicEvents<EventItem>(supabase),
       ]);
 
+      const { data: trainerRows } = await supabase
+        .from("trainer_profiles")
+        .select("*")
+        .eq("status", "approved")
+        .order("display_name", { ascending: true });
+      const approvedTrainers = (trainerRows ?? []) as TrainerProfileRow[];
+      const { data: trainerSlots } = approvedTrainers.length > 0
+        ? await supabase
+            .from("trainer_availability_slots")
+            .select("*")
+            .in("trainer_id", approvedTrainers.map((trainer) => trainer.id))
+            .eq("status", "available")
+            .gte("starts_at", new Date().toISOString())
+        : { data: [] };
+
       setSports((sportsData ?? []) as Sport[]);
+      setTrainers(mapTrainerRows(approvedTrainers, (trainerSlots ?? []) as TrainerAvailabilitySlot[]));
       setEvents(
         filterVisiblePublicEvents(eventData).filter(
           (event) => isRegularAslSundayLeagueEvent(event) || !isPastEvent(event),
@@ -765,6 +845,37 @@ export default function EventsPage() {
     [derivedEvents, matchesFilters],
   );
 
+  const filteredTrainers = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    const typeAllowsTrainers =
+      selectedTypes.length === 0 ||
+      selectedTypes.includes("clinics") ||
+      selectedTypes.includes("private-training");
+
+    if (!typeAllowsTrainers || selectedAges.length > 0 || selectedSkills.length > 0 || selectedPrices.length > 0) {
+      return [];
+    }
+
+    return trainers.filter((trainer) => {
+      const sportKey = slugifyFilterValue(trainer.sport);
+      const locationKey = slugifyFilterValue(trainer.location);
+
+      if (query && !trainerSearchText(trainer).includes(query)) {
+        return false;
+      }
+
+      if (selectedSports.length > 0 && !selectedSports.includes(sportKey)) {
+        return false;
+      }
+
+      if (selectedLocations.length > 0 && !selectedLocations.includes(locationKey)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [searchTerm, selectedAges, selectedLocations, selectedPrices, selectedSkills, selectedSports, selectedTypes, trainers]);
+
   const filteredCollections = useMemo(() => {
     const pickupEvents = filteredEvents.filter((event) => event.eventTypeKey === "pickup");
     const nonPickupEvents = filteredEvents.filter((event) => event.eventTypeKey !== "pickup");
@@ -983,6 +1094,38 @@ export default function EventsPage() {
     );
   };
 
+  const renderTrainerCard = (trainer: TrainerProfile) => (
+    <article key={trainer.slug} className={styles.trainerCard}>
+      <button
+        className={styles.trainerCardMedia}
+        type="button"
+        style={{ backgroundImage: `url(${trainer.headshotUrl})` }}
+        onClick={() => router.push(`/trainers/${trainer.slug}`)}
+        aria-label={`Open trainer profile for ${trainer.name}`}
+      >
+        <span>{trainer.sport}</span>
+      </button>
+      <div className={styles.trainerCardBody}>
+        <div>
+          <h3>{trainer.name}</h3>
+          <p>{trainer.headline}</p>
+        </div>
+        <div className={styles.trainerCardMeta}>
+          <span>{trainer.location}</span>
+          <span>{trainer.availability.length} open day{trainer.availability.length === 1 ? "" : "s"}</span>
+        </div>
+        <div className={styles.trainerCardActions}>
+          <button className="button ghost" type="button" onClick={() => router.push(`/trainers/${trainer.slug}`)}>
+            View Trainer
+          </button>
+          <button className="button primary" type="button" onClick={() => router.push(`/trainers/${trainer.slug}#book-session`)}>
+            Book Session
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+
   useEffect(() => {
     if (directLinkedEvent && isRegularAslSundayLeagueEvent(directLinkedEvent)) {
       router.replace(SUNDAY_LEAGUE_HREF);
@@ -1164,7 +1307,7 @@ export default function EventsPage() {
                 </div>
               </div>
 
-              {filteredEvents.length === 0 ? (
+              {filteredEvents.length === 0 && filteredTrainers.length === 0 ? (
                 <div className={styles.eventsEmptyState}>
                   <h3>No events match these filters.</h3>
                   <p className="muted">Try removing a few checkboxes or clearing the search.</p>
@@ -1203,6 +1346,20 @@ export default function EventsPage() {
                     filteredCollections.pickupEvents,
                     "No pickup events match the filters right now.",
                   )}
+                  <section className={styles.eventsGroup} id="filtered-training-clinics">
+                    <div className={styles.eventsGroupHeader}>
+                      <p className="eyebrow">Training</p>
+                      <h2>Training and Clinics</h2>
+                      <p className="muted">Trainer profiles with private sessions, clinics, and available booking times.</p>
+                    </div>
+                    {filteredTrainers.length > 0 ? (
+                      <div className={styles.eventCardGrid}>
+                        {filteredTrainers.map(renderTrainerCard)}
+                      </div>
+                    ) : (
+                      <p className="muted" style={{ marginTop: 18 }}>No trainers match the filters right now.</p>
+                    )}
+                  </section>
                 </div>
               ) : (
                 <div className={styles.eventsCalendar}>

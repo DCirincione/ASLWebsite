@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 
-import { canAccessAdminDashboard, canAccessPartnerPortal, canAccessRefPortal, type ProfileRole } from "@/lib/event-approval";
+import { canAccessAdminDashboard, canAccessPartnerPortal, canAccessRefPortal, canAccessTrainerPortal, type ProfileRole } from "@/lib/event-approval";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -71,6 +71,11 @@ export const isAdminOrOwner = async (req: NextRequest) => {
 export const isPartnerUser = async (req: NextRequest) => {
   const profile = await getAuthenticatedProfile(req);
   return canAccessPartnerPortal(profile?.role);
+};
+
+export const isTrainerUser = async (req: NextRequest) => {
+  const profile = await getAuthenticatedProfile(req);
+  return canAccessTrainerPortal(profile?.role);
 };
 
 export const isRefPortalUser = async (req: NextRequest) => {

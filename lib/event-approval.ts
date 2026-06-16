@@ -9,11 +9,15 @@ export const isEventApprovalStatus = (value: unknown): value is EventApprovalSta
   typeof value === "string" && EVENT_APPROVAL_STATUSES.includes(value as EventApprovalStatus);
 
 export const isPartnerRole = (role?: Profile["role"] | null) => role === "partner";
+export const isTrainerRole = (role?: Profile["role"] | null) => role === "trainer";
 
 export const canAccessAdminDashboard = (role?: Profile["role"] | null) => role === "admin" || role === "owner";
 
 export const canAccessPartnerPortal = (role?: Profile["role"] | null) =>
   role === "partner" || role === "admin" || role === "owner";
+
+export const canAccessTrainerPortal = (role?: Profile["role"] | null) =>
+  role === "trainer" || role === "admin" || role === "owner";
 
 export const canAccessRefPortal = (role?: Profile["role"] | null) =>
   role === "ref" || role === "admin" || role === "owner";

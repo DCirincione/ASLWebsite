@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getAuthenticatedProfile, getSupabaseServiceRole } from "@/lib/admin-route-auth";
-import { canAccessPartnerPortal } from "@/lib/event-approval";
+import { canAccessPartnerPortal, canAccessTrainerPortal } from "@/lib/event-approval";
 
 export const runtime = "nodejs";
 
@@ -39,6 +39,20 @@ const uploadConfigs = {
     validate: (file: File) =>
       file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf"),
     invalidMessage: "Please upload a valid PDF waiver file.",
+  },
+  "trainer-headshot": {
+    bucket: EVENT_IMAGE_BUCKET,
+    folder: "trainers/headshots",
+    allow: (role?: string | null) => canAccessTrainerPortal(role as never),
+    validate: (file: File) => file.type.startsWith("image/"),
+    invalidMessage: "Please upload a valid headshot image file.",
+  },
+  "trainer-flyer": {
+    bucket: FLYER_BUCKET,
+    folder: "trainers",
+    allow: (role?: string | null) => canAccessTrainerPortal(role as never),
+    validate: (file: File) => file.type.startsWith("image/"),
+    invalidMessage: "Please upload a valid flyer image file.",
   },
 } as const;
 

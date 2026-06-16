@@ -182,7 +182,7 @@ type ContactMessage = {
 type UserDirectoryRecord = {
   id: string;
   name: string;
-  role?: "player" | "partner" | "ref" | "admin" | "owner" | null;
+  role?: "player" | "partner" | "trainer" | "ref" | "admin" | "owner" | null;
   age?: string | null;
   sports?: string[] | null;
   suspended?: boolean | null;
@@ -190,7 +190,7 @@ type UserDirectoryRecord = {
   suspension_reason?: string | null;
   created_at?: string | null;
 };
-type UserRole = "player" | "partner" | "ref" | "admin" | "owner";
+type UserRole = "player" | "partner" | "trainer" | "ref" | "admin" | "owner";
 type UserManageForm = {
   role: UserRole;
   status: "active" | "suspended";
@@ -7497,6 +7497,13 @@ export default function AdminPage() {
                               onClick={() => setManageForm((prev) => ({ ...prev, role: "partner" }))}
                             >
                               Partner
+                            </button>
+                            <button
+                              type="button"
+                              className={`button ${manageForm.role === "trainer" ? "primary" : "ghost"}`}
+                              onClick={() => setManageForm((prev) => ({ ...prev, role: "trainer" }))}
+                            >
+                              Trainer
                             </button>
                             <button
                               type="button"

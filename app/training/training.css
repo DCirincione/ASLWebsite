@@ -1,0 +1,201 @@
+.training-page__back {
+  padding-top: 16px;
+}
+
+.training-page {
+  padding-top: 28px;
+}
+
+.training-manager,
+.training-panel,
+.training-form-grid label,
+.training-session-card,
+.training-slot-form label {
+  display: grid;
+  gap: 12px;
+}
+
+.training-manager {
+  margin-bottom: 24px;
+}
+
+.training-panel {
+  margin-top: 22px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: var(--glow);
+}
+
+.training-panel__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.training-panel h2 {
+  margin: 0;
+}
+
+.training-form-grid,
+.training-slot-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.training-form-grid__full {
+  grid-column: 1 / -1;
+}
+
+.training-form-grid label,
+.training-session-card label,
+.training-slot-form label {
+  color: #0f172a;
+  font-weight: 800;
+}
+
+.training-form-grid input,
+.training-form-grid textarea,
+.training-form-grid select,
+.training-session-card input,
+.training-session-card textarea,
+.training-slot-form input {
+  width: 100%;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: #ffffff;
+  color: #0f172a;
+  font: inherit;
+  font-weight: 500;
+}
+
+.training-form-grid textarea,
+.training-session-card textarea {
+  resize: vertical;
+}
+
+.training-session-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.training-session-card {
+  padding: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.86);
+}
+
+.training-slot-form {
+  align-items: end;
+}
+
+.training-slot-list,
+.training-booking-list {
+  display: grid;
+  gap: 10px;
+}
+
+.training-slot-row,
+.training-booking-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 14px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.training-booking-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.training-booking-row div {
+  display: grid;
+  gap: 4px;
+}
+
+.training-booking-row span,
+.training-booking-row p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.training-status {
+  margin: 0;
+  font-weight: 800;
+}
+
+.training-status--success {
+  color: #166534;
+}
+
+.training-status--error {
+  color: #b42318;
+}
+
+.training-status--loading {
+  color: #475569;
+}
+
+html[data-theme="dark"] .training-panel {
+  background: #0f192d;
+  border-color: #1f2a40;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .training-session-card,
+html[data-theme="dark"] .training-slot-row,
+html[data-theme="dark"] .training-booking-row {
+  background: rgba(15, 23, 42, 0.74);
+  border-color: #1f2a40;
+}
+
+html[data-theme="dark"] .training-form-grid label,
+html[data-theme="dark"] .training-session-card label,
+html[data-theme="dark"] .training-slot-form label,
+html[data-theme="dark"] .training-form-grid input,
+html[data-theme="dark"] .training-form-grid textarea,
+html[data-theme="dark"] .training-form-grid select,
+html[data-theme="dark"] .training-session-card input,
+html[data-theme="dark"] .training-session-card textarea,
+html[data-theme="dark"] .training-slot-form input {
+  color: #f8fafc;
+}
+
+html[data-theme="dark"] .training-form-grid input,
+html[data-theme="dark"] .training-form-grid textarea,
+html[data-theme="dark"] .training-form-grid select,
+html[data-theme="dark"] .training-session-card input,
+html[data-theme="dark"] .training-session-card textarea,
+html[data-theme="dark"] .training-slot-form input {
+  background: rgba(15, 23, 42, 0.86);
+  border-color: #1f2a40;
+}
+
+@media (max-width: 900px) {
+  .training-session-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .training-panel {
+    padding: 20px 18px;
+  }
+
+  .training-form-grid,
+  .training-slot-form,
+  .training-slot-row,
+  .training-booking-row {
+    grid-template-columns: 1fr;
+  }
+}
