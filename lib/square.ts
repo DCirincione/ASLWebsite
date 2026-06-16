@@ -42,6 +42,7 @@ type SquareCatalogItem = {
   id?: string;
   type?: string;
   item_data?: {
+    description?: string;
     image_ids?: string[];
     categories?: SquareCatalogCategoryReference[];
     reporting_category?: SquareCatalogCategoryReference;
@@ -66,6 +67,7 @@ type SquareCatalogImage = {
 
 export type SquareCatalogItemMerchDetails = {
   collections: string[];
+  description: string | null;
   imageUrls: string[];
 };
 
@@ -237,6 +239,7 @@ export const readSquareCatalogItemMerchDetails = async (itemIds: string[]) => {
             .filter((url): url is string => Boolean(url));
           const merchDetails: SquareCatalogItemMerchDetails = {
             collections: [],
+            description: item.item_data?.description?.trim() || null,
             imageUrls,
           };
 
@@ -281,6 +284,7 @@ export const readSquareCatalogItemMerchDetails = async (itemIds: string[]) => {
         item.id?.trim() || "",
         {
           collections: [...new Set(collectionNames)],
+          description: item.item_data?.description?.trim() || null,
           imageUrls,
         },
       ] as const;

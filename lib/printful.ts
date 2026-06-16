@@ -661,6 +661,7 @@ const mapPrintfulProduct = (
   fallbackId: string,
   storefrontUrl: string | null,
   squareCollections: string[],
+  squareDescription: string | null,
   squareImageUrls: string[],
   printfulCatalogDescription: string | null,
   index: number,
@@ -693,11 +694,12 @@ const mapPrintfulProduct = (
   const ctaUrl = resolveProductLink(externalId, storefrontUrl);
   const imageUrls = squareImageUrls.length > 0 ? squareImageUrls : resolveProductImages(syncProduct, variants);
   const printfulDescription = resolvePrintfulDescription(details, variants) ?? printfulCatalogDescription;
+  const description = normalizePrintfulDescription(squareDescription) ?? printfulDescription;
 
   return {
     id: syncProduct?.id != null ? String(syncProduct.id) : fallbackId,
     name,
-    description: printfulDescription ?? buildDescription(sizes, colors, category),
+    description: description ?? buildDescription(sizes, colors, category),
     category,
     categoryKey: slugifyValue(category),
     collections: squareCollections,
@@ -865,6 +867,7 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
                 `printful-${index}`,
                 storefrontUrl,
                 squareItemDetails?.collections ?? [],
+                squareItemDetails?.description ?? null,
                 squareItemDetails?.imageUrls ?? [],
                 printfulCatalogDescription,
                 index,
