@@ -21,6 +21,12 @@ type LeaderboardAccumulator = Pick<
   "team_id" | "wins" | "draws" | "losses" | "goals_for" | "goals_against" | "forfeit_wins"
 >;
 
+type GoalScorerInput = {
+  playerId: string;
+  playerName: string;
+  goalNumber: number;
+};
+
 const parseScore = (value: unknown) => {
   if (value === null || value === undefined || value === "") return null;
   if (typeof value === "number" && Number.isInteger(value) && value >= 0) return value;
@@ -33,10 +39,26 @@ const parseScore = (value: unknown) => {
   return undefined;
 };
 
-const parseScorerIds = (value: unknown) => {
+const parseScorers = (value: unknown) => {
   if (!Array.isArray(value)) return undefined;
-  const ids = value.map((item) => (typeof item === "string" ? item.trim() : "")).filter(Boolean);
-  return ids.every((id) => id.length > 0) ? ids : undefined;
+
+  const scorers: GoalScorerInput[] = [];
+  for (const [index, item] of value.entries()) {
+    if (typeof item === "string") {
+      const playerId = item.trim();
+      if (playerId) scorers.push({ playerId, playerName: "", goalNumber: index + 1 });
+      continue;
+    }
+
+    if (!item || typeof item !== "object") return undefined;
+    const entry = item as { playerId?: unknown; playerName?: unknown };
+    const playerId = typeof entry.playerId === "string" ? entry.playerId.trim() : "";
+    const playerName = typeof entry.playerName === "string" ? entry.playerName.trim() : "";
+    if (playerName.length > 100) return undefined;
+    if (playerId || playerName) scorers.push({ playerId, playerName, goalNumber: index + 1 });
+  }
+
+  return scorers;
 };
 
 const getRosterPlayersByProfileId = async (supabase: SupabaseServiceClient, team: SundayLeagueTeam) => {
@@ -93,21 +115,33 @@ const getRosterPlayersByProfileId = async (supabase: SupabaseServiceClient, team
 const buildGoalRows = (
   matchupId: string,
   teamId: string,
-  scorerIds: string[],
+  scorers: GoalScorerInput[],
   rosterByProfileId: Map<string, string>,
 ) =>
-  scorerIds.map((profileId, index): SundayLeagueMatchupGoalInsert => {
-    const playerName = rosterByProfileId.get(profileId);
-    if (!playerName) {
-      throw new Error("Each scorer must be on that team's accepted roster.");
+  scorers.map((scorer): SundayLeagueMatchupGoalInsert => {
+    if (scorer.playerId) {
+      const linkedPlayerName = rosterByProfileId.get(scorer.playerId);
+      if (!linkedPlayerName) {
+        throw new Error("Each linked scorer must be on that team's accepted roster.");
+      }
+
+      return {
+        matchup_id: matchupId,
+        team_id: teamId,
+        player_user_id: scorer.playerId,
+        player_name: linkedPlayerName,
+        goal_number: scorer.goalNumber,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
     }
 
     return {
       matchup_id: matchupId,
       team_id: teamId,
-      player_user_id: profileId,
-      player_name: playerName,
-      goal_number: index + 1,
+      player_user_id: null,
+      player_name: scorer.playerName,
+      goal_number: scorer.goalNumber,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
@@ -255,8 +289,8 @@ export async function PATCH(req: NextRequest) {
   const teamTwoScore = parseScore(body?.team_2_score);
   const forfeitedTeamId =
     typeof body?.forfeited_team_id === "string" ? body.forfeited_team_id.trim() || null : null;
-  const teamOneScorers = parseScorerIds(body?.team_1_scorers);
-  const teamTwoScorers = parseScorerIds(body?.team_2_scorers);
+  const teamOneScorers = parseScorers(body?.team_1_scorers);
+  const teamTwoScorers = parseScorers(body?.team_2_scorers);
 
   if (!matchupId) {
     return NextResponse.json({ error: "Missing matchup ID." }, { status: 400 });
@@ -267,7 +301,10 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (teamOneScorers === undefined || teamTwoScorers === undefined) {
-    return NextResponse.json({ error: "Scorers must be submitted as player lists." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Scorers must be valid linked players or names up to 100 characters." },
+      { status: 400 },
+    );
   }
 
   const { data: existingMatchup, error: existingMatchupError } = await supabase
@@ -289,12 +326,18 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (!forfeitedTeamId) {
-    if (teamOneScore !== null && teamOneScorers.length !== teamOneScore) {
-      return NextResponse.json({ error: "Select one roster scorer for every Team 1 goal." }, { status: 400 });
+    if (
+      teamOneScorers.length > 0 &&
+      (teamOneScore === null || teamOneScorers.some((scorer) => scorer.goalNumber > teamOneScore))
+    ) {
+      return NextResponse.json({ error: "Team 1 cannot have more scorers than goals." }, { status: 400 });
     }
 
-    if (teamTwoScore !== null && teamTwoScorers.length !== teamTwoScore) {
-      return NextResponse.json({ error: "Select one roster scorer for every Team 2 goal." }, { status: 400 });
+    if (
+      teamTwoScorers.length > 0 &&
+      (teamTwoScore === null || teamTwoScorers.some((scorer) => scorer.goalNumber > teamTwoScore))
+    ) {
+      return NextResponse.json({ error: "Team 2 cannot have more scorers than goals." }, { status: 400 });
     }
   }
 

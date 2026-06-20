@@ -28,9 +28,13 @@ type ScoreDraft = {
   team_2_score: string;
   forfeited_team_id: string;
 };
+type GoalScorerDraft = {
+  playerId: string;
+  playerName: string;
+};
 type GoalDraft = {
-  team_1_scorers: string[];
-  team_2_scorers: string[];
+  team_1_scorers: GoalScorerDraft[];
+  team_2_scorers: GoalScorerDraft[];
 };
 type RosterPlayer = {
   id: string;
@@ -53,10 +57,23 @@ const emptyGoalDraft = (): GoalDraft => ({
   team_2_scorers: [],
 });
 
-const resizeScorers = (scorers: string[], score: string) => {
+const emptyGoalScorer = (): GoalScorerDraft => ({ playerId: "", playerName: "" });
+
+const resizeScorers = (scorers: GoalScorerDraft[], score: string) => {
   const count = Number(score);
   if (!Number.isInteger(count) || count <= 0) return [];
-  return Array.from({ length: count }, (_, index) => scorers[index] ?? "");
+  return Array.from({ length: count }, (_, index) => scorers[index] ?? emptyGoalScorer());
+};
+
+const goalRowsToDrafts = (goals: SundayLeagueMatchupGoal[]) => {
+  const drafts: GoalScorerDraft[] = [];
+  for (const goal of goals) {
+    drafts[goal.goal_number - 1] = {
+      playerId: goal.player_user_id ?? "",
+      playerName: goal.player_user_id ? "" : goal.player_name,
+    };
+  }
+  return drafts;
 };
 
 const formatScore = (matchup: SundayLeagueMatchup) =>
@@ -211,13 +228,13 @@ export default function RefPortalPage() {
       nextGoalDrafts[matchup.id] = {
         team_1_scorers: matchup.team_1_id
           ? resizeScorers(
-              (goalsByMatchupTeam.get(`${matchup.id}:${matchup.team_1_id}`) ?? []).map((goal) => goal.player_user_id ?? ""),
+              goalRowsToDrafts(goalsByMatchupTeam.get(`${matchup.id}:${matchup.team_1_id}`) ?? []),
               matchup.team_1_score == null ? "" : String(matchup.team_1_score),
             )
           : [],
         team_2_scorers: matchup.team_2_id
           ? resizeScorers(
-              (goalsByMatchupTeam.get(`${matchup.id}:${matchup.team_2_id}`) ?? []).map((goal) => goal.player_user_id ?? ""),
+              goalRowsToDrafts(goalsByMatchupTeam.get(`${matchup.id}:${matchup.team_2_id}`) ?? []),
               matchup.team_2_score == null ? "" : String(matchup.team_2_score),
             )
           : [],
@@ -316,11 +333,23 @@ export default function RefPortalPage() {
     }
   };
 
-  const updateGoalDraft = (matchupId: string, key: keyof GoalDraft, index: number, profileId: string) => {
+  const updateGoalDraft = (
+    matchupId: string,
+    key: keyof GoalDraft,
+    index: number,
+    field: keyof GoalScorerDraft,
+    value: string,
+  ) => {
     setGoalDrafts((prev) => {
       const current = prev[matchupId] ?? emptyGoalDraft();
       const nextScorers = [...current[key]];
-      nextScorers[index] = profileId;
+      const currentScorer = nextScorers[index] ?? emptyGoalScorer();
+      nextScorers[index] = {
+        ...currentScorer,
+        [field]: value,
+        ...(field === "playerId" && value ? { playerName: "" } : {}),
+        ...(field === "playerName" && value ? { playerId: "" } : {}),
+      };
       return {
         ...prev,
         [matchupId]: {
@@ -335,8 +364,8 @@ export default function RefPortalPage() {
     event.preventDefault();
     const draft = scoreDrafts[matchup.id] ?? getScoreDraft(matchup);
     const goalDraft = goalDrafts[matchup.id] ?? emptyGoalDraft();
-    const teamOneScorers = draft.forfeited_team_id ? [] : goalDraft.team_1_scorers.filter(Boolean);
-    const teamTwoScorers = draft.forfeited_team_id ? [] : goalDraft.team_2_scorers.filter(Boolean);
+    const teamOneScorers = draft.forfeited_team_id ? [] : goalDraft.team_1_scorers;
+    const teamTwoScorers = draft.forfeited_team_id ? [] : goalDraft.team_2_scorers;
 
     setScoreStatuses((prev) => ({ ...prev, [matchup.id]: { type: "loading" } }));
 
@@ -374,19 +403,21 @@ export default function RefPortalPage() {
         [updatedMatchup.id]: {
           team_1_scorers: updatedMatchup.team_1_id
             ? resizeScorers(
-                updatedGoals
-                  .filter((goal) => goal.team_id === updatedMatchup.team_1_id)
-                  .sort((left, right) => left.goal_number - right.goal_number)
-                  .map((goal) => goal.player_user_id ?? ""),
+                goalRowsToDrafts(
+                  updatedGoals
+                    .filter((goal) => goal.team_id === updatedMatchup.team_1_id)
+                    .sort((left, right) => left.goal_number - right.goal_number),
+                ),
                 updatedMatchup.team_1_score == null ? "" : String(updatedMatchup.team_1_score),
               )
             : [],
           team_2_scorers: updatedMatchup.team_2_id
             ? resizeScorers(
-                updatedGoals
-                  .filter((goal) => goal.team_id === updatedMatchup.team_2_id)
-                  .sort((left, right) => left.goal_number - right.goal_number)
-                  .map((goal) => goal.player_user_id ?? ""),
+                goalRowsToDrafts(
+                  updatedGoals
+                    .filter((goal) => goal.team_id === updatedMatchup.team_2_id)
+                    .sort((left, right) => left.goal_number - right.goal_number),
+                ),
                 updatedMatchup.team_2_score == null ? "" : String(updatedMatchup.team_2_score),
               )
             : [],
@@ -512,6 +543,7 @@ export default function RefPortalPage() {
                       const teamOneRoster = matchup.team_1_id ? rostersByTeamId[matchup.team_1_id] ?? [] : [];
                       const teamTwoRoster = matchup.team_2_id ? rostersByTeamId[matchup.team_2_id] ?? [] : [];
                       const linkedScorers = [...goalDraft.team_1_scorers, ...goalDraft.team_2_scorers]
+                        .map((scorer) => scorer.playerId)
                         .filter(Boolean)
                         .map(
                           (profileId) =>
@@ -573,56 +605,78 @@ export default function RefPortalPage() {
                           {!hasForfeit ? (
                             <div className="ref-portal__scorers">
                               <div className="ref-portal__scorer-team">
-                                <h3>{teamOneLabel} scorers</h3>
+                                <h3>{teamOneLabel} scorers (optional)</h3>
                                 {goalDraft.team_1_scorers.length > 0 ? (
-                                  goalDraft.team_1_scorers.map((profileId, index) => (
-                                    <label key={`${matchup.id}-team-1-goal-${index}`}>
+                                  goalDraft.team_1_scorers.map((scorer, index) => (
+                                    <div className="ref-portal__scorer-entry" key={`${matchup.id}-team-1-goal-${index}`}>
                                       <span>Goal {index + 1}</span>
-                                      <select
-                                        value={profileId}
-                                        onChange={(event) =>
-                                          updateGoalDraft(matchup.id, "team_1_scorers", index, event.target.value)
-                                        }
-                                        disabled={teamOneRoster.length === 0}
-                                        aria-label={`${teamOneLabel} goal ${index + 1} scorer`}
-                                      >
-                                        <option value="">Select scorer</option>
-                                        {teamOneRoster.map((player) => (
-                                          <option key={player.id} value={player.profileId}>
-                                            {player.jerseyNumber ? `#${player.jerseyNumber} ` : ""}
-                                            {player.name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </label>
+                                      <div className="ref-portal__scorer-fields">
+                                        <select
+                                          value={scorer.playerId}
+                                          onChange={(event) =>
+                                            updateGoalDraft(matchup.id, "team_1_scorers", index, "playerId", event.target.value)
+                                          }
+                                          disabled={teamOneRoster.length === 0}
+                                          aria-label={`${teamOneLabel} goal ${index + 1} linked scorer`}
+                                        >
+                                          <option value="">Link roster player</option>
+                                          {teamOneRoster.map((player) => (
+                                            <option key={player.id} value={player.profileId}>
+                                              {player.jerseyNumber ? `#${player.jerseyNumber} ` : ""}
+                                              {player.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <input
+                                          value={scorer.playerName}
+                                          onChange={(event) =>
+                                            updateGoalDraft(matchup.id, "team_1_scorers", index, "playerName", event.target.value)
+                                          }
+                                          placeholder="Or type player name"
+                                          maxLength={100}
+                                          aria-label={`${teamOneLabel} goal ${index + 1} scorer name`}
+                                        />
+                                      </div>
+                                    </div>
                                   ))
                                 ) : (
                                   <p className="muted">No goals entered.</p>
                                 )}
                               </div>
                               <div className="ref-portal__scorer-team">
-                                <h3>{teamTwoLabel} scorers</h3>
+                                <h3>{teamTwoLabel} scorers (optional)</h3>
                                 {goalDraft.team_2_scorers.length > 0 ? (
-                                  goalDraft.team_2_scorers.map((profileId, index) => (
-                                    <label key={`${matchup.id}-team-2-goal-${index}`}>
+                                  goalDraft.team_2_scorers.map((scorer, index) => (
+                                    <div className="ref-portal__scorer-entry" key={`${matchup.id}-team-2-goal-${index}`}>
                                       <span>Goal {index + 1}</span>
-                                      <select
-                                        value={profileId}
-                                        onChange={(event) =>
-                                          updateGoalDraft(matchup.id, "team_2_scorers", index, event.target.value)
-                                        }
-                                        disabled={teamTwoRoster.length === 0}
-                                        aria-label={`${teamTwoLabel} goal ${index + 1} scorer`}
-                                      >
-                                        <option value="">Select scorer</option>
-                                        {teamTwoRoster.map((player) => (
-                                          <option key={player.id} value={player.profileId}>
-                                            {player.jerseyNumber ? `#${player.jerseyNumber} ` : ""}
-                                            {player.name}
-                                          </option>
-                                        ))}
-                                      </select>
-                                    </label>
+                                      <div className="ref-portal__scorer-fields">
+                                        <select
+                                          value={scorer.playerId}
+                                          onChange={(event) =>
+                                            updateGoalDraft(matchup.id, "team_2_scorers", index, "playerId", event.target.value)
+                                          }
+                                          disabled={teamTwoRoster.length === 0}
+                                          aria-label={`${teamTwoLabel} goal ${index + 1} linked scorer`}
+                                        >
+                                          <option value="">Link roster player</option>
+                                          {teamTwoRoster.map((player) => (
+                                            <option key={player.id} value={player.profileId}>
+                                              {player.jerseyNumber ? `#${player.jerseyNumber} ` : ""}
+                                              {player.name}
+                                            </option>
+                                          ))}
+                                        </select>
+                                        <input
+                                          value={scorer.playerName}
+                                          onChange={(event) =>
+                                            updateGoalDraft(matchup.id, "team_2_scorers", index, "playerName", event.target.value)
+                                          }
+                                          placeholder="Or type player name"
+                                          maxLength={100}
+                                          aria-label={`${teamTwoLabel} goal ${index + 1} scorer name`}
+                                        />
+                                      </div>
+                                    </div>
                                   ))
                                 ) : (
                                   <p className="muted">No goals entered.</p>
