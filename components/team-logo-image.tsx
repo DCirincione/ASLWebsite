@@ -1,12 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
-
-import { supabase } from "@/lib/supabase/client";
 
 const TEAM_PLACEHOLDER = "/team-placeholder.svg";
-const SIGNUPS_BUCKET = "signups";
 
 const extractStoragePath = (value?: string | null) => {
   const normalized = value?.trim() || "";
@@ -46,50 +42,27 @@ export function TeamLogoImage({
   width,
   height,
 }: TeamLogoImageProps) {
-  const [resolvedSrc, setResolvedSrc] = useState<string>(TEAM_PLACEHOLDER);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    const resolve = async () => {
-      const normalized = src?.trim() || "";
-      if (!normalized) {
-        setResolvedSrc(TEAM_PLACEHOLDER);
-        return;
-      }
-
-      const path = extractStoragePath(normalized);
-      if (!path) {
-        setResolvedSrc(isDirectUrl(normalized) ? normalized : TEAM_PLACEHOLDER);
-        return;
-      }
-
-      if (!supabase) {
-        setResolvedSrc(TEAM_PLACEHOLDER);
-        return;
-      }
-
-      const { data, error } = await supabase.storage.from(SIGNUPS_BUCKET).createSignedUrl(path, 60 * 60);
-      if (cancelled) return;
-
-      if (error || !data?.signedUrl) {
-        setResolvedSrc(TEAM_PLACEHOLDER);
-        return;
-      }
-
-      setResolvedSrc(data.signedUrl);
-    };
-
-    void resolve();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [src]);
+  const normalized = src?.trim() || "";
+  const storagePath = extractStoragePath(normalized);
+  const resolvedSrc = storagePath
+    ? `/api/sunday-league/team-logo?path=${encodeURIComponent(storagePath)}`
+    : isDirectUrl(normalized)
+      ? normalized
+      : TEAM_PLACEHOLDER;
+  const unoptimized = Boolean(storagePath);
 
   if (fill) {
-    return <Image src={resolvedSrc} alt={alt} fill sizes={sizes} />;
+    return <Image src={resolvedSrc} alt={alt} fill sizes={sizes} unoptimized={unoptimized} />;
   }
 
-  return <Image src={resolvedSrc} alt={alt} width={width ?? 80} height={height ?? 80} sizes={sizes} />;
+  return (
+    <Image
+      src={resolvedSrc}
+      alt={alt}
+      width={width ?? 80}
+      height={height ?? 80}
+      sizes={sizes}
+      unoptimized={unoptimized}
+    />
+  );
 }
