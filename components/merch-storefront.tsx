@@ -137,13 +137,38 @@ const matchesCollectionKeys = (product: MerchProduct, selectedValues: string[]) 
   return product.collectionKeys.some((collectionKey) => selectedValues.includes(collectionKey));
 };
 
+const SL_TEAM_CATEGORY_ID = "sl-team";
+
+const sundayLeagueTeamCollectionIds = new Set([
+  "ballers-fc",
+  "duvalin-fc",
+  "la-selecta",
+  "lethals-fc",
+  "los-amigos",
+  "milkers-fc",
+  "purple-bombers",
+  "qts-fc",
+]);
+
+const sundayLeagueTeamNamePattern = /\b(ballers|duvalin|selecta|lethals|amigos|milkers|bombers|purple bombers|qts)\b/i;
+
+const isSundayLeagueTeamCollectionKey = (collectionKey: string) => sundayLeagueTeamCollectionIds.has(collectionKey);
+
+const productHasSundayLeagueTeamCollection = (product: MerchProduct) =>
+  product.collectionKeys.some(isSundayLeagueTeamCollectionKey) ||
+  sundayLeagueTeamNamePattern.test(product.name);
+
 const productMatchesFilterState = (
   product: MerchProduct,
   filters: FilterState,
   skippedGroup?: FilterGroupKey,
 ) => {
-  if (skippedGroup !== "activeCategory" && filters.activeCategory !== "all" && product.categoryKey !== filters.activeCategory) {
-    return false;
+  if (skippedGroup !== "activeCategory" && filters.activeCategory !== "all") {
+    if (filters.activeCategory === SL_TEAM_CATEGORY_ID) {
+      if (!productHasSundayLeagueTeamCollection(product)) return false;
+    } else if (product.categoryKey !== filters.activeCategory) {
+      return false;
+    }
   }
 
   if (
@@ -209,6 +234,12 @@ const genderCollectionIds = new Set([
 ]);
 
 const isSportCollectionOption = (option: MerchFilterOption) => sportCollectionIds.has(option.id);
+
+const isSundayLeagueTeamCollectionOption = (option: MerchFilterOption) =>
+  isSundayLeagueTeamCollectionKey(option.id) ||
+  /\bsl team\b/i.test(option.label) ||
+  /\bsunday league team\b/i.test(option.label) ||
+  /\b(ballers|duvalin|selecta|lethals|amigos|milkers|bombers|qts)\b/i.test(option.label);
 
 const isGenderCollectionOption = (option: MerchFilterOption) =>
   genderCollectionIds.has(option.id) ||
@@ -994,18 +1025,27 @@ export function MerchStorefront({ catalog, purchasesEnabled }: MerchStorefrontPr
       count: catalog.products.length,
       preview: catalog.products[0] ?? null,
     },
+    {
+      id: SL_TEAM_CATEGORY_ID,
+      label: "SL Team",
+      count: catalog.products.filter(productHasSundayLeagueTeamCollection).length,
+      preview: catalog.products.find(productHasSundayLeagueTeamCollection) ?? null,
+    },
     ...catalog.filters.categories.map((option) => ({
       ...option,
       preview: catalog.products.find((product) => product.categoryKey === option.id) ?? null,
     })),
-  ];
+  ].filter((category) => category.id === "all" || category.count > 0);
 
   const groupedSportCollections = catalog.filters.collections.filter(
     (option) => isSportCollectionOption(option) && option.id !== "all-sports",
   );
   const groupedGenderCollections = catalog.filters.collections.filter((option) => isGenderCollectionOption(option));
   const groupedStandardCollections = catalog.filters.collections.filter(
-    (option) => !isSportCollectionOption(option) && !isGenderCollectionOption(option),
+    (option) =>
+      !isSportCollectionOption(option) &&
+      !isSundayLeagueTeamCollectionOption(option) &&
+      !isGenderCollectionOption(option),
   );
 
   const filterState: FilterState = {
@@ -1028,7 +1068,10 @@ export function MerchStorefront({ catalog, purchasesEnabled }: MerchStorefrontPr
       catalog.products.filter(
         (product) =>
           productMatchesFilterState(product, filterState, "activeCategory") &&
-          (category.id === "all" || product.categoryKey === category.id),
+          (category.id === "all" ||
+            (category.id === SL_TEAM_CATEGORY_ID
+              ? productHasSundayLeagueTeamCollection(product)
+              : product.categoryKey === category.id)),
       ).length,
     ]),
   );

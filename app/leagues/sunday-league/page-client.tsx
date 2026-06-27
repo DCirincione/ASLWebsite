@@ -348,19 +348,21 @@ export default function SundayLeaguePageClient({
         .map((entry) => {
           const team = teamsById.get(entry.team_id);
           if (!team) return null;
+          const forfeitWins = entry.forfeit_wins;
+          const nonForfeitWins = Math.max(entry.wins - forfeitWins, 0);
 
           return {
             id: entry.id,
             team: team.team_name,
-            wins: entry.wins,
+            wins: nonForfeitWins,
             draws: entry.draws,
             losses: entry.losses,
             goalsFor: entry.goals_for,
             goalsAgainst: entry.goals_against,
             goalDistribution: `${entry.goals_for - entry.goals_against > 0 ? "+" : ""}${entry.goals_for - entry.goals_against}`,
-            points: entry.wins * 3 + entry.draws + entry.forfeit_wins,
-            gamesPlayed: entry.wins + entry.draws + entry.losses + entry.forfeit_wins,
-            forfeitWins: entry.forfeit_wins,
+            points: entry.points,
+            gamesPlayed: entry.games_played,
+            forfeitWins,
           };
         })
         .filter((row): row is LeaderboardTableRow => row !== null)

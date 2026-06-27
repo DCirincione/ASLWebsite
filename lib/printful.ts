@@ -166,10 +166,14 @@ const PRINTFUL_API_BASE_URL = "https://api.printful.com";
 const PRINTFUL_REQUEST_TIMEOUT_MS = 12000;
 const PRINTFUL_REQUEST_ATTEMPTS = 3;
 const PRINTFUL_DETAIL_CONCURRENCY = 4;
+const MERCH_CATALOG_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let cachedMerchCatalog: { catalog: MerchCatalog; expiresAt: number } | null = null;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const shouldRetryPrintfulRequest = (status: number) => status === 408 || status === 429 || status >= 500;
+const isPrintfulConfigurationError = (status: number) => status === 401 || status === 403 || status === 404;
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -872,12 +876,43 @@ const buildFallbackCatalog = (statusMessage: string | null): MerchCatalog => {
   };
 };
 
+const readCachedMerchCatalog = () => {
+  if (!cachedMerchCatalog || cachedMerchCatalog.expiresAt <= Date.now()) return null;
+  return cachedMerchCatalog.catalog;
+};
+
+const cacheMerchCatalog = (catalog: MerchCatalog) => {
+  if (catalog.source !== "printful" || catalog.products.length === 0) return catalog;
+
+  cachedMerchCatalog = {
+    catalog,
+    expiresAt: Date.now() + MERCH_CATALOG_CACHE_TTL_MS,
+  };
+
+  return catalog;
+};
+
+const buildCatalogFromCacheOrFallback = (statusMessage: string | null) => {
+  const cached = readCachedMerchCatalog();
+  if (!cached) return buildFallbackCatalog(statusMessage);
+
+  return {
+    ...cached,
+    statusMessage: statusMessage
+      ? `${statusMessage} Showing the last successfully loaded catalog.`
+      : cached.statusMessage,
+  };
+};
+
 export async function readMerchCatalog(): Promise<MerchCatalog> {
+  const cached = readCachedMerchCatalog();
+  if (cached) return cached;
+
   const token = getPrintfulApiToken();
   const checkout = readMerchCheckoutConfig();
 
   if (!token) {
-    return buildFallbackCatalog(
+    return buildCatalogFromCacheOrFallback(
       "Preview mode is active. Add PRINTFUL_API_TOKEN to load live products and filter options from Printful.",
     );
   }
@@ -896,6 +931,10 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
         activeMode = mode;
         break;
       } catch (error) {
+        if (error instanceof PrintfulRequestError && isPrintfulConfigurationError(error.status)) {
+          return buildCatalogFromCacheOrFallback(error.message);
+        }
+
         if (!(error instanceof PrintfulRequestError)) {
           throw error;
         }
@@ -903,7 +942,7 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
     }
 
     if (!activeMode) {
-      return buildFallbackCatalog(
+      return buildCatalogFromCacheOrFallback(
         "Printful is configured, but the catalog endpoint could not be reached. Check PRINTFUL_STORE_ID or PRINTFUL_PRODUCT_SOURCE.",
       );
     }
@@ -956,12 +995,12 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
       });
 
     if (products.length === 0) {
-      return buildFallbackCatalog(
+      return buildCatalogFromCacheOrFallback(
         "Printful is connected, but no synced products were found yet. Add products in Printful and they will appear here.",
       );
     }
 
-    return {
+    return cacheMerchCatalog({
       source: "printful",
       storeName,
       storefrontUrl,
@@ -971,9 +1010,9 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
       checkout,
       products,
       filters: buildFilterOptions(products),
-    };
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Could not load Printful products.";
-    return buildFallbackCatalog(message);
+    return buildCatalogFromCacheOrFallback(message);
   }
 }

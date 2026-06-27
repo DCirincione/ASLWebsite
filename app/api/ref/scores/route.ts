@@ -4,7 +4,6 @@ import { getAuthenticatedProfile, getSupabaseServiceRole } from "@/lib/admin-rou
 import { canAccessRefPortal } from "@/lib/event-approval";
 import type {
   SundayLeagueLeaderboard,
-  SundayLeagueLeaderboardInsert,
   SundayLeagueLeaderboardUpdate,
   SundayLeagueMatchup,
   SundayLeagueMatchupGoal,
@@ -18,13 +17,27 @@ type SupabaseServiceClient = NonNullable<ReturnType<typeof getSupabaseServiceRol
 
 type LeaderboardAccumulator = Pick<
   SundayLeagueLeaderboard,
-  "team_id" | "wins" | "draws" | "losses" | "goals_for" | "goals_against" | "forfeit_wins"
+  | "team_id"
+  | "wins"
+  | "draws"
+  | "losses"
+  | "goals_for"
+  | "goals_against"
+  | "forfeit_wins"
 >;
 
 type GoalScorerInput = {
   playerId: string;
   playerName: string;
   goalNumber: number;
+};
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+    return error.message;
+  }
+  return fallback;
 };
 
 const parseScore = (value: unknown) => {
@@ -175,9 +188,18 @@ const applyMatchResult = (
 };
 
 const applyForfeitResult = (winningRow: LeaderboardAccumulator, losingRow: LeaderboardAccumulator) => {
+  winningRow.wins += 1;
   winningRow.forfeit_wins += 1;
   losingRow.losses += 1;
 };
+
+const hasLeaderboardActivity = (row: LeaderboardAccumulator) =>
+  row.wins > 0 ||
+  row.draws > 0 ||
+  row.losses > 0 ||
+  row.goals_for > 0 ||
+  row.goals_against > 0 ||
+  row.forfeit_wins > 0;
 
 const recalculateSundayLeagueLeaderboard = async (supabase: SupabaseServiceClient) => {
   const [teamsResponse, matchupsResponse, leaderboardResponse] = await Promise.all([
@@ -223,11 +245,20 @@ const recalculateSundayLeagueLeaderboard = async (supabase: SupabaseServiceClien
 
   const now = new Date().toISOString();
   const existingRowByTeamId = new Map(existingRows.map((row) => [row.team_id, row]));
-  const inserts: SundayLeagueLeaderboardInsert[] = [];
   const updates: Array<SundayLeagueLeaderboardUpdate & { id: string }> = [];
+  const deleteIds: string[] = [];
 
   for (const row of leaderboardByTeamId.values()) {
     const existingRow = existingRowByTeamId.get(row.team_id);
+    const hasActivity = hasLeaderboardActivity(row);
+
+    if (!hasActivity) {
+      if (existingRow) {
+        deleteIds.push(existingRow.id);
+      }
+      continue;
+    }
+
     const payload = {
       team_id: row.team_id,
       wins: row.wins,
@@ -241,9 +272,12 @@ const recalculateSundayLeagueLeaderboard = async (supabase: SupabaseServiceClien
 
     if (existingRow) {
       updates.push({ id: existingRow.id, ...payload });
-    } else {
-      inserts.push({ ...payload, created_at: now });
     }
+  }
+
+  if (deleteIds.length > 0) {
+    const { error } = await supabase.from("sunday_league_leaderboard").delete().in("id", deleteIds);
+    if (error) throw error;
   }
 
   for (const update of updates) {
@@ -252,10 +286,6 @@ const recalculateSundayLeagueLeaderboard = async (supabase: SupabaseServiceClien
     if (error) throw error;
   }
 
-  if (inserts.length > 0) {
-    const { error } = await supabase.from("sunday_league_leaderboard").insert(inserts);
-    if (error) throw error;
-  }
 };
 
 export async function PATCH(req: NextRequest) {
@@ -412,12 +442,10 @@ export async function PATCH(req: NextRequest) {
   try {
     await recalculateSundayLeagueLeaderboard(supabase);
   } catch (leaderboardError) {
+    const message = getErrorMessage(leaderboardError, "The leaderboard could not be recalculated.");
     return NextResponse.json(
       {
-        error:
-          leaderboardError instanceof Error
-            ? `Score saved, but the leaderboard could not be recalculated: ${leaderboardError.message}`
-            : "Score saved, but the leaderboard could not be recalculated.",
+        error: `Score saved, but the leaderboard could not be recalculated: ${message}`,
         matchup: data,
         goals: savedGoals,
       },
