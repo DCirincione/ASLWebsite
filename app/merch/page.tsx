@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { unstable_noStore as noStore } from "next/cache";
 import Link from "next/link";
 
 import "./merch.css";
@@ -15,9 +14,9 @@ export const metadata: Metadata = {
   description: "Shop Aldrich Sports merchandise, apparel, and fan gear.",
 };
 
-export default async function MerchPage() {
-  noStore();
+export const revalidate = 300;
 
+export default async function MerchPage() {
   const [catalog, siteSettings] = await Promise.all([readMerchCatalog(), readSiteSettings()]);
 
   return (

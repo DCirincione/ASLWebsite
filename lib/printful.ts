@@ -163,6 +163,13 @@ class PrintfulRequestError extends Error {
 }
 
 const PRINTFUL_API_BASE_URL = "https://api.printful.com";
+const PRINTFUL_REQUEST_TIMEOUT_MS = 12000;
+const PRINTFUL_REQUEST_ATTEMPTS = 3;
+const PRINTFUL_DETAIL_CONCURRENCY = 4;
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const shouldRetryPrintfulRequest = (status: number) => status === 408 || status === 429 || status >= 500;
 
 const currencyFormatter = new Intl.NumberFormat("en-US", {
   style: "currency",
@@ -415,22 +422,83 @@ const readPrintfulErrorMessage = (json: unknown, fallback: string) => {
 };
 
 async function fetchPrintfulJson<T>(path: string, storeId?: string) {
-  const response = await fetch(`${PRINTFUL_API_BASE_URL}${path}`, {
-    headers: resolvePrintfulHeaders(storeId),
-    cache: "no-store",
-  });
+  let lastError: unknown = null;
 
-  const json = (await response.json().catch(() => null)) as PrintfulApiResponse<T> | null;
+  for (let attempt = 1; attempt <= PRINTFUL_REQUEST_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), PRINTFUL_REQUEST_TIMEOUT_MS);
 
-  if (!response.ok || !json) {
-    throw new PrintfulRequestError(
-      readPrintfulErrorMessage(json, `Printful request failed for ${path}.`),
-      response.status || 500,
-    );
+    try {
+      const response = await fetch(`${PRINTFUL_API_BASE_URL}${path}`, {
+        headers: resolvePrintfulHeaders(storeId),
+        signal: controller.signal,
+      });
+
+      const json = (await response.json().catch(() => null)) as PrintfulApiResponse<T> | null;
+
+      if (response.ok && json) {
+        return json;
+      }
+
+      const error = new PrintfulRequestError(
+        readPrintfulErrorMessage(json, `Printful request failed for ${path}.`),
+        response.status || 500,
+      );
+
+      if (!shouldRetryPrintfulRequest(error.status) || attempt === PRINTFUL_REQUEST_ATTEMPTS) {
+        throw error;
+      }
+
+      lastError = error;
+    } catch (error) {
+      lastError = error;
+      if (error instanceof PrintfulRequestError && !shouldRetryPrintfulRequest(error.status)) {
+        throw error;
+      }
+
+      if (attempt === PRINTFUL_REQUEST_ATTEMPTS) {
+        throw error;
+      }
+    } finally {
+      clearTimeout(timeoutId);
+    }
+
+    await sleep(350 * attempt);
   }
 
-  return json;
+  throw lastError instanceof Error ? lastError : new Error(`Printful request failed for ${path}.`);
 }
+
+const mapWithConcurrency = async <Input, Output>(
+  items: Input[],
+  concurrency: number,
+  mapper: (item: Input, index: number) => Promise<Output>,
+) => {
+  const results: PromiseSettledResult<Output>[] = new Array(items.length);
+  let nextIndex = 0;
+
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+
+      try {
+        results[currentIndex] = {
+          status: "fulfilled",
+          value: await mapper(items[currentIndex], currentIndex),
+        };
+      } catch (reason) {
+        results[currentIndex] = {
+          status: "rejected",
+          reason,
+        };
+      }
+    }
+  });
+
+  await Promise.all(workers);
+  return results;
+};
 
 async function resolvePrintfulStoreContext() {
   const explicitStoreId = getPrintfulStoreId();
@@ -845,38 +913,36 @@ export async function readMerchCatalog(): Promise<MerchCatalog> {
     ).catch(() => new Map());
     const printfulCatalogDescriptionByProductId = new Map<number, Promise<string | null>>();
 
-    const detailResults = await Promise.allSettled(
-      summaries
-        .filter((summary) => summary.id != null && !summary.is_ignored)
-        .map((summary, index) =>
-          fetchPrintfulProductDetails(String(summary.id), activeMode, storeId || undefined).then(
-            async (details) => {
-              const catalogProductId = getPrintfulCatalogProductId(details.sync_variants ?? []);
-              const printfulCatalogDescription =
-                catalogProductId == null
-                  ? null
-                  : await (() => {
-                      const cached = printfulCatalogDescriptionByProductId.get(catalogProductId);
-                      if (cached) return cached;
+    const detailSummaries = summaries.filter((summary) => summary.id != null && !summary.is_ignored);
+    const detailResults = await mapWithConcurrency(
+      detailSummaries,
+      PRINTFUL_DETAIL_CONCURRENCY,
+      async (summary, index) => {
+        const details = await fetchPrintfulProductDetails(String(summary.id), activeMode, storeId || undefined);
+        const catalogProductId = getPrintfulCatalogProductId(details.sync_variants ?? []);
+        const printfulCatalogDescription =
+          catalogProductId == null
+            ? null
+            : await (() => {
+                const cached = printfulCatalogDescriptionByProductId.get(catalogProductId);
+                if (cached) return cached;
 
-                      const request = fetchPrintfulCatalogProductDescription(catalogProductId).catch(() => null);
-                      printfulCatalogDescriptionByProductId.set(catalogProductId, request);
-                      return request;
-                    })();
-              const squareItemDetails = squareItemDetailsByItemId.get(details.sync_product?.external_id?.trim() || "");
-              return mapPrintfulProduct(
-                details,
-                `printful-${index}`,
-                storefrontUrl,
-                squareItemDetails?.collections ?? [],
-                squareItemDetails?.description ?? null,
-                squareItemDetails?.imageUrls ?? [],
-                printfulCatalogDescription,
-                index,
-              );
-            },
-          ),
-        ),
+                const request = fetchPrintfulCatalogProductDescription(catalogProductId).catch(() => null);
+                printfulCatalogDescriptionByProductId.set(catalogProductId, request);
+                return request;
+              })();
+        const squareItemDetails = squareItemDetailsByItemId.get(details.sync_product?.external_id?.trim() || "");
+        return mapPrintfulProduct(
+          details,
+          `printful-${index}`,
+          storefrontUrl,
+          squareItemDetails?.collections ?? [],
+          squareItemDetails?.description ?? null,
+          squareItemDetails?.imageUrls ?? [],
+          printfulCatalogDescription,
+          index,
+        );
+      },
     );
 
     const products = detailResults
