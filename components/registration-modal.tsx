@@ -496,14 +496,45 @@ export function RegistrationModal({
       return;
     }
 
-    const { error } =
-      mode === "edit" && submissionId
-        ? await client.from("event_submissions").update(payload).eq("id", submissionId).eq("user_id", userId)
-        : await client.from("event_submissions").insert(payload);
+    if (mode === "edit" && submissionId) {
+      const { error } = await client.from("event_submissions").update(payload).eq("id", submissionId).eq("user_id", userId);
 
-    if (error) {
-      setStatus({ type: "error", message: error.message ?? `Could not ${mode === "edit" ? "update" : "submit"} registration.` });
-      return;
+      if (error) {
+        setStatus({ type: "error", message: error.message ?? "Could not update registration." });
+        return;
+      }
+    } else {
+      const { data: sessionData } = await client.auth.getSession();
+      const accessToken = sessionData.session?.access_token ?? null;
+      if (!accessToken) {
+        setUserId(null);
+        setAuthMode("signin");
+        setAuthStep("auth");
+        return;
+      }
+
+      const response = await fetch("/api/events/register", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          eventId: eventConfig.id,
+          name: payload.name,
+          email: payload.email,
+          phone: payload.phone,
+          answers: payload.answers,
+          attachments: payload.attachments,
+          waiverAccepted: payload.waiver_accepted,
+        }),
+      });
+      const json = (await response.json().catch(() => null)) as { error?: string } | null;
+
+      if (!response.ok) {
+        setStatus({ type: "error", message: json?.error ?? "Could not submit registration." });
+        return;
+      }
     }
 
     void syncAldrichCommunicationsPreference(client, Boolean(values.communications_opt_in));

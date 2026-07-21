@@ -11,6 +11,7 @@ import {
   markPartnerApplicationDraftFailed,
   type PartnerApplicationDraft,
 } from "@/lib/partner-application-store";
+import { sendEventSignupNotification } from "@/lib/event-notifications";
 import { getSquareWebhookNotificationUrl, verifySquareWebhookSignature } from "@/lib/square";
 import type {
   Event,
@@ -212,11 +213,11 @@ const processEventPayment = async ({
 
   const { data: eventRow } = await serviceClient
     .from("events")
-    .select("id,registration_enabled,allow_multiple_registrations,registration_limit")
+    .select("id,title,signup_mode,registration_enabled,allow_multiple_registrations,registration_limit")
     .eq("id", draft.event_id)
     .maybeSingle();
 
-  const eventConfig = eventRow as Pick<Event, "id" | "registration_enabled" | "allow_multiple_registrations" | "registration_limit"> | null;
+  const eventConfig = eventRow as Pick<Event, "id" | "title" | "signup_mode" | "registration_enabled" | "allow_multiple_registrations" | "registration_limit"> | null;
   if (!eventConfig?.id || !eventConfig.registration_enabled) {
     await serviceClient
       .from("event_checkout_drafts")
@@ -348,6 +349,12 @@ const processEventPayment = async ({
       error_message: null,
     } satisfies EventCheckoutDraftUpdate)
     .eq("id", draft.id);
+
+  try {
+    await sendEventSignupNotification({ event: eventConfig, submission, paid: true });
+  } catch (error) {
+    console.error("[square/webhook] ntfy event signup notification failed", error);
+  }
 };
 
 const processPartnerApplicationPayment = async ({

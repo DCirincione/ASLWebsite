@@ -21,6 +21,13 @@ Next.js App Router starter with a components-first structure.
 - `MERCH_SHIPPING_FEE_CENTS` is optional and still supported as a flat fallback when no tier matches or no tier table is configured.
 - `MERCH_SHIPPING_FEE_LABEL` is optional and defaults to `Shipping`.
 
+## Event Signup Notifications
+- `NTFY_TOPIC` enables phone notifications for event signups. Use a long, random topic name and subscribe to that topic in the ntfy phone app.
+- `NTFY_SERVER_URL` is optional and defaults to `https://ntfy.sh`. Set this if you self-host ntfy.
+- `NTFY_TOPIC_URL` is optional and can be used instead of `NTFY_TOPIC`/`NTFY_SERVER_URL` when you want to provide the full publish URL.
+- `NTFY_TOKEN` is optional and sends a Bearer token for protected ntfy topics.
+- `APP_URL` or `NEXT_PUBLIC_APP_URL` is optional and lets notifications open the admin page when tapped.
+
 ## Next steps
 - Add new pages in `app/` (for example `app/about/page.tsx`).
 - Extend `components/` with the UI patterns you want to reuse.
