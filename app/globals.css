@@ -1784,8 +1784,11 @@ html[data-theme="dark"] .search-dropdown__item:hover {
 .register-modal__success {
   display: grid;
   gap: 20px;
-  margin-top: 24px;
-  max-width: 640px;
+  place-content: center;
+  min-height: min(520px, calc(100dvh - 120px));
+  margin: 24px auto 0;
+  max-width: 760px;
+  text-align: center;
 }
 
 .register-auth-warning {
@@ -1824,8 +1827,8 @@ html[data-theme="dark"] .search-dropdown__item:hover {
 
 .register-modal__success-copy {
   display: grid;
-  gap: 10px;
-  padding: 24px;
+  gap: 14px;
+  padding: 36px;
   border-radius: 20px;
   border: 1px solid rgba(22, 163, 74, 0.18);
   background: linear-gradient(180deg, rgba(240, 253, 244, 0.96), rgba(220, 252, 231, 0.88));
@@ -1835,6 +1838,21 @@ html[data-theme="dark"] .search-dropdown__item:hover {
 .register-modal__success-copy h3,
 .register-modal__success-copy .muted {
   margin: 0;
+}
+
+.register-modal__success-copy h3 {
+  color: #102136;
+  font-size: clamp(2.5rem, 7vw, 5rem);
+  line-height: 0.95;
+  letter-spacing: 0;
+}
+
+.register-modal__success-copy .muted {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+}
+
+.register-modal__success .register-modal__footer {
+  justify-content: center;
 }
 
 .register-modal__footer {
@@ -2372,6 +2390,10 @@ html[data-theme="dark"] .register-modal {
 html[data-theme="dark"] .register-modal__success-copy {
   border-color: rgba(74, 222, 128, 0.22);
   background: linear-gradient(180deg, rgba(20, 83, 45, 0.48), rgba(20, 83, 45, 0.28));
+}
+
+html[data-theme="dark"] .register-modal__success-copy h3 {
+  color: #f8fafc;
 }
 
 html[data-theme="dark"] .register-auth-warning__copy h3 {
