@@ -27,6 +27,7 @@ Next.js App Router starter with a components-first structure.
 - `NTFY_TOPIC_URL` is optional and can be used instead of `NTFY_TOPIC`/`NTFY_SERVER_URL` when you want to provide the full publish URL.
 - `NTFY_TOKEN` is optional and sends a Bearer token for protected ntfy topics.
 - `APP_URL` or `NEXT_PUBLIC_APP_URL` is optional and lets notifications open the admin page when tapped.
+- `EVENT_SIGNUP_FROM_EMAIL` is optional and controls the do-not-reply confirmation email sender for event signups. It falls back to `CONTACT_FROM_EMAIL`.
 
 ## Next steps
 - Add new pages in `app/` (for example `app/about/page.tsx`).

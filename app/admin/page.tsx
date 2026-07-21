@@ -103,6 +103,8 @@ type EventFormState = {
   payment_amount: string;
   show_public_signups: boolean;
   require_waiver: boolean;
+  confirmation_email_subject: string;
+  confirmation_email_body: string;
   registration_fields: RegistrationFieldEditor[];
   recurrence_mode: EventRecurrenceMode;
   recurrence_dates: string[];
@@ -433,9 +435,12 @@ const createEmptyRegistrationField = (): RegistrationFieldEditor => ({
   expanded: false,
 });
 
-const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick<EventFormState, "show_public_signups" | "require_waiver" | "registration_fields" | "recurrence_mode" | "recurrence_dates" | "recurrence_date_input"> => {
+const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick<EventFormState, "show_public_signups" | "require_waiver" | "confirmation_email_subject" | "confirmation_email_body" | "registration_fields" | "recurrence_mode" | "recurrence_dates" | "recurrence_date_input"> => {
   const schema = value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
   const recurrence = readEventRecurrence(value);
+  const confirmationEmail = schema?.confirmation_email && typeof schema.confirmation_email === "object" && !Array.isArray(schema.confirmation_email)
+    ? schema.confirmation_email as Record<string, unknown>
+    : null;
   const rawFields = Array.isArray(schema?.fields) ? schema.fields : Array.isArray(value) ? value : [];
   const registrationFields = rawFields.flatMap((entry) => {
     if (!entry || typeof entry !== "object") return [];
@@ -455,6 +460,8 @@ const parseRegistrationSchemaState = (value: Event["registration_schema"]): Pick
   return {
     show_public_signups: schema?.show_public_signups !== false,
     require_waiver: Boolean(schema?.require_waiver),
+    confirmation_email_subject: typeof confirmationEmail?.subject === "string" ? confirmationEmail.subject : "",
+    confirmation_email_body: typeof confirmationEmail?.body === "string" ? confirmationEmail.body : "",
     registration_fields: registrationFields,
     recurrence_mode: recurrence?.mode === "dates" ? "dates" : "none",
     recurrence_dates: recurrence?.mode === "dates" ? recurrence.dates : [],
@@ -488,13 +495,24 @@ const buildRegistrationSchema = (formState: EventFormState) => {
   });
   const recurrence = "recurrence" in recurrenceInput ? recurrenceInput.recurrence : null;
 
-  if (formState.show_public_signups && !formState.require_waiver && fields.length === 0 && !recurrence) {
+  const confirmationEmailSubject = formState.confirmation_email_subject.trim();
+  const confirmationEmailBody = formState.confirmation_email_body.trim();
+  const confirmationEmail =
+    confirmationEmailSubject || confirmationEmailBody
+      ? {
+          subject: confirmationEmailSubject || undefined,
+          body: confirmationEmailBody || undefined,
+        }
+      : null;
+
+  if (formState.show_public_signups && !formState.require_waiver && fields.length === 0 && !recurrence && !confirmationEmail) {
     return null;
   }
 
   return {
     show_public_signups: formState.show_public_signups,
     require_waiver: formState.require_waiver,
+    confirmation_email: confirmationEmail,
     recurrence,
     fields,
   };
@@ -811,6 +829,8 @@ export default function AdminPage() {
     payment_amount: "",
     show_public_signups: true,
     require_waiver: false,
+    confirmation_email_subject: "",
+    confirmation_email_body: "",
     registration_fields: [],
     recurrence_mode: "none",
     recurrence_dates: [],
@@ -835,6 +855,8 @@ export default function AdminPage() {
     payment_amount: "",
     show_public_signups: true,
     require_waiver: false,
+    confirmation_email_subject: "",
+    confirmation_email_body: "",
     registration_fields: [],
     recurrence_mode: "none",
     recurrence_dates: [],
@@ -1669,6 +1691,8 @@ export default function AdminPage() {
       payment_amount: "",
       show_public_signups: true,
       require_waiver: false,
+      confirmation_email_subject: "",
+      confirmation_email_body: "",
       registration_fields: [],
       recurrence_mode: "none",
       recurrence_dates: [],
@@ -1771,6 +1795,8 @@ export default function AdminPage() {
       payment_amount: event.payment_amount_cents ? (event.payment_amount_cents / 100).toFixed(2) : "",
       show_public_signups: registrationState.show_public_signups,
       require_waiver: registrationState.require_waiver,
+      confirmation_email_subject: registrationState.confirmation_email_subject,
+      confirmation_email_body: registrationState.confirmation_email_body,
       registration_fields: registrationState.registration_fields,
       recurrence_mode: registrationState.recurrence_mode,
       recurrence_dates: registrationState.recurrence_dates,
@@ -1802,6 +1828,8 @@ export default function AdminPage() {
       payment_amount: event.payment_amount_cents ? (event.payment_amount_cents / 100).toFixed(2) : "",
       show_public_signups: registrationState.show_public_signups,
       require_waiver: registrationState.require_waiver,
+      confirmation_email_subject: registrationState.confirmation_email_subject,
+      confirmation_email_body: registrationState.confirmation_email_body,
       registration_fields: registrationState.registration_fields.map((field) => ({
         ...field,
         id: createId(),
@@ -2278,6 +2306,68 @@ export default function AdminPage() {
             )}
           </>
         ) : null}
+      </div>
+    );
+  };
+
+  const renderConfirmationEmailControls = (target: "create" | "edit", state: EventFormState) => {
+    const updateTarget = target === "create" ? update : updateEdit;
+
+    return (
+      <div className="account-card" style={{ display: "grid", gap: 12 }}>
+        <div>
+          <h3 style={{ margin: 0 }}>Signup Confirmation Email</h3>
+          <p className="muted" style={{ margin: "4px 0 0" }}>
+            Sent automatically after someone signs up. Only write the middle message; the rest is always included.
+          </p>
+        </div>
+        <div className="form-control">
+          <label htmlFor={`${target}-confirmation-email-subject`}>Subject</label>
+          <input
+            id={`${target}-confirmation-email-subject`}
+            value={state.confirmation_email_subject}
+            onChange={(e) => updateTarget("confirmation_email_subject", e.target.value)}
+            placeholder="Thanks for signing up"
+          />
+          <p className="form-help muted">Leave blank to use the standard subject for this event.</p>
+        </div>
+        <div className="form-control">
+          <label htmlFor={`${target}-confirmation-email-body`}>Message</label>
+          <div
+            className="muted"
+            style={{
+              border: "1px solid var(--border)",
+              borderBottom: 0,
+              borderRadius: "14px 14px 0 0",
+              padding: "12px 14px",
+              background: "rgba(248, 250, 252, 0.88)",
+            }}
+          >
+            Hi [player name],
+          </div>
+          <textarea
+            id={`${target}-confirmation-email-body`}
+            rows={7}
+            value={state.confirmation_email_body}
+            onChange={(e) => updateTarget("confirmation_email_body", e.target.value)}
+            placeholder={"Thanks for signing up. We received your registration and will reach out soon with next steps."}
+            style={{ borderRadius: 0 }}
+          />
+          <div
+            className="muted"
+            style={{
+              border: "1px solid var(--border)",
+              borderTop: 0,
+              borderRadius: "0 0 14px 14px",
+              padding: "12px 14px",
+              background: "rgba(248, 250, 252, 0.88)",
+              whiteSpace: "pre-line",
+            }}
+          >
+            {"Event: [event name]\n\nAldrich Sports"}
+          </div>
+          <p className="form-help muted">Leave blank to use the standard thank-you message.</p>
+        </div>
       </div>
     );
   };
@@ -5073,6 +5163,7 @@ export default function AdminPage() {
                 <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
               ) : null}
               {renderRecurrenceControls("edit", editForm)}
+              {renderConfirmationEmailControls("edit", editForm)}
               {renderRegistrationBuilder("edit", editForm)}
               {renderEventFlyerControls(event)}
               <div className="cta-row">
@@ -5470,6 +5561,7 @@ export default function AdminPage() {
                     <p className="muted">Waitlist events can still collect custom questions. Waivers, registration limits, and payments stay disabled.</p>
                   ) : null}
                   {renderRecurrenceControls("create", form)}
+                  {renderConfirmationEmailControls("create", form)}
                   {renderRegistrationBuilder("create", form)}
                   {renderCreateFlyerControls()}
                   <div className="cta-row">

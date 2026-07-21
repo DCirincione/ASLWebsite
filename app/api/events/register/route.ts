@@ -4,7 +4,7 @@ import { getBearerToken, getSupabaseServiceRole, getSupabaseWithToken } from "@/
 import { isPaidEventRegistration } from "@/lib/effective-event-registrations";
 import { isPublicEventVisible } from "@/lib/event-approval";
 import { getSignupDuplicateMessage } from "@/lib/event-signups";
-import { sendEventSignupNotification } from "@/lib/event-notifications";
+import { sendEventSignupConfirmationEmail, sendEventSignupNotification } from "@/lib/event-notifications";
 import type { Event, EventSubmission, EventSubmissionInsert, JsonValue } from "@/lib/supabase/types";
 
 export const runtime = "nodejs";
@@ -259,6 +259,12 @@ export async function POST(req: NextRequest) {
       await sendEventSignupNotification({ event: eventConfig, submission });
     } catch (error) {
       console.error("[events/register] ntfy notification failed", error);
+    }
+
+    try {
+      await sendEventSignupConfirmationEmail({ event: eventConfig, submission });
+    } catch (error) {
+      console.error("[events/register] confirmation email failed", error);
     }
 
     return NextResponse.json({ ok: true, submissionId: submission.id });
