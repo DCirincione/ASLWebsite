@@ -18,7 +18,7 @@ type RequestBody = {
 
 type PublicEventRow = Pick<
   Event,
-  "id" | "title" | "description" | "registration_program_slug" | "host_type" | "approval_status"
+  "id" | "title" | "description" | "registration_program_slug" | "host_type" | "approval_status" | "hide_event"
 >;
 
 export async function POST(req: NextRequest) {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 
     const { data: eventRows, error: eventError } = await supabase
       .from("events")
-      .select("id,title,description,registration_program_slug,host_type,approval_status")
+      .select("id,title,description,registration_program_slug,host_type,approval_status,hide_event")
       .in("id", eventIds);
 
     if (eventError) {

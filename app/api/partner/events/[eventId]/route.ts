@@ -114,7 +114,7 @@ const buildPartnerEventPayload = (body: EventWriteBody) => {
 };
 
 const selectClause =
-  "id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,registration_schema,waiver_url,registration_limit,payment_required,payment_amount_cents,created_by_user_id,approval_status,approval_notes,submitted_for_approval_at,approved_at";
+  "id,title,start_date,end_date,time_info,location,description,host_type,hide_event,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,registration_schema,waiver_url,registration_limit,payment_required,payment_amount_cents,created_by_user_id,approval_status,approval_notes,submitted_for_approval_at,approved_at";
 
 export async function PATCH(
   req: NextRequest,

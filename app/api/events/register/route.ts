@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
 
     const { data: eventRow, error: eventError } = await serviceClient
       .from("events")
-      .select("id,title,host_type,approval_status,signup_mode,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit,payment_required,payment_amount_cents")
+      .select("id,title,host_type,approval_status,hide_event,signup_mode,registration_enabled,registration_schema,waiver_url,allow_multiple_registrations,registration_limit,payment_required,payment_amount_cents")
       .eq("id", eventId)
       .maybeSingle();
 

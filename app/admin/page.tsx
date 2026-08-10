@@ -92,6 +92,7 @@ type EventFormState = {
   location: string;
   description: string;
   host_type: HostType;
+  hide_event: boolean;
   image_url: string;
   signup_mode: SignupMode;
   registration_program_slug: string;
@@ -818,6 +819,7 @@ export default function AdminPage() {
     location: "",
     description: "",
     host_type: "aldrich",
+    hide_event: false,
     image_url: "",
     signup_mode: "registration",
     registration_program_slug: "",
@@ -844,6 +846,7 @@ export default function AdminPage() {
     location: "",
     description: "",
     host_type: "aldrich",
+    hide_event: false,
     image_url: "",
     signup_mode: "registration",
     registration_program_slug: "",
@@ -932,7 +935,7 @@ export default function AdminPage() {
     setEventsError(null);
     const { data, error } = await supabase
       .from("events")
-      .select("id,title,start_date,end_date,time_info,location,description,host_type,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,waiver_url,allow_multiple_registrations,registration_limit,registration_schema,payment_required,payment_amount_cents,created_by_user_id,approved_by_user_id,approval_status,approval_notes,submitted_for_approval_at,approved_at")
+      .select("id,title,start_date,end_date,time_info,location,description,host_type,hide_event,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,waiver_url,allow_multiple_registrations,registration_limit,registration_schema,payment_required,payment_amount_cents,created_by_user_id,approved_by_user_id,approval_status,approval_notes,submitted_for_approval_at,approved_at")
       .order("start_date", { ascending: true, nullsFirst: false });
 
     if (!error && data) {
@@ -1680,6 +1683,7 @@ export default function AdminPage() {
       location: "",
       description: "",
       host_type: "aldrich",
+      hide_event: false,
       image_url: "",
       signup_mode: "registration",
       registration_program_slug: "",
@@ -1784,6 +1788,7 @@ export default function AdminPage() {
       location: event.location ?? "",
       description: event.description ?? "",
       host_type: event.host_type ?? "aldrich",
+      hide_event: Boolean(event.hide_event),
       image_url: event.image_url ?? "",
       signup_mode: event.signup_mode === "waitlist" ? "waitlist" : "registration",
       registration_program_slug: event.registration_program_slug ?? "",
@@ -1817,6 +1822,7 @@ export default function AdminPage() {
       location: event.location ?? "",
       description: event.description ?? "",
       host_type: event.host_type ?? "aldrich",
+      hide_event: Boolean(event.hide_event),
       image_url: event.image_url ?? "",
       signup_mode: event.signup_mode === "waitlist" ? "waitlist" : "registration",
       registration_program_slug: event.registration_program_slug ?? "",
@@ -2648,6 +2654,7 @@ export default function AdminPage() {
       location: form.location.trim() || null,
       description: form.description.trim() || null,
       host_type: form.host_type || null,
+      hide_event: form.hide_event,
       image_url: form.image_url.trim() || null,
       signup_mode: form.signup_mode,
       registration_program_slug: form.registration_program_slug.trim() || null,
@@ -2793,6 +2800,7 @@ export default function AdminPage() {
       location: editForm.location.trim() || null,
       description: editForm.description.trim() || null,
       host_type: editForm.host_type || null,
+      hide_event: editForm.hide_event,
       image_url: editForm.image_url.trim() || null,
       signup_mode: editForm.signup_mode,
       registration_program_slug: editForm.registration_program_slug.trim() || null,
@@ -4907,6 +4915,7 @@ export default function AdminPage() {
           <div className="event-card__header">
             <h3>{event.title}</h3>
           </div>
+          {event.hide_event ? <p className="muted">Visibility: hidden from public events pages</p> : null}
           {showPartnerApprovalControls && event.host_type === "partner" ? (
             <div style={{ marginTop: 12, display: "grid", gap: 10 }}>
               <div className="form-control">
@@ -5136,6 +5145,17 @@ export default function AdminPage() {
                     onChange={(e) => updateEdit("registration_enabled", e.target.checked)}
                   />
                   <span>Accept signups</span>
+                </label>
+              </div>
+              <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+                <label className="checkbox-label" htmlFor={`edit-hide-event-${event.id}`}>
+                  <input
+                    id={`edit-hide-event-${event.id}`}
+                    type="checkbox"
+                    checked={editForm.hide_event}
+                    onChange={(e) => updateEdit("hide_event", e.target.checked)}
+                  />
+                  <span>Hide Event</span>
                 </label>
               </div>
               <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
@@ -5530,12 +5550,23 @@ export default function AdminPage() {
                     <label className="checkbox-label">
                       <input
                         type="checkbox"
-                        checked={form.registration_enabled}
-                        onChange={(e) => update("registration_enabled", e.target.checked)}
+                      checked={form.registration_enabled}
+                      onChange={(e) => update("registration_enabled", e.target.checked)}
+                    />
+                      <span>Accept signups</span>
+                    </label>
+                  </div>
+                  <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+                    <label className="checkbox-label" htmlFor="event-hide-event">
+                      <input
+                        id="event-hide-event"
+                        type="checkbox"
+                        checked={form.hide_event}
+                        onChange={(e) => update("hide_event", e.target.checked)}
                       />
-                  <span>Accept signups</span>
-                </label>
-              </div>
+                      <span>Hide Event</span>
+                    </label>
+                  </div>
                   <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
                     <label className="checkbox-label">
                       <input

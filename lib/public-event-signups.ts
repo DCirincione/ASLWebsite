@@ -24,7 +24,7 @@ export type PublicEventSignupCountResponse = {
 };
 
 export const PUBLIC_EVENT_SELECT =
-  "id,title,start_date,end_date,time_info,location,description,host_type,approval_status,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,registration_limit,payment_required,payment_amount_cents,registration_schema";
+  "id,title,start_date,end_date,time_info,location,description,host_type,approval_status,hide_event,image_url,signup_mode,registration_program_slug,sport_id,registration_enabled,registration_limit,payment_required,payment_amount_cents,registration_schema";
 
 const getRegistrationSchemaRecord = (value: Event["registration_schema"]) =>
   value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;

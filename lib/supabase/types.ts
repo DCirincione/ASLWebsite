@@ -118,6 +118,7 @@ export type Event = {
   description?: string | null;
   status?: "scheduled" | "potential" | "tbd" | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
+  hide_event?: boolean | null;
   image_url?: string | null;
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
@@ -149,6 +150,7 @@ export type EventInsert = {
   description?: string | null;
   status?: "scheduled" | "potential" | "tbd" | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
+  hide_event?: boolean | null;
   image_url?: string | null;
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;
@@ -179,6 +181,7 @@ export type EventUpdate = {
   description?: string | null;
   status?: "scheduled" | "potential" | "tbd" | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
+  hide_event?: boolean | null;
   image_url?: string | null;
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;

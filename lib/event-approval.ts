@@ -22,10 +22,10 @@ export const canAccessTrainerPortal = (role?: Profile["role"] | null) =>
 export const canAccessRefPortal = (role?: Profile["role"] | null) =>
   role === "ref" || role === "admin" || role === "owner";
 
-export const isPublicEventVisible = (event: Pick<Event, "host_type" | "approval_status">) =>
-  event.host_type !== "partner" || event.approval_status === "approved";
+export const isPublicEventVisible = (event: Pick<Event, "host_type" | "approval_status" | "hide_event">) =>
+  event.hide_event !== true && (event.host_type !== "partner" || event.approval_status === "approved");
 
-export const filterVisiblePublicEvents = <T extends Pick<Event, "host_type" | "approval_status">>(events: T[]) =>
+export const filterVisiblePublicEvents = <T extends Pick<Event, "host_type" | "approval_status" | "hide_event">>(events: T[]) =>
   events.filter(isPublicEventVisible);
 
 export const formatApprovalStatusLabel = (status?: Event["approval_status"] | null) => {

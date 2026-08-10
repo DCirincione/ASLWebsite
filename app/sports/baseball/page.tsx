@@ -55,7 +55,7 @@ export default function BaseballPage() {
       const [{ data, error }, { data: sportsData, error: sportsError }] = await Promise.all([
         supabase
           .from("events")
-          .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled,registration_limit,registration_schema")
+          .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,hide_event,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled,registration_limit,registration_schema")
           .order("start_date", { ascending: true, nullsFirst: false }),
         supabase.from("sports").select("id,title").order("title", { ascending: true }),
       ]);

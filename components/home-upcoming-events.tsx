@@ -32,6 +32,7 @@ type HomeEvent = {
   description?: string | null;
   host_type?: "aldrich" | "featured" | "partner" | "other" | null;
   approval_status?: "approved" | "pending_approval" | "changes_requested" | null;
+  hide_event?: boolean | null;
   image_url?: string | null;
   signup_mode?: "registration" | "waitlist" | null;
   registration_program_slug?: string | null;

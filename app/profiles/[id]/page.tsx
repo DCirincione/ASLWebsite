@@ -27,7 +27,7 @@ type FriendSummary = { id: string; name: string; avatar_url?: string | null };
 type PublicSundayLeagueTeam = Pick<SundayLeagueTeam, "id" | "team_name" | "team_logo_url">;
 type PublicRegisteredEvent = Pick<
   Event,
-  "id" | "title" | "start_date" | "end_date" | "time_info" | "location" | "description" | "host_type" | "approval_status"
+  "id" | "title" | "start_date" | "end_date" | "time_info" | "location" | "description" | "host_type" | "approval_status" | "hide_event"
 >;
 
 const fallbackProfile: ProfileWithAvatar = {
@@ -213,7 +213,7 @@ export default function PublicProfilePage() {
 
       const { data: events, error: eventsError } = await client
         .from("events")
-        .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status")
+        .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,hide_event")
         .in("id", uniqueEventIds);
 
       if (eventsError || !events) {
