@@ -83,6 +83,7 @@ html[data-theme="dark"] .home-banner__button.button.ghost:hover:not(:disabled) {
 }
 
 .sponsor-ticker {
+  --sponsor-ticker-duration: 32s;
   width: 100%;
   padding: 22px 0;
   overflow: hidden;
@@ -134,7 +135,7 @@ html[data-theme="dark"] .home-banner__button.button.ghost:hover:not(:disabled) {
   display: flex;
   width: max-content;
   gap: 22px;
-  animation: sponsor-ticker-scroll 18s linear infinite;
+  animation: sponsor-ticker-scroll var(--sponsor-ticker-duration) linear infinite;
 }
 
 .sponsor-ticker__item {
@@ -185,6 +186,12 @@ a.sponsor-ticker__item:hover {
   }
 }
 
+@media (min-width: 701px) {
+  .sponsor-ticker {
+    --sponsor-ticker-duration: 42s;
+  }
+}
+
 @keyframes sponsor-ticker-scroll {
   from {
     transform: translateX(0);
@@ -201,7 +208,7 @@ a.sponsor-ticker__item:hover {
   }
 
   .sponsor-ticker__track {
-    animation: sponsor-ticker-scroll 18s linear infinite;
+    animation: sponsor-ticker-scroll var(--sponsor-ticker-duration) linear infinite;
     flex-wrap: nowrap;
     justify-content: flex-start;
     width: min(1120px, calc(100% - 32px));
