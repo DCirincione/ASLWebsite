@@ -20,7 +20,7 @@ import {
   shouldShowPublicEventSignups,
   type PublicEventSignupStats,
 } from "@/lib/public-event-signups";
-import { sportMatchesEvent } from "@/lib/sports";
+import { filterVisiblePublicSports, sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 import type { Event, Sport } from "@/lib/supabase/types";
@@ -57,11 +57,11 @@ export default function BasketballPage() {
           .from("events")
           .select("id,title,start_date,end_date,time_info,location,description,host_type,approval_status,hide_event,signup_mode,registration_program_slug,sport_id,image_url,registration_enabled,registration_limit,registration_schema")
           .order("start_date", { ascending: true, nullsFirst: false }),
-        supabase.from("sports").select("id,title").order("title", { ascending: true }),
+        supabase.from("sports").select("id,title,hide_sport").order("title", { ascending: true }),
       ]);
 
       if (!error && !sportsError && data) {
-        const sports = (sportsData ?? []) as Sport[];
+        const sports = filterVisiblePublicSports((sportsData ?? []) as Sport[]);
         const basketballOnly = filterVisiblePublicEvents(data as Event[]).filter((row) =>
           sportMatchesEvent(row, "basketball", sports) &&
           (row.registration_program_slug ?? "").trim().toLowerCase().startsWith("basketball-")

@@ -22,7 +22,7 @@ import {
   shouldShowPublicEventSignups,
   type PublicEventSignupStats,
 } from "@/lib/public-event-signups";
-import { normalizeSportSlug } from "@/lib/sports";
+import { filterVisiblePublicSports, normalizeSportSlug } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
@@ -571,7 +571,7 @@ export default function EventsPage() {
       if (!supabase) return;
       setLoading(true);
       const [{ data: sportsData }, eventData] = await Promise.all([
-        supabase.from("sports").select("id,title,section_headers").order("title", { ascending: true }),
+        supabase.from("sports").select("id,title,section_headers,hide_sport").order("title", { ascending: true }),
         loadVisiblePublicEvents<EventItem>(supabase),
       ]);
 
@@ -590,7 +590,7 @@ export default function EventsPage() {
             .gte("starts_at", new Date().toISOString())
         : { data: [] };
 
-      setSports((sportsData ?? []) as Sport[]);
+      setSports(filterVisiblePublicSports((sportsData ?? []) as Sport[]));
       setTrainers(mapTrainerRows(approvedTrainers, (trainerSlots ?? []) as TrainerAvailabilitySlot[]));
       setEvents(
         filterVisiblePublicEvents(eventData).filter(

@@ -684,6 +684,7 @@ export type Sport = {
   gender?: "men" | "women" | "coed" | "open" | null;
   short_description?: string | null;
   section_headers?: string[] | null;
+  hide_sport?: boolean | null;
   image_url?: string | null;
   created_at?: string | null;
 };
@@ -698,6 +699,7 @@ export type SportInsert = {
   gender?: "men" | "women" | "coed" | "open" | null;
   short_description?: string | null;
   section_headers?: string[] | null;
+  hide_sport?: boolean | null;
   image_url?: string | null;
   created_at?: string | null;
 };
@@ -712,6 +714,7 @@ export type SportUpdate = {
   gender?: "men" | "women" | "coed" | "open" | null;
   short_description?: string | null;
   section_headers?: string[] | null;
+  hide_sport?: boolean | null;
   image_url?: string | null;
   created_at?: string | null;
 };

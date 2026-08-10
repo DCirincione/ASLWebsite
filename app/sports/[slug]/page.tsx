@@ -20,7 +20,7 @@ import {
   shouldShowPublicEventSignups,
   type PublicEventSignupStats,
 } from "@/lib/public-event-signups";
-import { getEventSectionLabel, normalizeSportSlug, parseSportSectionHeaders, slugifySportValue, sportMatchesEvent } from "@/lib/sports";
+import { filterVisiblePublicSports, getEventSectionLabel, normalizeSportSlug, parseSportSectionHeaders, slugifySportValue, sportMatchesEvent } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
@@ -85,8 +85,8 @@ export default function DynamicSportPage() {
         return;
       }
 
-      const matchedSport =
-        ((sportsData ?? []) as Sport[]).find((entry) => normalizeSportSlug(entry) === routeSlug) ?? null;
+      const visibleSports = filterVisiblePublicSports((sportsData ?? []) as Sport[]);
+      const matchedSport = visibleSports.find((entry) => normalizeSportSlug(entry) === routeSlug) ?? null;
 
       if (!matchedSport) {
         setSport(null);
@@ -97,7 +97,7 @@ export default function DynamicSportPage() {
 
       const sportSlug = normalizeSportSlug(matchedSport);
       const matchedEvents = eventsData
-        .filter((event) => sportMatchesEvent(event, sportSlug, (sportsData ?? []) as Sport[]))
+        .filter((event) => sportMatchesEvent(event, sportSlug, visibleSports))
         .map((event) => ({
           ...event,
           image: event.image_url || undefined,

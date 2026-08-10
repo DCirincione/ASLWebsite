@@ -17,6 +17,11 @@ export const normalizeSportSlug = (sport?: SportSlugSource | null) => {
   return slugifySportValue(sport.title?.trim() || sport.slug?.trim() || "");
 };
 
+export const isPublicSportVisible = (sport: Pick<Sport, "hide_sport">) => sport.hide_sport !== true;
+
+export const filterVisiblePublicSports = <T extends Pick<Sport, "hide_sport">>(sports: T[]) =>
+  sports.filter(isPublicSportVisible);
+
 const RETIRED_SPORT_IMAGE_PATHS = new Set([
   "/baseball/champst2025.jpeg",
   "/basketball/champst2025.jpeg",

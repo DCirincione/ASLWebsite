@@ -118,6 +118,7 @@ type SportFormState = {
   gender: SportGender;
   short_description: string;
   section_headers: string;
+  hide_sport: boolean;
   image_url: string;
 };
 type SundayLeagueScheduleMatchupFormRow = {
@@ -545,6 +546,7 @@ const createEmptySportForm = (): SportFormState => ({
   gender: "open",
   short_description: "",
   section_headers: "",
+  hide_sport: false,
   image_url: "",
 });
 
@@ -645,6 +647,7 @@ const mapSportToForm = (sport: Sport): SportFormState => ({
   gender: sport.gender ?? "open",
   short_description: sport.short_description ?? "",
   section_headers: parseSportSectionHeaders(sport.section_headers).join("\n"),
+  hide_sport: Boolean(sport.hide_sport),
   image_url: sport.image_url ?? "",
 });
 
@@ -2911,6 +2914,7 @@ export default function AdminPage() {
       gender: state.gender || null,
       short_description: state.short_description.trim() || null,
       ...(sectionHeaders.length > 0 ? { section_headers: sectionHeaders } : {}),
+      hide_sport: state.hide_sport,
       image_url: state.image_url.trim() || null,
     };
   };
@@ -5371,6 +5375,17 @@ export default function AdminPage() {
             placeholder="Leagues, clinics, and special events."
           />
         </div>
+        <div className="form-control checkbox-control" style={{ justifySelf: "start", textAlign: "left", width: "fit-content" }}>
+          <label className="checkbox-label" htmlFor={`${target}-sport-hide`}>
+            <input
+              id={`${target}-sport-hide`}
+              type="checkbox"
+              checked={state.hide_sport}
+              onChange={(e) => updateField("hide_sport", e.target.checked)}
+            />
+            <span>Hide Sport Page</span>
+          </label>
+        </div>
         <div className="form-control">
           <label htmlFor={`${target}-sport-sections`}>Section Headers</label>
           <textarea
@@ -6316,6 +6331,7 @@ export default function AdminPage() {
                           </div>
                           <div className="event-card__meta">
                             <p className="muted">Page: /sports/{slugifySportValue(sport.title)}</p>
+                            {sport.hide_sport ? <p className="muted">Visibility: hidden from public sports pages</p> : null}
                             {sport.players_per_team ? <p className="muted">Players per team: {sport.players_per_team}</p> : null}
                             {sport.gender ? <p className="muted">Gender: {sport.gender}</p> : null}
                             {parseSportSectionHeaders(sport.section_headers).length > 0 ? (

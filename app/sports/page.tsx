@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 
 import { PageShell } from "@/components/page-shell";
 import { Section } from "@/components/section";
-import { normalizeSportSlug, sanitizeSportImageUrl, slugifySportValue } from "@/lib/sports";
+import { filterVisiblePublicSports, normalizeSportSlug, sanitizeSportImageUrl, slugifySportValue } from "@/lib/sports";
 import { supabase } from "@/lib/supabase/client";
 import type { Sport } from "@/lib/supabase/types";
 
@@ -81,7 +81,7 @@ export default function SportsPage() {
       if (!supabase) return;
       const { data, error } = await supabase.from("sports").select("*").order("title", { ascending: true });
       if (!error && data) {
-        const mapped = (data as Sport[]).map((sport) => ({
+        const mapped = filterVisiblePublicSports(data as Sport[]).map((sport) => ({
           ...sport,
           slug: normalizeSportSlug(sport) || slugifySportValue(sport.title ?? "sport"),
         }));
