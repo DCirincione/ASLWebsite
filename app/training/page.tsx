@@ -135,6 +135,26 @@ const parseDurationMinutes = (value: string) => {
   return Number.isFinite(total) && total > 0 ? total : null;
 };
 
+const addMinutesToTimeInput = (timeValue: string, minutesToAdd: number) => {
+  const [hoursValue, minutesValue] = timeValue.split(":").map(Number);
+  if (
+    !Number.isInteger(hoursValue) ||
+    !Number.isInteger(minutesValue) ||
+    hoursValue < 0 ||
+    hoursValue > 23 ||
+    minutesValue < 0 ||
+    minutesValue > 59 ||
+    !Number.isFinite(minutesToAdd)
+  ) {
+    return "";
+  }
+
+  const nextTotalMinutes = (hoursValue * 60 + minutesValue + minutesToAdd) % (24 * 60);
+  const nextHours = Math.floor(nextTotalMinutes / 60).toString().padStart(2, "0");
+  const nextMinutes = (nextTotalMinutes % 60).toString().padStart(2, "0");
+  return `${nextHours}:${nextMinutes}`;
+};
+
 export default function TrainingPage() {
   const [accessStatus, setAccessStatus] = useState<"loading" | "allowed" | "no-session" | "forbidden">("loading");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -254,13 +274,23 @@ export default function TrainingPage() {
   };
 
   const addSlotStartTime = () => {
-    setSlotStartTimes((current) => [
-      ...current,
-      {
-        startTime: "",
-        sessionIndex: current[current.length - 1]?.sessionIndex ?? "0",
-      },
-    ]);
+    setSlotStartTimes((current) => {
+      const previousEntry = [...current].reverse().find((entry) => entry.startTime.trim()) ?? current[current.length - 1];
+      const nextSessionIndex = previousEntry?.sessionIndex ?? "0";
+      const sessionIndex = Number(nextSessionIndex);
+      const previousSession = sessionOptions[sessionIndex] ?? form.session_options[sessionIndex] ?? null;
+      const durationMinutes = previousSession?.duration ? parseDurationMinutes(previousSession.duration) : null;
+
+      return [
+        ...current,
+        {
+          startTime: previousEntry?.startTime && durationMinutes
+            ? addMinutesToTimeInput(previousEntry.startTime, durationMinutes)
+            : "",
+          sessionIndex: nextSessionIndex,
+        },
+      ];
+    });
   };
 
   const removeSlotStartTime = (index: number) => {

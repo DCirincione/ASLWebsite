@@ -40,6 +40,7 @@ export type TrainerProfile = {
 
 const fallbackHeadshot = "/ASLLogo.png";
 const fallbackFlyer = "/home-hero/Aldrich Sports Leagues.png";
+const TRAINER_AVAILABILITY_TIME_ZONE = "America/New_York";
 
 const isRecord = (value: JsonValue | unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -90,10 +91,29 @@ const formatSlotTime = (startsAt: string, endsAt: string) => {
   return `${startDate.toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
+    timeZone: TRAINER_AVAILABILITY_TIME_ZONE,
   })} - ${endDate.toLocaleTimeString(undefined, {
     hour: "numeric",
     minute: "2-digit",
+    timeZone: TRAINER_AVAILABILITY_TIME_ZONE,
   })}`;
+};
+
+const getSlotDateKey = (startsAt: string) => {
+  const date = new Date(startsAt);
+  if (Number.isNaN(date.getTime())) return startsAt.slice(0, 10);
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: TRAINER_AVAILABILITY_TIME_ZONE,
+  }).formatToParts(date);
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+
+  return year && month && day ? `${year}-${month}-${day}` : startsAt.slice(0, 10);
 };
 
 export const parseSessionDurationMinutes = (value: string) => {
@@ -123,7 +143,7 @@ const groupAvailabilitySlots = (slots: TrainerAvailabilitySlot[]): TrainerAvaila
   const grouped = new Map<string, TrainerAvailabilityDay>();
 
   for (const slot of slots) {
-    const date = slot.starts_at.slice(0, 10);
+    const date = getSlotDateKey(slot.starts_at);
     if (!grouped.has(date)) {
       grouped.set(date, { date, slots: [] });
     }
