@@ -7104,7 +7104,7 @@ export default function AdminPage() {
                     </button>
                   </div>
                   <form className="register-form" onSubmit={handleSaveHomeEventsSettings}>
-                    <div className="register-form-grid">
+                    <div className="register-form-grid admin-home-events-grid">
                       {siteSettingsForm.homeEventIds.map((selectedEventId, index) => {
                         const selectedInOtherSlot = new Set(
                           siteSettingsForm.homeEventIds.filter((eventId, eventIndex) => eventIndex !== index && eventId),

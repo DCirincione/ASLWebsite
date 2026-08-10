@@ -124,6 +124,33 @@
   white-space: nowrap;
 }
 
+.admin-home-events-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 20px;
+  row-gap: 18px;
+}
+
+.admin-home-events-grid > .form-control:not(.register-form-control--end) {
+  grid-template-rows: auto auto;
+  min-width: 0;
+}
+
+.admin-home-events-grid > .form-control:not(.register-form-control--end) > label {
+  min-height: 0;
+  align-items: center;
+}
+
+.admin-home-events-grid select {
+  width: 100%;
+  min-width: 0;
+}
+
+@media (max-width: 860px) {
+  .admin-home-events-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .admin-registration-summary {
   width: 100%;
   text-align: left;
