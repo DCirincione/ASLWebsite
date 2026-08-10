@@ -217,6 +217,9 @@ type AdminSiteSettings = {
     buttonEventId?: string;
     buttonPageHref?: string;
   };
+  homeEvents?: {
+    selectedEventIds?: string[];
+  };
   merch?: {
     purchasesEnabled?: boolean;
   };
@@ -229,6 +232,23 @@ type SportSponsorDraft = {
   linkUrl: string;
   buttonText: string;
   altText: string;
+};
+
+const HOME_EVENT_SLOT_COUNT = 4;
+
+const normalizeHomeEventSelection = (value?: unknown) => {
+  const ids = Array.isArray(value)
+    ? Array.from(
+        new Set(
+          value
+            .filter((eventId): eventId is string => typeof eventId === "string")
+            .map((eventId) => eventId.trim())
+            .filter(Boolean),
+        ),
+      ).slice(0, HOME_EVENT_SLOT_COUNT)
+    : [];
+
+  return Array.from({ length: HOME_EVENT_SLOT_COUNT }, (_, index) => ids[index] ?? "");
 };
 
 const isJsonRecord = (value: unknown): value is Record<string, JsonValue | undefined> =>
@@ -677,6 +697,7 @@ export default function AdminPage() {
   const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
   const [communitySponsorsStatus, setCommunitySponsorsStatus] = useState<FormStatus>({ type: "idle" });
   const [siteSettingsStatus, setSiteSettingsStatus] = useState<FormStatus>({ type: "idle" });
+  const [homeEventsSettingsStatus, setHomeEventsSettingsStatus] = useState<FormStatus>({ type: "idle" });
   const [merchSettingsStatus, setMerchSettingsStatus] = useState<FormStatus>({ type: "idle" });
   const [sportSponsorStatus, setSportSponsorStatus] = useState<FormStatus>({ type: "idle" });
   const [announcementStatus, setAnnouncementStatus] = useState<FormStatus>({ type: "idle" });
@@ -804,6 +825,7 @@ export default function AdminPage() {
     homeBannerButtonTarget: "none" as HomeBannerButtonTarget,
     homeBannerButtonEventId: "",
     homeBannerButtonPageHref: "",
+    homeEventIds: ["", "", "", ""] as string[],
     merchPurchasesEnabled: true,
   });
   const [sportSponsorDrafts, setSportSponsorDrafts] = useState<Record<string, SportSponsorDraft>>({});
@@ -1187,6 +1209,7 @@ export default function AdminPage() {
   const loadSiteSettings = async () => {
     setLoadingSiteSettings(true);
     setSiteSettingsStatus({ type: "idle" });
+    setHomeEventsSettingsStatus({ type: "idle" });
     setMerchSettingsStatus({ type: "idle" });
     setSportSponsorStatus({ type: "idle" });
     try {
@@ -1195,6 +1218,7 @@ export default function AdminPage() {
       if (!response.ok) {
         const message = json?.error ?? "Could not load site settings.";
         setSiteSettingsStatus({ type: "error", message });
+        setHomeEventsSettingsStatus({ type: "error", message });
         setMerchSettingsStatus({ type: "error", message });
         setSportSponsorStatus({ type: "error", message });
         return;
@@ -1219,6 +1243,7 @@ export default function AdminPage() {
           typeof settings.homeBanner?.buttonPageHref === "string"
             ? settings.homeBanner.buttonPageHref
             : "",
+        homeEventIds: normalizeHomeEventSelection(settings.homeEvents?.selectedEventIds),
         merchPurchasesEnabled:
           typeof settings.merch?.purchasesEnabled === "boolean"
             ? settings.merch.purchasesEnabled
@@ -1237,6 +1262,7 @@ export default function AdminPage() {
       );
     } catch {
       setSiteSettingsStatus({ type: "error", message: "Could not load site settings." });
+      setHomeEventsSettingsStatus({ type: "error", message: "Could not load site settings." });
       setMerchSettingsStatus({ type: "error", message: "Could not load site settings." });
       setSportSponsorStatus({ type: "error", message: "Could not load site settings." });
     } finally {
@@ -3497,6 +3523,15 @@ export default function AdminPage() {
     setSiteSettingsForm((prev) => ({ ...prev, [key]: value }));
   };
 
+  const updateHomeEventSlot = (index: number, eventId: string) => {
+    setSiteSettingsForm((prev) => ({
+      ...prev,
+      homeEventIds: prev.homeEventIds.map((currentEventId, currentIndex) =>
+        currentIndex === index ? eventId : currentEventId,
+      ),
+    }));
+  };
+
   const updateSportSponsorDraft = <K extends keyof SportSponsorDraft>(
     sportSlug: string,
     key: K,
@@ -4268,6 +4303,7 @@ export default function AdminPage() {
           typeof settings.homeBanner?.buttonPageHref === "string"
             ? settings.homeBanner.buttonPageHref
             : homeBannerButtonPageHref,
+        homeEventIds: normalizeHomeEventSelection(settings.homeEvents?.selectedEventIds),
         merchPurchasesEnabled:
           typeof settings.merch?.purchasesEnabled === "boolean"
             ? settings.merch.purchasesEnabled
@@ -4276,6 +4312,53 @@ export default function AdminPage() {
       setSiteSettingsStatus({ type: "success", message: "Home page banner settings updated." });
     } catch {
       setSiteSettingsStatus({ type: "error", message: "Could not update site settings." });
+    }
+  };
+
+  const handleSaveHomeEventsSettings = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    const accessToken = await getAccessToken();
+    if (!accessToken) {
+      setHomeEventsSettingsStatus({ type: "error", message: "Sign in again to continue." });
+      return;
+    }
+
+    const selectedEventIds = siteSettingsForm.homeEventIds.map((eventId) => eventId.trim()).filter(Boolean);
+    if (selectedEventIds.length !== HOME_EVENT_SLOT_COUNT || new Set(selectedEventIds).size !== HOME_EVENT_SLOT_COUNT) {
+      setHomeEventsSettingsStatus({ type: "error", message: "Choose 4 different events for the home page." });
+      return;
+    }
+
+    setHomeEventsSettingsStatus({ type: "loading" });
+    try {
+      const response = await fetch("/api/admin/site-settings", {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+          authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          homeEvents: {
+            selectedEventIds,
+          },
+        }),
+      });
+      const json = await response.json();
+      if (!response.ok) {
+        setHomeEventsSettingsStatus({ type: "error", message: json?.error ?? "Could not update home page events." });
+        return;
+      }
+
+      const settings = (json?.settings ?? {}) as AdminSiteSettings;
+      setSiteSettingsForm((prev) => ({
+        ...prev,
+        homeEventIds: normalizeHomeEventSelection(settings.homeEvents?.selectedEventIds),
+      }));
+      setHomeEventsSettingsStatus({ type: "success", message: "Home page events updated." });
+    } catch {
+      setHomeEventsSettingsStatus({ type: "error", message: "Could not update home page events." });
     }
   };
 
@@ -4328,6 +4411,7 @@ export default function AdminPage() {
           typeof settings.homeBanner?.buttonPageHref === "string"
             ? settings.homeBanner.buttonPageHref
             : siteSettingsForm.homeBannerButtonPageHref,
+        homeEventIds: normalizeHomeEventSelection(settings.homeEvents?.selectedEventIds),
         merchPurchasesEnabled:
           typeof settings.merch?.purchasesEnabled === "boolean"
             ? settings.merch.purchasesEnabled
@@ -7006,6 +7090,61 @@ export default function AdminPage() {
                   {siteSettingsStatus.message ? (
                     <p className={`form-help ${siteSettingsStatus.type === "error" ? "error" : "muted"}`}>
                       {siteSettingsStatus.message}
+                    </p>
+                  ) : null}
+                </section>
+                <section className="account-card">
+                  <div className="account-card__header">
+                    <div>
+                      <h2>Home Page Upcoming Events</h2>
+                      <p className="muted">Choose the 4 events that appear in the Upcoming Events section on the home page.</p>
+                    </div>
+                    <button className="button ghost" type="button" onClick={() => void loadSiteSettings()} disabled={loadingSiteSettings}>
+                      {loadingSiteSettings ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+                  <form className="register-form" onSubmit={handleSaveHomeEventsSettings}>
+                    <div className="register-form-grid">
+                      {siteSettingsForm.homeEventIds.map((selectedEventId, index) => {
+                        const selectedInOtherSlot = new Set(
+                          siteSettingsForm.homeEventIds.filter((eventId, eventIndex) => eventIndex !== index && eventId),
+                        );
+
+                        return (
+                          <div className="form-control" key={`home-event-slot-${index}`}>
+                            <label htmlFor={`settings-home-event-${index}`}>Event {index + 1}</label>
+                            <select
+                              id={`settings-home-event-${index}`}
+                              value={selectedEventId}
+                              onChange={(e) => updateHomeEventSlot(index, e.target.value)}
+                              disabled={loadingEvents}
+                              required
+                            >
+                              <option value="">{loadingEvents ? "Loading events..." : "Select an event"}</option>
+                              {events.map((event) => (
+                                <option
+                                  key={event.id}
+                                  value={event.id}
+                                  disabled={selectedInOtherSlot.has(event.id)}
+                                >
+                                  {event.title} • {dateLabel(event.start_date, event.end_date)}
+                                  {event.hide_event ? " • hidden" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="cta-row">
+                      <button className="button primary" type="submit" disabled={homeEventsSettingsStatus.type === "loading"}>
+                        {homeEventsSettingsStatus.type === "loading" ? "Saving..." : "Save Home Events"}
+                      </button>
+                    </div>
+                  </form>
+                  {homeEventsSettingsStatus.message ? (
+                    <p className={`form-help ${homeEventsSettingsStatus.type === "error" ? "error" : "muted"}`}>
+                      {homeEventsSettingsStatus.message}
                     </p>
                   ) : null}
                 </section>

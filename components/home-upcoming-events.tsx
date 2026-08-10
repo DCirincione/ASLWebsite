@@ -12,17 +12,20 @@ import {
   getSignupUnavailableMessage,
 } from "@/lib/event-signups";
 import {
+  attachPublicEventSignupCounts,
   formatEventSignupLabel,
   loadVisiblePublicEvents,
+  PUBLIC_EVENT_SELECT,
   shouldShowPublicEventSignups,
   type PublicEventSignupStats,
 } from "@/lib/public-event-signups";
+import { filterVisiblePublicEvents } from "@/lib/event-approval";
 import type { JsonValue } from "@/lib/supabase/types";
 import { supabase } from "@/lib/supabase/client";
 import { isRegularAslSundayLeagueEvent, SUNDAY_LEAGUE_HREF } from "@/lib/sunday-league";
 import { useRegisteredEventIds } from "@/lib/supabase/use-registered-program-slugs";
 
-type HomeEvent = {
+type HomeEventRow = {
   id: string;
   title: string;
   start_date?: string | null;
@@ -40,7 +43,9 @@ type HomeEvent = {
   registration_limit?: number | null;
   registration_schema?: JsonValue | null;
   image?: string | null;
-} & PublicEventSignupStats;
+};
+
+type HomeEvent = HomeEventRow & PublicEventSignupStats;
 
 const fallbackEvents: HomeEvent[] = [
   {
@@ -103,7 +108,13 @@ const formatDateRange = (start?: string | null, end?: string | null) => {
   return `${startLabel} - ${formatDate(end)}`;
 };
 
-export function HomeUpcomingEvents() {
+type HomeUpcomingEventsProps = {
+  selectedEventIds?: string[];
+};
+
+const EMPTY_SELECTED_EVENT_IDS: string[] = [];
+
+export function HomeUpcomingEvents({ selectedEventIds = EMPTY_SELECTED_EVENT_IDS }: HomeUpcomingEventsProps) {
   const router = useRouter();
   const [events, setEvents] = useState<HomeEvent[]>(fallbackEvents);
   const [loading, setLoading] = useState(false);
@@ -118,15 +129,31 @@ export function HomeUpcomingEvents() {
     const loadEvents = async () => {
       if (!supabase) return;
       setLoading(true);
-      const data = await loadVisiblePublicEvents<HomeEvent>(supabase, { limit: 12 });
-      if (data.length > 0) {
-        setEvents(data.slice(0, 4));
+      const configuredEventIds = Array.from(new Set(selectedEventIds.map((eventId) => eventId.trim()).filter(Boolean))).slice(0, 4);
+
+      if (configuredEventIds.length > 0) {
+        const { data } = await supabase
+          .from("events")
+          .select(PUBLIC_EVENT_SELECT)
+          .in("id", configuredEventIds);
+        const visibleEvents = filterVisiblePublicEvents((data ?? []) as HomeEventRow[]);
+        const eventsById = new Map(visibleEvents.map((event) => [event.id, event]));
+        const orderedEvents = configuredEventIds
+          .map((eventId) => eventsById.get(eventId))
+          .filter((event): event is HomeEventRow => Boolean(event));
+        const withSignupCounts = await attachPublicEventSignupCounts(supabase, orderedEvents);
+        setEvents(withSignupCounts);
+      } else {
+        const data = await loadVisiblePublicEvents<HomeEvent>(supabase, { limit: 12 });
+        if (data.length > 0) {
+          setEvents(data.slice(0, 4));
+        }
       }
       setLoading(false);
     };
 
     void loadEvents();
-  }, []);
+  }, [selectedEventIds]);
 
   const primaryDateLabel = (event: HomeEvent) => {
     const dateRange = formatDateRange(event.start_date, event.end_date);

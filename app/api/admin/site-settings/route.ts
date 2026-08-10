@@ -31,6 +31,9 @@ export async function PUT(req: NextRequest) {
       merch?: {
         purchasesEnabled?: boolean;
       };
+      homeEvents?: {
+        selectedEventIds?: unknown;
+      };
       sportSponsors?: Record<
         string,
         {
@@ -72,6 +75,16 @@ export async function PUT(req: NextRequest) {
       typeof body.merch?.purchasesEnabled === "boolean"
         ? body.merch.purchasesEnabled
         : currentSettings.merch.purchasesEnabled;
+    const selectedEventIds = Array.isArray(body.homeEvents?.selectedEventIds)
+      ? Array.from(
+          new Set(
+            body.homeEvents.selectedEventIds
+              .filter((eventId): eventId is string => typeof eventId === "string")
+              .map((eventId) => eventId.trim())
+              .filter(Boolean),
+          ),
+        )
+      : currentSettings.homeEvents.selectedEventIds;
     const sportSponsors = body.sportSponsors
       ? Object.fromEntries(
           Object.entries(body.sportSponsors)
@@ -105,6 +118,9 @@ export async function PUT(req: NextRequest) {
     if (buttonTarget === "page" && !buttonPageHref) {
       return NextResponse.json({ error: "Choose a page for the banner button." }, { status: 400 });
     }
+    if (body.homeEvents && selectedEventIds.length !== 4) {
+      return NextResponse.json({ error: "Choose exactly 4 events for the home page." }, { status: 400 });
+    }
 
     const settings = await writeSiteSettings({
       homeBanner: {
@@ -113,6 +129,9 @@ export async function PUT(req: NextRequest) {
         buttonTarget,
         buttonEventId: buttonTarget === "event" ? buttonEventId : "",
         buttonPageHref: buttonTarget === "page" ? buttonPageHref : "",
+      },
+      homeEvents: {
+        selectedEventIds: selectedEventIds.slice(0, 4),
       },
       merch: {
         purchasesEnabled,

@@ -6,6 +6,9 @@
     "buttonEventId": "8ad9baff-5d65-4be1-8268-b51b8115ff5f",
     "buttonPageHref": ""
   },
+  "homeEvents": {
+    "selectedEventIds": []
+  },
   "merch": {
     "purchasesEnabled": false
   }

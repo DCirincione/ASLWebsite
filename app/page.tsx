@@ -98,7 +98,7 @@ export default async function Home() {
         title="Upcoming Events"
         description="Check out the latest tournaments and leagues happening near you."
       >
-        <HomeUpcomingEvents />
+        <HomeUpcomingEvents selectedEventIds={siteSettings.homeEvents.selectedEventIds} />
         <div className="event-actions">
           <Link className="button primary" href="/events">
             View All Events

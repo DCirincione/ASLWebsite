@@ -23,6 +23,10 @@ export type MerchSettings = {
   purchasesEnabled: boolean;
 };
 
+export type HomeEventsSettings = {
+  selectedEventIds: string[];
+};
+
 export type SportSponsorSettings = {
   enabled: boolean;
   sponsorName: string;
@@ -34,6 +38,7 @@ export type SportSponsorSettings = {
 
 export type SiteSettings = {
   homeBanner: HomeBannerSettings;
+  homeEvents: HomeEventsSettings;
   merch: MerchSettings;
   sportSponsors: Record<string, SportSponsorSettings>;
 };
@@ -47,6 +52,9 @@ const DEFAULT_SITE_SETTINGS: SiteSettings = {
     buttonTarget: "none",
     buttonEventId: "",
     buttonPageHref: "",
+  },
+  homeEvents: {
+    selectedEventIds: [],
   },
   merch: {
     purchasesEnabled: true,
@@ -97,6 +105,17 @@ const normalizeSiteSettings = (value?: Partial<SiteSettings> | null): SiteSettin
     }
   }
 
+  const selectedEventIds = Array.isArray(value?.homeEvents?.selectedEventIds)
+    ? Array.from(
+        new Set(
+          value.homeEvents.selectedEventIds
+            .filter((eventId): eventId is string => typeof eventId === "string")
+            .map((eventId) => eventId.trim())
+            .filter(Boolean),
+        ),
+      ).slice(0, 4)
+    : DEFAULT_SITE_SETTINGS.homeEvents.selectedEventIds;
+
   return {
     homeBanner: {
       enabled:
@@ -110,6 +129,9 @@ const normalizeSiteSettings = (value?: Partial<SiteSettings> | null): SiteSettin
       buttonTarget,
       buttonEventId: buttonTarget === "event" ? buttonEventId : "",
       buttonPageHref: buttonTarget === "page" ? buttonPageHref : "",
+    },
+    homeEvents: {
+      selectedEventIds,
     },
     merch: {
       purchasesEnabled:
