@@ -36,6 +36,7 @@ export type TrainerProfile = {
   flyerUrl: string;
   status: TrainerProfileRow["status"];
   availability: TrainerAvailabilityDay[];
+  network: Pick<TrainerProfileRow, "booking_mode" | "level" | "background" | "interview_quote" | "sports" | "locations" | "travel_areas" | "travel_miles" | "booking_url" | "referral_code" | "referral_discount">;
 };
 
 const fallbackHeadshot = "/ASLLogo.png";
@@ -166,6 +167,7 @@ export const normalizeTrainerProfile = (
   trainer: TrainerProfileRow,
   slots: TrainerAvailabilitySlot[] = [],
 ): TrainerProfile => ({
+  network: { booking_mode: trainer.booking_mode ?? "network", level: trainer.level, background: trainer.background, interview_quote: trainer.interview_quote, sports: trainer.sports, locations: trainer.locations, travel_areas: trainer.travel_areas, travel_miles: trainer.travel_miles, booking_url: trainer.booking_url, referral_code: trainer.referral_code, referral_discount: trainer.referral_discount },
   id: trainer.id,
   userId: trainer.user_id,
   slug: trainer.slug,

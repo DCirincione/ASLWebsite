@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { confirmTrainerCheckout } from "@/lib/trainer-payments";
 
 import { getSupabaseServiceRole } from "@/lib/admin-route-auth";
 import {
@@ -497,6 +498,8 @@ export async function POST(req: NextRequest) {
         draft: partnerApplicationDraft,
       });
     }
+
+    if (!partnerApplicationDraft) await confirmTrainerCheckout(payment.order_id);
 
     return NextResponse.json({ ok: true });
   } catch {

@@ -14,6 +14,7 @@ const links = [
   { href: "/", label: "Home" },
   { href: "/events", label: "Events" },
   { href: "/sports", label: "Sports" },
+  { href: "/trainers", label: "Trainers" },
   { href: "/merch", label: "Merch" },
   { href: "/community", label: "Community" },
   { href: "/contact", label: "Contact" },
@@ -169,7 +170,9 @@ export function SiteHeader() {
     if (!header) return;
 
     const updateHeaderHeight = () => {
-      setHeaderHeight(Math.max(64, Math.ceil(header.getBoundingClientRect().height)));
+      const height = Math.max(64, Math.ceil(header.getBoundingClientRect().height));
+      setHeaderHeight(height);
+      document.documentElement.style.setProperty("--site-header-height", `${height}px`);
     };
 
     updateHeaderHeight();
@@ -263,7 +266,7 @@ export function SiteHeader() {
                       ) : null}
                       {canAccessTraining ? (
                         <Link href="/training" className="nav__link nav__link--sub" onClick={() => setIsMobileNavOpen(false)}>
-                          Training Portal
+                          Trainer Hub
                         </Link>
                       ) : null}
                     </div>
@@ -318,7 +321,7 @@ export function SiteHeader() {
                     ) : null}
                     {canAccessTraining ? (
                       <Link href="/training" role="menuitem" onClick={() => setIsMenuOpen(false)}>
-                        Training Portal
+                        Trainer Hub
                       </Link>
                     ) : null}
                     <Link href="/account/settings" role="menuitem" onClick={() => setIsMenuOpen(false)}>

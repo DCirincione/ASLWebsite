@@ -1,4 +1,5 @@
 import "./community.css";
+import { CommunitySponsorCarousel } from "@/components/community-sponsor-carousel";
 
 import Image from "next/image";
 import { unstable_noStore as noStore } from "next/cache";
@@ -48,7 +49,7 @@ export default async function CommunityPage() {
     readCommunitySponsors(),
     readCommunityArticles(),
   ]);
-  const featuredSponsors = sponsors.filter((sponsor) => sponsor.placement === "top").slice(0, 2);
+  const featuredSponsors = sponsors.filter((sponsor) => sponsor.placement === "top").slice(0, 3);
   const featuredSponsorIds = new Set(featuredSponsors.map((sponsor) => sponsor.id));
   const standardSponsors = sponsors.filter((sponsor) => !featuredSponsorIds.has(sponsor.id));
 
@@ -103,64 +104,33 @@ export default async function CommunityPage() {
               <>
                 {featuredSponsors.length > 0 ? (
                   <div className={`community-sponsors-featured community-sponsors-featured--count-${featuredSponsors.length}`}>
-                    <article className="community-sponsor-card community-sponsor-card--featured">
+                    {featuredSponsors.map((sponsor) => (
+                    <article key={sponsor.id} className="community-sponsor-card community-sponsor-card--featured">
                       <div className="community-sponsor-card__image-wrap community-sponsor-card__image-wrap--featured">
                         <div
                           className="community-sponsor-card__image community-sponsor-card__image--featured"
                           role="img"
-                          aria-label={featuredSponsors[0].name}
-                          style={{ backgroundImage: `url(${featuredSponsors[0].image})` }}
+                          aria-label={sponsor.name}
+                          style={{ backgroundImage: `url(${sponsor.image})` }}
                         />
                       </div>
                       <div className="community-sponsor-card__copy">
-                        <p className="community-sponsor-card__name">{featuredSponsors[0].name}</p>
+                        <p className="community-sponsor-card__name">{sponsor.name}</p>
                         <p className="community-sponsor-card__text" style={{ whiteSpace: "pre-line" }}>
-                          {featuredSponsors[0].description}
+                          {sponsor.description}
                         </p>
                         <SponsorMediaLinks
-                          websiteUrl={featuredSponsors[0].websiteUrl}
-                          instagramUrl={featuredSponsors[0].instagramUrl}
+                          websiteUrl={sponsor.websiteUrl}
+                          instagramUrl={sponsor.instagramUrl}
                         />
                       </div>
                     </article>
-
-                    {featuredSponsors.length === 2 ? (
-                      <>
-                        <div className="community-sponsors-featured__divider" aria-hidden="true">
-                          <span />
-                        </div>
-                        <article className="community-sponsor-card community-sponsor-card--featured">
-                          <div className="community-sponsor-card__image-wrap community-sponsor-card__image-wrap--featured">
-                            <div
-                              className="community-sponsor-card__image community-sponsor-card__image--featured"
-                              role="img"
-                              aria-label={featuredSponsors[1].name}
-                              style={{ backgroundImage: `url(${featuredSponsors[1].image})` }}
-                            />
-                          </div>
-                          <div className="community-sponsor-card__copy">
-                            <p className="community-sponsor-card__name">{featuredSponsors[1].name}</p>
-                            <p className="community-sponsor-card__text" style={{ whiteSpace: "pre-line" }}>
-                              {featuredSponsors[1].description}
-                            </p>
-                            <SponsorMediaLinks
-                              websiteUrl={featuredSponsors[1].websiteUrl}
-                              instagramUrl={featuredSponsors[1].instagramUrl}
-                            />
-                          </div>
-                        </article>
-                      </>
-                    ) : null}
+                    ))}
                   </div>
                 ) : null}
 
                 {standardSponsors.length > 0 ? (
-                  <div
-                    className={`community-sponsors-carousel ${standardSponsors.length > 2 ? "community-sponsors-carousel--scrollable" : ""}`}
-                    aria-label="More community sponsors"
-                  >
-                    <div className="community-sponsors-carousel__viewport">
-                      <div className="community-sponsors-carousel__track">
+                  <CommunitySponsorCarousel count={standardSponsors.length}>
                         {standardSponsors.map((sponsor) => (
                           <article key={sponsor.id ?? sponsor.name} className="community-sponsor-card community-sponsor-card--carousel">
                             <div className="community-sponsor-card__image-wrap">
@@ -173,26 +143,12 @@ export default async function CommunityPage() {
                             </div>
                             <div className="community-sponsor-card__copy">
                               <p className="community-sponsor-card__name">{sponsor.name}</p>
-                              <p className="community-sponsor-card__text" style={{ whiteSpace: "pre-line" }}>
-                                {sponsor.description}
-                              </p>
+                              <p className="community-sponsor-card__text" style={{ whiteSpace: "pre-line" }}>{sponsor.description}</p>
                               <SponsorMediaLinks websiteUrl={sponsor.websiteUrl} instagramUrl={sponsor.instagramUrl} />
                             </div>
                           </article>
                         ))}
-                      </div>
-                    </div>
-
-                    {standardSponsors.length > 2 ? (
-                      <div className="community-sponsors-carousel__cue" aria-hidden="true">
-                        <span className="community-sponsors-carousel__cue-arrow">↑</span>
-                        <span className="community-sponsors-carousel__cue-line" />
-                        <span className="community-sponsors-carousel__cue-text">Scroll</span>
-                        <span className="community-sponsors-carousel__cue-line" />
-                        <span className="community-sponsors-carousel__cue-arrow">↓</span>
-                      </div>
-                    ) : null}
-                  </div>
+                  </CommunitySponsorCarousel>
                 ) : null}
               </>
             ) : (

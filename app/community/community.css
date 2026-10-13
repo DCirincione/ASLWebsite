@@ -230,7 +230,12 @@ html[data-theme="dark"] .community-donation-form__amount {
 }
 
 .community-sponsors-featured--count-2 {
-  grid-template-columns: minmax(320px, 500px) 34px minmax(320px, 500px);
+  grid-template-columns: repeat(2, minmax(0, 500px));
+}
+
+.community-sponsors-featured--count-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
 }
 
 .community-sponsors-featured__divider {
@@ -259,6 +264,8 @@ html[data-theme="dark"] .community-donation-form__amount {
 }
 
 .community-sponsor-card--featured {
+  min-width: 0;
+  overflow-wrap: anywhere;
   grid-template-columns: 1fr;
   align-content: start;
   gap: 14px;
@@ -361,6 +368,8 @@ html[data-theme="dark"] .community-donation-form__amount {
 .community-sponsor-card--featured .community-sponsor-card__links {
   justify-content: center;
 }
+
+.community-sponsors-carousel__mobile-controls { display: none; }
 
 .community-sponsors-carousel {
   --community-sponsor-slide-height: 260px;
@@ -560,7 +569,8 @@ html:not([data-theme="dark"]) .community-sponsors-carousel__track::after {
 }
 
 @media (max-width: 980px) {
-  .community-sponsors-featured--count-2 {
+  .community-sponsors-featured--count-2,
+  .community-sponsors-featured--count-3 {
     grid-template-columns: 1fr;
   }
 
@@ -633,10 +643,16 @@ html:not([data-theme="dark"]) .community-sponsors-carousel__track::after {
   }
 
   .community-sponsors-carousel__track {
+    grid-auto-flow: column;
+    grid-auto-columns: 88%;
+    grid-template-columns: none;
     max-height: none;
-    overflow: visible;
-    padding-right: 0;
-    scroll-snap-type: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 0 0 12px;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    align-items: start;
   }
 
   .community-sponsor-card--carousel {
@@ -664,4 +680,13 @@ html:not([data-theme="dark"]) .community-sponsors-carousel__track::after {
   .article-card__image {
     height: 160px;
   }
+}
+
+@media (max-width: 720px) {
+  .community-sponsors-carousel, .community-sponsors-carousel__viewport { min-width: 0; }
+  .community-sponsor-card--carousel { min-width: 0; overflow-wrap: anywhere; }
+  .community-sponsors-carousel__track::-webkit-scrollbar { height: 6px; }
+  .community-sponsors-carousel__mobile-controls { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: .85rem; }
+  .community-sponsors-carousel__mobile-controls > div { display: flex; gap: 6px; }
+  .community-sponsors-carousel__mobile-controls .button { padding: 6px 12px; }
 }

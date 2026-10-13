@@ -2348,6 +2348,40 @@ html[data-theme="dark"] .event-detail__media-empty {
   background: #ffffff;
 }
 
+input[type="file"] {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+input[type="file"]::file-selector-button {
+  margin-right: 14px;
+  padding: 6px 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 65%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 650;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+input[type="file"]:hover::file-selector-button {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+}
+
+input[type="file"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
 .checkbox-control {
   display: flex;
   align-items: center;

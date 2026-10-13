@@ -1,3 +1,4 @@
+import { safeBookingUrl, stringList, textValue } from "@/lib/trainer-network";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getAuthenticatedProfile, getSupabaseServiceRole } from "@/lib/admin-route-auth";
@@ -5,6 +6,17 @@ import { canAccessTrainerPortal, trimOptionalString } from "@/lib/event-approval
 import type { JsonValue, TrainerProfile, TrainerProfileInsert, TrainerProfileStatus, TrainerProfileUpdate } from "@/lib/supabase/types";
 
 type TrainerProfileBody = Partial<{
+  booking_mode: unknown;
+  level: unknown;
+  background: unknown;
+  interview_quote: unknown;
+  sports: unknown;
+  locations: unknown;
+  travel_areas: unknown;
+  travel_miles: unknown;
+  booking_url: unknown;
+  referral_code: unknown;
+  referral_discount: unknown;
   id: unknown;
   slug: unknown;
   display_name: unknown;
@@ -56,7 +68,7 @@ const sanitizeSessionOptions = (value: unknown): JsonValue => {
 };
 
 const selectProfileColumns =
-  "id,user_id,slug,display_name,headline,bio,sport,location,headshot_url,flyer_url,specialties,session_options,status,created_at,updated_at";
+  "*";
 
 const canManageProfile = (viewerId: string, role: string | null | undefined, trainer: Pick<TrainerProfile, "user_id">) =>
   trainer.user_id === viewerId || role === "admin" || role === "owner";
@@ -98,7 +110,10 @@ export async function GET(req: NextRequest) {
       : Promise.resolve({ data: [], error: null });
 
     const [{ data: slots }, { data: bookings }] = await Promise.all([slotsQuery, bookingsQuery]);
-    return NextResponse.json({ profile, slots: slots ?? [], bookings: bookings ?? [] });
+    const admin = viewer.role === "admin" || viewer.role === "owner";
+    const { data: profiles } = admin ? await supabase.from("trainer_profiles").select("id,display_name").order("display_name") : { data: [] };
+    const { data: earnings } = profile ? await supabase.from("trainer_checkouts").select("id,session_name,session_cents,venue_fee_cents,commission_cents,trainer_cents,paid_at,status,created_at,square_payment_link_id").eq("trainer_id", profile.id).order("created_at", { ascending: false }) : { data: [] };
+    return NextResponse.json({ profile, slots: slots ?? [], bookings: bookings ?? [], profiles: profiles ?? [], earnings: earnings ?? [] });
   } catch {
     return NextResponse.json({ error: "Could not load trainer profile." }, { status: 500 });
   }
@@ -134,7 +149,23 @@ export async function PATCH(req: NextRequest) {
       ? requestedStatus ?? (existing as TrainerProfile | null)?.status ?? "draft"
       : (existing as TrainerProfile | null)?.status ?? "pending_approval";
 
+    const admin = viewer.role === "admin" || viewer.role === "owner";
+    const mode = body.booking_mode === "referral" ? "referral" : body.booking_mode === "network" ? "network" : existing?.booking_mode ?? "network";
+    const bookingUrl = body.booking_url === undefined ? existing?.booking_url : safeBookingUrl(body.booking_url);
+    if (mode === "referral" && !bookingUrl) return NextResponse.json({ error: "Referral partners need a valid HTTPS booking link." }, { status: 400 });
+    const networkFields = {
+      booking_mode: mode,
+      booking_url: bookingUrl ?? null,
+      background: body.background === undefined ? existing?.background ?? "" : textValue(body.background),
+      sports: body.sports === undefined ? existing?.sports ?? [] : stringList(body.sports),
+      locations: body.locations === undefined ? existing?.locations ?? [] : stringList(body.locations),
+      travel_areas: body.travel_areas === undefined ? existing?.travel_areas ?? "" : textValue(body.travel_areas),
+      travel_miles: body.travel_miles === undefined ? existing?.travel_miles ?? null : Number.isFinite(Number(body.travel_miles)) && Number(body.travel_miles) > 0 ? Math.min(200, Number(body.travel_miles)) : null,
+      referral_discount: body.referral_discount === undefined ? existing?.referral_discount ?? "" : textValue(body.referral_discount, 300),
+      ...(admin ? { level: ["Rising", "Collegiate", "Elite"].includes(String(body.level)) ? body.level as "Rising" | "Collegiate" | "Elite" : existing?.level ?? null, interview_quote: body.interview_quote === undefined ? existing?.interview_quote ?? "" : textValue(body.interview_quote), referral_code: body.referral_code === undefined ? existing?.referral_code ?? "" : textValue(body.referral_code, 60) } : {}),
+    };
     const payload = {
+      ...networkFields,
       slug,
       display_name: displayName,
       headline: trimOptionalString(body.headline) ?? "",

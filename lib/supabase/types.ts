@@ -1009,6 +1009,18 @@ export type TrainerAvailabilitySlotStatus = "available" | "held" | "booked" | "c
 export type TrainerBookingStatus = "requested" | "confirmed" | "cancelled" | "completed";
 
 export type TrainerProfile = {
+  booking_mode?: "network" | "referral";
+  level?: "Rising" | "Collegiate" | "Elite" | null;
+  background?: string;
+  interview_quote?: string;
+  sports?: string[];
+  locations?: string[];
+  travel_areas?: string;
+  travel_miles?: number | null;
+  booking_url?: string | null;
+  referral_code?: string;
+  referral_discount?: string;
+
   id: string;
   user_id: string;
   slug: string;
@@ -1027,6 +1039,18 @@ export type TrainerProfile = {
 };
 
 export type TrainerProfileInsert = {
+  booking_mode?: "network" | "referral";
+  level?: "Rising" | "Collegiate" | "Elite" | null;
+  background?: string;
+  interview_quote?: string;
+  sports?: string[];
+  locations?: string[];
+  travel_areas?: string;
+  travel_miles?: number | null;
+  booking_url?: string | null;
+  referral_code?: string;
+  referral_discount?: string;
+
   id?: string;
   user_id: string;
   slug: string;
@@ -1045,6 +1069,18 @@ export type TrainerProfileInsert = {
 };
 
 export type TrainerProfileUpdate = {
+  booking_mode?: "network" | "referral";
+  level?: "Rising" | "Collegiate" | "Elite" | null;
+  background?: string;
+  interview_quote?: string;
+  sports?: string[];
+  locations?: string[];
+  travel_areas?: string;
+  travel_miles?: number | null;
+  booking_url?: string | null;
+  referral_code?: string;
+  referral_discount?: string;
+
   id?: string;
   user_id?: string;
   slug?: string;

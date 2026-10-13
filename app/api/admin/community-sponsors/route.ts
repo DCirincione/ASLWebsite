@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
     }
 
     const current = await readCommunitySponsors();
-    if (placement === "top" && countTopSponsors(current) >= 2) {
-      return NextResponse.json({ error: "Top Sponsors can only contain two sponsors." }, { status: 400 });
+    if (placement === "top" && countTopSponsors(current) >= 3) {
+      return NextResponse.json({ error: "Top Sponsors can contain up to three sponsors." }, { status: 400 });
     }
 
     const sponsor: CommunitySponsor = {
@@ -93,8 +93,8 @@ export async function PUT(req: NextRequest) {
     }
 
     const current = await readCommunitySponsors();
-    if (placement === "top" && countTopSponsors(current, id) >= 2) {
-      return NextResponse.json({ error: "Top Sponsors can only contain two sponsors." }, { status: 400 });
+    if (placement === "top" && countTopSponsors(current, id) >= 3) {
+      return NextResponse.json({ error: "Top Sponsors can contain up to three sponsors." }, { status: 400 });
     }
 
     const next: CommunitySponsor[] = current.map((sponsor) =>
@@ -137,5 +137,27 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ ok: true, sponsors: next });
   } catch {
     return NextResponse.json({ error: "Could not delete sponsor." }, { status: 500 });
+  }
+}
+
+export async function PATCH(req: NextRequest) {
+  try {
+    if (!(await isAdminOrOwner(req))) return NextResponse.json({ error: "Unauthorized." }, { status: 403 });
+    const { placement, ids } = await req.json();
+    if (!["top", "standard"].includes(placement) || !Array.isArray(ids) || ids.some(id => typeof id !== "string") || new Set(ids).size !== ids.length) {
+      return NextResponse.json({ error: "Invalid sponsor order." }, { status: 400 });
+    }
+    const current = await readCommunitySponsors();
+    const group = current.filter(sponsor => sponsor.placement === placement);
+    const byId = new Map(group.map(sponsor => [sponsor.id, sponsor]));
+    if (ids.length !== group.length || ids.some(id => !byId.has(id))) {
+      return NextResponse.json({ error: "The sponsor list changed. Refresh and try again." }, { status: 409 });
+    }
+    let index = 0;
+    const next = current.map(sponsor => sponsor.placement === placement ? byId.get(ids[index++])! : sponsor);
+    await writeCommunitySponsors(next);
+    return NextResponse.json({ sponsors: next });
+  } catch {
+    return NextResponse.json({ error: "Could not save sponsor order." }, { status: 500 });
   }
 }

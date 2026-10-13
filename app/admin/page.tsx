@@ -4,7 +4,7 @@ import "./admin.css";
 import "../account/account.css";
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from "react";
 
 import { AccessibilityControls } from "@/components/accessibility-controls";
 import { HistoryBackButton } from "@/components/history-back-button";
@@ -698,6 +698,11 @@ export default function AdminPage() {
   const [sportsStatus, setSportsStatus] = useState<FormStatus>({ type: "idle" });
   const [communityStatus, setCommunityStatus] = useState<FormStatus>({ type: "idle" });
   const [communityContentStatus, setCommunityContentStatus] = useState<FormStatus>({ type: "idle" });
+  const [draggedSponsor, setDraggedSponsor] = useState<string | null>(null);
+  const [sponsorDropTarget, setSponsorDropTarget] = useState<string | null>(null);
+  const sponsorSaveQueue = useRef<Promise<void>>(Promise.resolve());
+  const sponsorOrderRevision = useRef(0);
+  const [sponsorOrderSaving, setSponsorOrderSaving] = useState(false);
   const [communitySponsorsStatus, setCommunitySponsorsStatus] = useState<FormStatus>({ type: "idle" });
   const [siteSettingsStatus, setSiteSettingsStatus] = useState<FormStatus>({ type: "idle" });
   const [homeEventsSettingsStatus, setHomeEventsSettingsStatus] = useState<FormStatus>({ type: "idle" });
@@ -3513,6 +3518,42 @@ export default function AdminPage() {
     setExpandedCommunitySponsorCards((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  const reorderSponsor = async (sourceId: string, targetId: string) => {
+    if (sourceId === targetId) return;
+    const source = communitySponsors.find(item => item.id === sourceId);
+    const target = communitySponsors.find(item => item.id === targetId);
+    if (!source || !target || source.placement !== target.placement) return;
+    const ids = communitySponsors.filter(item => item.placement === source.placement).map(item => item.id);
+    const from = ids.indexOf(sourceId), to = ids.indexOf(targetId);
+    ids.splice(from, 1); ids.splice(to, 0, sourceId);
+    const byId = new Map(communitySponsors.map(item => [item.id, item]));
+    let position = 0;
+    setCommunitySponsors(communitySponsors.map(item => item.placement === source.placement ? byId.get(ids[position++])! : item));
+    setDraggedSponsor(null);
+    const revision = ++sponsorOrderRevision.current;
+    setSponsorOrderSaving(true);
+    sponsorSaveQueue.current = sponsorSaveQueue.current.then(async () => {
+    try {
+      const token = await getAccessToken();
+      if (!token) throw new Error("Sign in again to continue.");
+      const response = await fetch("/api/admin/community-sponsors", {
+        method: "PATCH",
+        headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+        body: JSON.stringify({ placement: source.placement, ids }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || "Could not save sponsor order.");
+      if (revision === sponsorOrderRevision.current) setCommunitySponsorsStatus({ type: "success", message: "Sponsor order saved." });
+    } catch (error) {
+      if (revision === sponsorOrderRevision.current) {
+        setCommunitySponsorsStatus({ type: "error", message: error instanceof Error ? error.message : "Could not save sponsor order." });
+        await loadCommunitySponsors();
+      }
+    } finally { if (revision === sponsorOrderRevision.current) setSponsorOrderSaving(false); }
+    });
+    await sponsorSaveQueue.current;
+  };
+
   const countTopSponsors = (excludedId?: string) =>
     communitySponsors.filter((sponsor) => sponsor.placement === "top" && sponsor.id !== excludedId).length;
 
@@ -3744,8 +3785,8 @@ export default function AdminPage() {
       setCommunitySponsorsStatus({ type: "error", message: "Business name, description, and image are required." });
       return;
     }
-    if (communitySponsorForm.placement === "top" && countTopSponsors() >= 2) {
-      setCommunitySponsorsStatus({ type: "error", message: "Top Sponsors can only contain two sponsors." });
+    if (communitySponsorForm.placement === "top" && countTopSponsors() >= 3) {
+      setCommunitySponsorsStatus({ type: "error", message: "Top Sponsors can contain up to three sponsors." });
       return;
     }
 
@@ -3805,8 +3846,8 @@ export default function AdminPage() {
       setCommunitySponsorsStatus({ type: "error", message: "Business name, description, and image are required." });
       return;
     }
-    if (communitySponsorEditForm.placement === "top" && countTopSponsors(id) >= 2) {
-      setCommunitySponsorsStatus({ type: "error", message: "Top Sponsors can only contain two sponsors." });
+    if (communitySponsorEditForm.placement === "top" && countTopSponsors(id) >= 3) {
+      setCommunitySponsorsStatus({ type: "error", message: "Top Sponsors can contain up to three sponsors." });
       return;
     }
 
@@ -6501,7 +6542,7 @@ export default function AdminPage() {
                               </option>
                             ))}
                           </select>
-                          <p className="form-help muted">Top Sponsors is limited to two sponsors and powers the split layout on the Community page.</p>
+                          <p className="form-help muted">Choose up to three Top Sponsors for the premium row on the Community page.</p>
                         </div>
                       </div>
                       <div className="form-control">
@@ -6576,7 +6617,7 @@ export default function AdminPage() {
                   <div className="account-card__header">
                     <div>
                       <h2>Current Sponsors</h2>
-                      <p className="muted">These sponsor cards are loaded from the local community sponsors source file.</p>
+                      <p className="muted">Drag the reorder handle within each section to change the display order. You can also use the arrow buttons.</p>
                     </div>
                     <button
                       className="button ghost"
@@ -6587,19 +6628,30 @@ export default function AdminPage() {
                       {loadingCommunitySponsors ? "Refreshing..." : "Refresh"}
                     </button>
                   </div>
+                  <p role="status" className={communitySponsorsStatus.type === "error" ? "form-help error" : "form-help muted"}>{sponsorOrderSaving ? "Saving sponsor order…" : communitySponsorsStatus.message}</p>
                   {loadingCommunitySponsors ? <p className="muted">Loading sponsors...</p> : null}
                   {!loadingCommunitySponsors && communitySponsors.length === 0 ? (
                     <p className="muted">No sponsors found.</p>
                   ) : null}
                   {!loadingCommunitySponsors && communitySponsors.length > 0 ? (
                     <div className="event-list admin-scroll-panel">
-                      {communitySponsors.map((sponsor) => {
+                      {(["top", "standard"] as const).map(placement => <section key={placement} aria-label={placement === "top" ? "Top Sponsors" : "Other Sponsors"}>
+                      <h3>{placement === "top" ? "Top Sponsors" : "Other Sponsors"}</h3>
+                      {!communitySponsors.some(sponsor => sponsor.placement === placement) && <p className="muted">No sponsors in this section.</p>}
+                      {communitySponsors.filter(sponsor => sponsor.placement === placement).map((sponsor, index, group) => {
                         const isExpanded = expandedCommunitySponsorCards[sponsor.id] || editingSponsorId === sponsor.id;
 
                         return (
-                          <article key={sponsor.id} className="event-card-simple">
+                          <article key={sponsor.id} data-sponsor-id={sponsor.id} className="event-card-simple" style={{ marginBottom: 12, outline: sponsorDropTarget === sponsor.id ? "2px solid var(--accent)" : undefined, opacity: draggedSponsor === sponsor.id ? 0.65 : 1 }}>
                             <div className="event-card__header">
-                              <h3>{sponsor.name}</h3>
+                              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                                <h3 style={{ margin: 0 }}>{sponsor.name}</h3>
+                                <div style={{ display: "flex", gap: 4 }}>
+                              <button type="button" className="button ghost" aria-label={`Drag to reorder ${sponsor.name}`} style={{ cursor: draggedSponsor === sponsor.id ? "grabbing" : "grab", padding: "6px 10px", touchAction: "none", userSelect: "none" }} onPointerDown={event => { if (event.button !== 0) return; event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId); setDraggedSponsor(sponsor.id); }} onPointerMove={event => { if (!event.currentTarget.hasPointerCapture(event.pointerId)) return; const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-sponsor-id]")?.dataset.sponsorId; setSponsorDropTarget(target && group.some(item => item.id === target) ? target : null); }} onPointerUp={event => { if (!event.currentTarget.hasPointerCapture(event.pointerId)) return; setSponsorDropTarget(null); event.currentTarget.releasePointerCapture(event.pointerId); const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-sponsor-id]")?.dataset.sponsorId; setDraggedSponsor(null); if (target) void reorderSponsor(sponsor.id, target); }} onPointerCancel={() => { setDraggedSponsor(null); setSponsorDropTarget(null); }}>⠿</button>
+                              <button type="button" className="button ghost" style={{ padding: "6px 10px" }} aria-label={`Move ${sponsor.name} earlier`} disabled={index === 0} onClick={() => void reorderSponsor(sponsor.id, group[index - 1].id)}>↑</button>
+                              <button type="button" className="button ghost" style={{ padding: "6px 10px" }} aria-label={`Move ${sponsor.name} later`} disabled={index === group.length - 1} onClick={() => void reorderSponsor(sponsor.id, group[index + 1].id)}>↓</button>
+                                </div>
+                              </div>
                               {editingSponsorId !== sponsor.id ? (
                                 <button
                                   className="button ghost"
@@ -6702,7 +6754,7 @@ export default function AdminPage() {
                                       </option>
                                     ))}
                                   </select>
-                                  <p className="form-help muted">Top Sponsors is limited to two sponsors and powers the split layout on the Community page.</p>
+                                  <p className="form-help muted">Choose up to three Top Sponsors for the premium row on the Community page.</p>
                                 </div>
                               </div>
                               <div className="form-control">
@@ -6777,6 +6829,7 @@ export default function AdminPage() {
                           </article>
                         );
                       })}
+                      </section>)}
                     </div>
                   ) : null}
                 </section>

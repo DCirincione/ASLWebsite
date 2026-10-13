@@ -29,7 +29,7 @@ export function SiteFooter() {
   const [profileRole, setProfileRole] = useState<Profile["role"] | null>(null);
   const footerResources = [
     ...resources,
-    ...(canAccessTrainerPortal(profileRole) ? [{ href: "/training", label: "Training Portal" }] : []),
+    ...(canAccessTrainerPortal(profileRole) ? [{ href: "/training", label: "Trainer Hub" }] : []),
     ...(canAccessRefPortal(profileRole) ? [{ href: "/ref-portal", label: "Ref Portal" }] : []),
   ];
 

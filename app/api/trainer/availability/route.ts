@@ -5,6 +5,8 @@ import { canAccessTrainerPortal } from "@/lib/event-approval";
 import type { TrainerProfile } from "@/lib/supabase/types";
 
 type AvailabilityBody = Partial<{
+  location: unknown;
+  venueFeeCents: unknown;
   trainerId: unknown;
   startsAt: unknown;
   endsAt: unknown;
@@ -50,9 +52,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden." }, { status: 403 });
     }
 
+    if (startDate <= new Date()) return NextResponse.json({ error: "Choose a future time." }, { status: 400 });
+    const fee = Number(body.venueFeeCents ?? 0);
+    const admin = viewer.role === "admin" || viewer.role === "owner";
+    if (!Number.isSafeInteger(fee) || fee < 0 || (fee > 0 && !admin)) return NextResponse.json({ error: "Venue fees must be set by an admin." }, { status: 400 });
     const { data, error } = await supabase
       .from("trainer_availability_slots")
       .insert({
+        location: trimString(body.location),
+        venue_fee_cents: fee,
         trainer_id: trainerId,
         starts_at: startDate.toISOString(),
         ends_at: endDate.toISOString(),
@@ -107,6 +115,7 @@ export async function PATCH(req: NextRequest) {
       .from("trainer_availability_slots")
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", slotId)
+      .in("status", ["available", "cancelled"])
       .select("*")
       .maybeSingle();
 

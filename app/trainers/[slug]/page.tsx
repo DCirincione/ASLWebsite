@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 
 import { getPublicTrainerBySlug, getPublicTrainers } from "@/lib/trainers";
 
-import TrainerPageClient from "./page-client";
+import TrainersNetwork from "../network";
 
 import "./trainer.css";
+import "../network.css";
 
 type TrainerPageProps = {
   params: Promise<{ slug: string }>;
@@ -39,5 +40,5 @@ export default async function TrainerPage({ params }: TrainerPageProps) {
     notFound();
   }
 
-  return <TrainerPageClient trainer={trainer} />;
+  return <TrainersNetwork trainers={[trainer]} sports={trainer.network.sports ?? [trainer.sport]} initialTrainer={trainer} />;
 }

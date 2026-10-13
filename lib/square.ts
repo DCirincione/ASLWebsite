@@ -148,6 +148,25 @@ export const createSquarePaymentLink = async (body: Record<string, unknown>) => 
   >("/v2/online-checkout/payment-links", body, "Could not create the Square checkout link.");
 };
 
+export const readSquarePayment = async (id: string) => {
+  const response = await fetch(`${getSquareApiBaseUrl()}/v2/payments/${encodeURIComponent(id)}`, { headers: getSquareHeaders(), cache: "no-store" });
+  const json = await response.json();
+  if (!response.ok || !json.payment) throw new Error("Could not verify Square payment.");
+  return json.payment as { id: string; status: string; order_id: string; amount_money?: { amount: number; currency: string } };
+};
+
+export const deleteSquarePaymentLink = async (id: string) => {
+  const response = await fetch(`${getSquareApiBaseUrl()}/v2/online-checkout/payment-links/${encodeURIComponent(id)}`, { method: "DELETE", headers: getSquareHeaders() });
+  if (!response.ok && response.status !== 404) throw new Error("Could not close checkout link.");
+};
+
+export const readSquareOrderState = async (id: string) => {
+  const response = await fetch(`${getSquareApiBaseUrl()}/v2/orders/${encodeURIComponent(id)}`, { headers: getSquareHeaders(), cache: "no-store" });
+  const json = await response.json();
+  if (!response.ok || !json.order) throw new Error("Could not verify Square order.");
+  return json.order.state as string;
+};
+
 export const createSquareCustomer = async (body: Record<string, unknown>) =>
   squareFetch<{ customer?: SquareCustomer }>("/v2/customers", body, "Could not create the Square customer.");
 
